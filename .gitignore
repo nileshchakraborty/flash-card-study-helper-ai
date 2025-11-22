@@ -1,0 +1,10 @@
+node_modules/
+uploads/
+cache/
+*.log
+.DS_Store
+.env
+dist/
+build/
+.env
+.idea/

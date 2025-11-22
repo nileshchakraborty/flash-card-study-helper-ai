@@ -1,9 +1,54 @@
 {
-  "name": "flash-card-study-helper-ai",
+  "name": "mindflip-ai",
   "version": "1.0.0",
-  "type": "commonjs",
+  "description": "AI-powered flash card study helper with swipeable cards, file uploads, and quiz functionality",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "demo": "node main.js"
+    "clean": "rm -rf dist public/dist",
+    "clean:backend": "rm -rf dist",
+    "clean:frontend": "rm -rf public/dist",
+    "prebuild": "npm run clean:backend",
+    "build": "tsc -p tsconfig.build.json",
+    "prebuild:frontend": "npm run clean:frontend",
+    "build:frontend": "tsc -p tsconfig.frontend.json",
+    "build:all": "npm run clean && npm run build && npm run build:frontend",
+    "start": "npm run clean && npm run build:all && node --loader ts-node/esm src/index.ts",
+    "serve": "node dist/index.js",
+    "dev": "npm run build:frontend && node --loader ts-node/esm src/index.ts",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.config.cjs"
+  },
+  "keywords": [
+    "flashcards",
+    "study",
+    "ai",
+    "education",
+    "learning"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "pdf-parse": "^1.1.4",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jest": "^30.0.0",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
