@@ -1,87 +1,49 @@
 /**
- * Flash Card Study Helper
+ * Flash Card Study Helper (runtime JS)
  * Provides utilities to build flashcard decks, generate study plans, and create quizzes.
  */
 
-type Topic = string;
-
-type CardId = string;
-
-type UploadedResource = {
-  name: string;
-  mimeType: string;
-  content: string; // Plaintext extracted from PDF/Images (simulated for this CLI example)
-};
-
-interface FlashCard {
-  id: CardId;
-  question: string;
-  answer: string;
-  tags: string[];
-}
-
-interface StudyPlanEntry {
-  day: number;
-  objectives: string[];
-  flashcards: CardId[];
-  quizSize: number;
-}
-
-interface StudyPlan {
-  topic: Topic;
-  durationDays: number;
-  entries: StudyPlanEntry[];
-}
-
-interface QuizAnswer {
-  cardId: CardId;
-  response: string;
-}
-
-interface QuizResult {
-  cardId: CardId;
-  correct: boolean;
-  expected: string;
-  response: string;
-}
-
 class FlashCardDeck {
-  private cards: FlashCard[] = [];
-
-  constructor(initialCards: FlashCard[] = []) {
+  constructor(initialCards = []) {
     this.cards = [...initialCards];
   }
 
-  addCard(card: FlashCard): void {
+  addCard(card) {
     this.cards.push(card);
   }
 
-  addCards(cards: FlashCard[]): void {
+  addCards(cards) {
     this.cards.push(...cards);
   }
 
-  findByTag(tag: string): FlashCard[] {
+  removeById(cardId) {
+    this.cards = this.cards.filter((card) => card.id !== cardId);
+  }
+
+  findByTag(tag) {
     return this.cards.filter((card) => card.tags.includes(tag));
   }
 
-  sample(size: number): FlashCard[] {
+  sample(size) {
     const shuffled = [...this.cards].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, Math.min(size, shuffled.length));
   }
 
-  getAll(): FlashCard[] {
+  getAll() {
     return [...this.cards];
   }
 }
 
 class StudyPlanGenerator {
-  constructor(private deck: FlashCardDeck) {}
+  constructor(deck) {
+    this.deck = deck;
+  }
 
-  createPlan(topic: Topic, durationDays = 5): StudyPlan {
+  createPlan(topic, durationDays = 5) {
     const cards = this.deck.getAll();
     const dailyQuota = Math.max(1, Math.ceil(cards.length / durationDays));
 
-    const entries: StudyPlanEntry[] = Array.from({ length: durationDays }, (_, idx) => {
+    const entries = Array.from({ length: durationDays }, (_, idx) => {
       const day = idx + 1;
       const dayCards = cards.slice(idx * dailyQuota, (idx + 1) * dailyQuota);
       return {
@@ -99,7 +61,7 @@ class StudyPlanGenerator {
     };
   }
 
-  private buildObjectives(topic: Topic, day: number, cardCount: number): string[] {
+  buildObjectives(topic, day, cardCount) {
     const focus = day === 1 ? "core definitions" : day === 2 ? "applications" : "mixed review";
     return [
       `Review ${cardCount} flashcards on ${topic}`,
@@ -110,13 +72,15 @@ class StudyPlanGenerator {
 }
 
 class QuizEngine {
-  constructor(private deck: FlashCardDeck) {}
+  constructor(deck) {
+    this.deck = deck;
+  }
 
-  generateQuiz(size = 5): FlashCard[] {
+  generateQuiz(size = 5) {
     return this.deck.sample(size);
   }
 
-  gradeQuiz(answers: QuizAnswer[]): QuizResult[] {
+  gradeQuiz(answers) {
     const cards = this.deck.getAll();
     return answers.map((answer) => {
       const card = cards.find((c) => c.id === answer.cardId);
@@ -136,14 +100,14 @@ class QuizEngine {
 }
 
 class ResourceToFlashCardConverter {
-  private static sentenceDelimiters = /[.!?]/g;
+  constructor(topic) {
+    this.topic = topic;
+  }
 
-  constructor(private topic: Topic) {}
-
-  convert(resource: UploadedResource): FlashCard[] {
+  convert(resource) {
     const baseId = resource.name.replace(/\W+/g, "-").toLowerCase();
     const sentences = resource.content
-      .split(ResourceToFlashCardConverter.sentenceDelimiters)
+      .split(/[.!?]/g)
       .map((s) => s.trim())
       .filter(Boolean);
 
@@ -159,7 +123,7 @@ class ResourceToFlashCardConverter {
     });
   }
 
-  private buildQuestion(sentence: string, idx: number): string {
+  buildQuestion(sentence, idx) {
     const snippet = sentence.length > 80 ? `${sentence.slice(0, 77)}...` : sentence;
     return `Q${idx + 1}: What does this statement refer to? ${snippet}`;
   }
@@ -167,7 +131,7 @@ class ResourceToFlashCardConverter {
 
 function demo() {
   const topic = "Neural Networks";
-  const uploadedResources: UploadedResource[] = [
+  const uploadedResources = [
     {
       name: "intro.pdf",
       mimeType: "application/pdf",
@@ -197,14 +161,18 @@ function demo() {
   console.log("Study Plan:\n", JSON.stringify(plan, null, 2));
   console.log("\nSample Quiz Questions:\n", quiz.map((card) => card.question));
 
-  const sampleAnswers: QuizAnswer[] = quiz.map((card) => ({ cardId: card.id, response: card.answer }));
+  const sampleAnswers = quiz.map((card) => ({ cardId: card.id, response: card.answer }));
   const results = quizEngine.gradeQuiz(sampleAnswers);
   console.log("\nQuiz Results:\n", results);
 }
 
-// Run demo when executed directly
 if (require.main === module) {
   demo();
 }
 
-export { FlashCardDeck, StudyPlanGenerator, QuizEngine, ResourceToFlashCardConverter, FlashCard, StudyPlan, StudyPlanEntry };
+module.exports = {
+  FlashCardDeck,
+  StudyPlanGenerator,
+  QuizEngine,
+  ResourceToFlashCardConverter,
+};
