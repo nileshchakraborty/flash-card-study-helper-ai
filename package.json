@@ -1,0 +1,9 @@
+{
+  "name": "flash-card-study-helper-ai",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node main.js"
+  }
+}

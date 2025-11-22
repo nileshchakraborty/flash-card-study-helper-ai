@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flash Card Study Helper</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Study helper demo</p>
+        <h1>Swipe flashcards to drive your revision plan</h1>
+        <p class="lede">
+          Swipe right to mark a card as learned. Swipe left to send it back to the deck
+          for more practice. Recreate a study plan at any time based on your swipes.
+        </p>
+      </div>
+      <div class="stats">
+        <div class="pill">Left swipes (review): <span id="left-count">0</span></div>
+        <div class="pill">Right swipes (mastered): <span id="right-count">0</span></div>
+        <div class="pill">Cards remaining: <span id="cards-remaining">0</span></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="deck-panel">
+        <div id="card-stack" class="card-stack" aria-live="polite"></div>
+        <div class="card-controls" aria-label="Card actions">
+          <button id="revise-btn" type="button" aria-label="Send card back to deck">Revise</button>
+          <button id="next-btn" type="button" aria-label="Mark card as mastered">Next</button>
+        </div>
+        <div class="hint">Swipe on mobile. On desktop, click Revise (left) or Next (right).</div>
+      </section>
+
+      <aside class="plan-panel">
+        <div class="panel-header">
+          <h2>Revision plan</h2>
+          <button id="rebuild-plan" type="button">Recreate from swipes</button>
+        </div>
+        <div id="plan-output" class="plan-output">Swipe to update the plan.</div>
+      </aside>
+    </main>
+
+    <template id="card-template">
+      <article class="card" tabindex="0">
+        <div class="card-content">
+          <p class="card-question"></p>
+          <div class="card-answer" hidden>
+            <div class="answer-label">Answer</div>
+            <p></p>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="show-answer" type="button">Show answer</button>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
