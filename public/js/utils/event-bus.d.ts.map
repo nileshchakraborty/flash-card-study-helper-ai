@@ -1,0 +1,1 @@
+{"version":3,"file":"event-bus.d.ts","sourceRoot":"","sources":["event-bus.ts"],"names":[],"mappings":"AAAA,cAAM,QAAQ;IACZ,OAAO,CAAC,SAAS,CAAkC;;IAKnD,EAAE,CAAC,KAAK,KAAA,EAAE,QAAQ,KAAA;IAQlB,GAAG,CAAC,KAAK,KAAA,EAAE,QAAQ,KAAA;IAKnB,IAAI,CAAC,KAAK,KAAA,EAAE,IAAI,KAAA;CAIjB;AAED,eAAO,MAAM,QAAQ,UAAiB,CAAC"}

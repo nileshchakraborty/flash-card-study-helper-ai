@@ -1,0 +1,162 @@
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import type { StudyUseCase } from '../../../core/ports/interfaces.js';
+
+export class ExpressServer {
+  private app: express.Application;
+  private upload: multer.Multer;
+
+  constructor(private studyService: StudyUseCase) {
+    this.app = express();
+    this.upload = multer({ storage: multer.memoryStorage() });
+    this.setupMiddleware();
+    this.setupRoutes();
+  }
+
+  private setupMiddleware() {
+    this.app.use(cors());
+    this.app.use(express.json());
+    this.app.use(express.static('public'));
+  }
+
+  private setupRoutes() {
+    // Flashcards
+    this.app.post('/api/generate', async (req, res) => {
+      try {
+        const { topic, count } = req.body;
+        const cards = await this.studyService.generateFlashcards(topic, count || 10);
+        res.json({ success: true, cards });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/upload', this.upload.single('file'), async (req, res) => {
+      try {
+        const file = req.file;
+        const topic = req.body.topic || 'General';
+        if (!file) throw new Error('No file uploaded');
+
+        const cards = await this.studyService.processFile(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+          topic
+        );
+        res.json({ success: true, cards });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/brief-answer', async (req, res) => {
+      try {
+        const { question, context } = req.body;
+        const answer = await this.studyService.getBriefAnswer(question, context);
+        res.json({ success: true, briefAnswer: answer });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Initial flashcards load
+    this.app.get('/api/flashcards', async (req, res) => {
+      try {
+        // Return empty array initially - cards are loaded from history
+        res.json({ cards: [] });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Quiz
+    this.app.post('/api/quiz', async (req, res) => {
+      try {
+        const { cards, topic } = req.body;
+        // Generate quiz questions from provided cards
+        const questions = cards.slice(0, Math.min(cards.length, 10)).map((card: any, index: number) => ({
+          id: `q${index + 1}`,
+          cardId: card.id,
+          question: card.front,
+          correctAnswer: card.back,
+          options: [card.back] // In real app, would generate distractors
+        }));
+        res.json({ questions });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/quiz/generate-advanced', async (req, res) => {
+      try {
+        const { previousResults, mode } = req.body;
+        const quiz = await this.studyService.generateAdvancedQuiz(previousResults, mode);
+        res.json({ success: true, quiz });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/quiz/history', async (req, res) => {
+      try {
+        const history = await this.studyService.getQuizHistory();
+        res.json({ history });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/quiz/history', async (req, res) => {
+      try {
+        const result = req.body;
+        result.timestamp = Date.now();
+        result.id = `quiz-${Date.now()}`;
+        await this.studyService.saveQuizResult(result);
+        res.json({ success: true, id: result.id });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Decks (History)
+    this.app.get('/api/decks', async (req, res) => {
+      try {
+        const history = await this.studyService.getDeckHistory();
+        res.json({ history });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/decks', async (req, res) => {
+      try {
+        const deck = req.body;
+        deck.timestamp = Date.now();
+        deck.id = `deck-${Date.now()}`;
+        await this.studyService.saveDeck(deck);
+        res.json({ success: true, id: deck.id });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Swipe tracking (optional analytics)
+    this.app.post('/api/swipe', async (req, res) => {
+      try {
+        // Optional: Track swipes for analytics
+        // For now, just acknowledge
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+  }
+
+  public start(port: number) {
+    this.app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  }
+}
