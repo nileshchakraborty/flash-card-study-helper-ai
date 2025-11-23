@@ -25,9 +25,9 @@ export class ExpressServer {
     // Flashcards
     this.app.post('/api/generate', async (req, res) => {
       try {
-        const { topic, count } = req.body;
-        const cards = await this.studyService.generateFlashcards(topic, count || 10);
-        res.json({ success: true, cards });
+        const { topic, count, mode, parentTopic } = req.body;
+        const result = await this.studyService.generateFlashcards(topic, count || 10, mode, parentTopic);
+        res.json({ success: true, cards: result.cards, recommendedTopics: result.recommendedTopics });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }

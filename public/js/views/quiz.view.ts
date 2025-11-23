@@ -177,24 +177,41 @@ export class QuizView extends BaseView {
     let message = '';
     let actionButtons = '';
 
-    if (passed) {
-      message = "Excellent work! You've mastered this.";
+    if (percentage === 100) {
+      message = "Perfect score! You're a master of this topic.";
       actionButtons = `
                 <button id="btn-quiz-harder" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">psychology</span>
-                    Make Harder Quiz
+                    Try Harder Questions Quiz
                 </button>
                 <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
                     Retry Quiz
                 </button>
             `;
-    } else {
-      message = "Keep studying! You'll get there.";
+    } else if (percentage < 80) {
+      message = "Keep practicing! Review the flashcards to improve.";
       actionButtons = `
+                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all mb-3 flex items-center justify-center gap-2">
+                    <span class="material-icons">refresh</span>
+                    Retry Quiz
+                </button>
                 <button id="btn-quiz-revise" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">school</span>
                     Revise Flashcards
+                </button>
+            `;
+    } else {
+      // 80-99%
+      message = "Great job! You're doing well.";
+      actionButtons = `
+                <button id="btn-quiz-harder" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all mb-3 flex items-center justify-center gap-2">
+                    <span class="material-icons">psychology</span>
+                    Try Harder Questions Quiz
+                </button>
+                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
+                    <span class="material-icons">refresh</span>
+                    Retry Quiz
                 </button>
             `;
     }

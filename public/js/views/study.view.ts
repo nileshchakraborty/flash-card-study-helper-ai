@@ -32,6 +32,7 @@ export class StudyView extends BaseView {
     // Button controls - map to actual HTML buttons
     const reviseBtn = this.getElement('#revise-btn');
     const nextBtn = this.getElement('#next-btn');
+    const quizBtn = this.getElement('#study-quiz-btn');
 
     if (reviseBtn) {
       this.bind(reviseBtn, 'click', () => {
@@ -47,6 +48,15 @@ export class StudyView extends BaseView {
         if (card && card.id !== 'demo') {
           deckModel.recordSwipe('right');
           deckModel.nextCard();
+        }
+      });
+    }
+    if (quizBtn) {
+      this.bind(quizBtn, 'click', () => {
+        const card = deckModel.getCurrentCard();
+        if (card && card.id !== 'demo') {
+          // Start quiz with current cards
+          eventBus.emit('quiz:request-start', { count: 5, topic: deckModel.currentTopic });
         }
       });
     }
@@ -75,17 +85,20 @@ export class StudyView extends BaseView {
   renderCard(card) {
     if (!this.elements.stack) return;
 
+    // Ensure nav buttons are visible when rendering a card
+    const reviseBtn = this.getElement('#revise-btn');
+    const nextBtn = this.getElement('#next-btn');
+    const quizBtn = this.getElement('#study-quiz-btn');
+
+    if (reviseBtn) reviseBtn.classList.remove('hidden');
+    if (nextBtn) nextBtn.classList.remove('hidden');
+    if (quizBtn) quizBtn.classList.remove('hidden');
+
     this.elements.stack.innerHTML = '';
 
     if (!card) {
-      this.elements.stack.innerHTML = `
-        <div class="text-center p-8 text-gray-500">
-          <p class="text-xl mb-4">All caught up!</p>
-          <button onclick="document.querySelector('[data-tab=\\'generate\\']').click()" class="text-primary hover:underline">
-            Generate more cards
-          </button>
-        </div>
-      `;
+      // Should be handled by showCompletion, but just in case
+      this.showCompletion();
       return;
     }
 
@@ -147,6 +160,15 @@ export class StudyView extends BaseView {
   showCompletion() {
     if (!this.elements.stack) return;
 
+    // Hide nav buttons
+    const reviseBtn = this.getElement('#revise-btn');
+    const nextBtn = this.getElement('#next-btn');
+    const quizBtn = this.getElement('#study-quiz-btn');
+
+    if (reviseBtn) reviseBtn.classList.add('hidden');
+    if (nextBtn) nextBtn.classList.add('hidden');
+    if (quizBtn) quizBtn.classList.add('hidden');
+
     // Trigger confetti
     // @ts-ignore
     if (typeof confetti === 'function') {
@@ -170,15 +192,33 @@ export class StudyView extends BaseView {
             <p class="text-gray-600 mb-8">You've completed this deck.</p>
             
             <div class="space-y-4">
-                <button id="harder-btn" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg">
-                    <span class="material-icons">psychology</span>
-                    Move to Harder Flashcards
-                </button>
-                
-                <button id="review-btn" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
+                <button id="revise-deck-btn" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
-                    Select Flashcards to Learn Again
+                    Revise Flashcards
                 </button>
+
+                <button id="take-quiz-btn" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-md">
+                    <span class="material-icons">quiz</span>
+                    Take Quiz
+                </button>
+
+                <div class="pt-4 border-t border-gray-100 mt-4">
+                    <p class="text-sm text-gray-500 mb-3">Ready for a challenge?</p>
+                    <div class="flex gap-2 mb-2 justify-center">
+                        <label class="inline-flex items-center">
+                            <input type="radio" class="form-radio text-primary" name="difficulty" value="basics" checked>
+                            <span class="ml-2 text-sm text-gray-700">Basics</span>
+                        </label>
+                        <label class="inline-flex items-center ml-4">
+                            <input type="radio" class="form-radio text-primary" name="difficulty" value="deep-dive">
+                            <span class="ml-2 text-sm text-gray-700">Deep Dive</span>
+                        </label>
+                    </div>
+                    <button id="harder-btn" class="w-full bg-gray-800 text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg">
+                        <span class="material-icons">psychology</span>
+                        Move to Harder Questions
+                    </button>
+                </div>
             </div>
         `;
 
@@ -186,17 +226,25 @@ export class StudyView extends BaseView {
 
     // Bind events for new buttons
     const harderBtn = completionCard.querySelector('#harder-btn');
-    const reviewBtn = completionCard.querySelector('#review-btn');
+    const reviseDeckBtn = completionCard.querySelector('#revise-deck-btn');
+    const takeQuizBtn = completionCard.querySelector('#take-quiz-btn');
 
     if (harderBtn) {
       harderBtn.addEventListener('click', () => {
-        eventBus.emit('deck:harder', null);
+        const difficulty = (completionCard.querySelector('input[name="difficulty"]:checked') as HTMLInputElement)?.value || 'basics';
+        eventBus.emit('deck:harder', { difficulty });
       });
     }
 
-    if (reviewBtn) {
-      reviewBtn.addEventListener('click', () => {
+    if (reviseDeckBtn) {
+      reviseDeckBtn.addEventListener('click', () => {
         eventBus.emit('deck:review', null);
+      });
+    }
+
+    if (takeQuizBtn) {
+      takeQuizBtn.addEventListener('click', () => {
+        eventBus.emit('quiz:request-start', { count: 5, topic: deckModel.currentTopic });
       });
     }
   }
