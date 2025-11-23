@@ -152,6 +152,11 @@ export class ExpressServer {
         res.status(500).json({ error: error.message });
       }
     });
+
+    // Serve index.html for all other routes (SPA)
+    this.app.get('*', (req, res) => {
+      res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+    });
   }
 
   public start(port: number) {
