@@ -1,6 +1,5 @@
 {
     "buildCommand": "npm run build:all",
     "outputDirectory": "public",
-    "installCommand": "npm install",
-    "framework": null
+    "installCommand": "npm install"
 }
