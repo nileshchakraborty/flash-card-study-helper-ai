@@ -74,7 +74,7 @@ export class GeneratorView extends BaseView {
       let cards = [];
 
       if (useBrowser) {
-        // Use LLM Orchestrator
+        // Use LLM Orchestrator with WebLLMGenerator
         const orchestrator = (window as any).llmOrchestrator;
         if (!orchestrator) {
           throw new Error('LLM Orchestrator not initialized');
@@ -85,53 +85,19 @@ export class GeneratorView extends BaseView {
           const { config } = orchestrator.getRecommendedStrategy();
           await orchestrator.loadModel(config, (progress, message) => {
             console.log(`Loading model: ${Math.round(progress * 100)}% - ${message}`);
-            // Optional: Update UI with progress
           });
         }
 
-        const prompt = `You are a helpful study assistant creating educational flashcards. You create QUESTIONS and ANSWERS, NOT code examples.
+        // Use WebLLMGenerator for full flow (same as backend)
+        const { WebLLMGenerator } = await import('../services/WebLLMGenerator.js');
+        const generator = new WebLLMGenerator(orchestrator);
 
-⚠️ CRITICAL RULES - FOLLOW EXACTLY:
-1. Each flashcard = ONE question + ONE answer
-2. Questions must be complete sentences ending with "?"
-3. Answers must be 1-3 sentence explanations in plain English
-4. NEVER include code snippets, variable names, or syntax in questions
-5. NEVER copy/paste code as answers
-6. Ask ABOUT concepts, not show code
+        // Get knowledge source from ConfigurationService
+        const { ConfigurationService } = await import('../services/ConfigurationService.js');
+        const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
-✅ GOOD EXAMPLES:
-Q: "What does the append() method do in Python?"
-A: "The append() method adds a single element to the end of a list. It modifies the list in-place and returns None."
-
-Q: "How do you open and read a file safely in Python?"
-A: "Use the 'with open(filename, mode) as f:' statement. This automatically closes the file even if errors occur."
-
-❌ BAD EXAMPLES (DO NOT DO THIS):
-Q: "_list = []"
-A: "# create our list..."
-
-Q: "with open(txt_file_path, 'r') as f:"
-A: "for line in f: if ':' in line: ..."
-
-JSON FORMAT:
-- Return ONLY a valid JSON array
-- Start with [ and end with ]
-- No markdown, no code blocks
-- Format: [{"question": "...", "answer": "..."}]
-
-Now create ${count} flashcards about: ${topic}`;
-
-        console.log('Generating with Browser LLM...');
-        const response = await orchestrator.generate(prompt);
-        console.log('LLM Response:', response);
-
-        const rawCards = this.parseLLMResponse(response);
-        cards = rawCards.map((c, i) => ({
-          id: `gen-${Date.now()}-${i}`,
-          front: c.question,
-          back: c.answer,
-          topic: topic
-        }));
+        console.log(`Generating with WebLLM (knowledge source: ${knowledgeSource})...`);
+        cards = await generator.generateFlashcards(topic, count, knowledgeSource);
 
       } else {
         const data = await apiService.post('/generate', { topic, count });

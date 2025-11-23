@@ -25,9 +25,37 @@ export class ExpressServer {
     // Flashcards
     this.app.post('/api/generate', async (req, res) => {
       try {
-        const { topic, count, mode, parentTopic } = req.body;
-        const result = await this.studyService.generateFlashcards(topic, count || 10, mode, parentTopic);
+        const { topic, count, mode, knowledgeSource, parentTopic } = req.body;
+        const result = await this.studyService.generateFlashcards(
+          topic,
+          count || 10,
+          mode,
+          knowledgeSource || 'ai-web',
+          parentTopic
+        );
         res.json({ success: true, cards: result.cards, recommendedTopics: result.recommendedTopics });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Search endpoint for WebLLM (client-side)
+    this.app.post('/api/search', async (req, res) => {
+      try {
+        const { query } = req.body;
+        const results = await this.studyService['searchAdapter'].search(query);
+        res.json({ success: true, results });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Scrape endpoint for WebLLM (client-side)
+    this.app.post('/api/scrape', async (req, res) => {
+      try {
+        const { urls } = req.body;
+        const content = await this.studyService['scrapeMultipleSources'](urls);
+        res.json({ success: true, content });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }

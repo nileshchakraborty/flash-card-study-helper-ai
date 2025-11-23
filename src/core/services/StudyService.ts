@@ -14,24 +14,38 @@ export class StudyService implements StudyUseCase {
     private storageAdapter: StoragePort
   ) { }
 
-  async generateFlashcards(topic: string, count: number, mode: 'standard' | 'deep-dive' = 'standard', parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
+  async generateFlashcards(topic: string, count: number, mode: 'standard' | 'deep-dive' = 'standard', knowledgeSource: 'ai-only' | 'web-only' | 'ai-web' = 'ai-web', parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     if (mode === 'deep-dive') {
       return this.generateDeepDiveFlashcards(topic, count);
     }
 
-    console.log(`\n=== Starting Knowledge Retrieval for: "${topic}" ===`);
+    console.log(`\n=== Starting Knowledge Retrieval for: "${topic}" (Mode: ${knowledgeSource}) ===`);
 
-    // Step 1: Check AI Internal Knowledge
-    console.log('1. Checking AI internal knowledge...');
+    // Step 1: Check AI Internal Knowledge (skip if web-only)
     let aiSummary = '';
-    try {
-      aiSummary = await this.aiAdapter.generateSummary(topic);
-      console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
-    } catch (e) {
-      console.warn('   Failed to get AI summary, proceeding without it.');
+    if (knowledgeSource !== 'web-only') {
+      console.log('1. Checking AI internal knowledge...');
+      try {
+        aiSummary = await this.aiAdapter.generateSummary(topic);
+        console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
+      } catch (e) {
+        console.warn('   Failed to get AI summary:', e.message);
+      }
     }
 
-    // Step 2: Search Web
+    // If AI-only mode, generate directly from AI knowledge
+    if (knowledgeSource === 'ai-only') {
+      console.log('2. Generating flashcards from AI knowledge (ai-only mode)...');
+      try {
+        const cards = await this.aiAdapter.generateFlashcards(topic, count);
+        return { cards };
+      } catch (e) {
+        console.error('   Failed to generate from AI knowledge:', e.message);
+        throw new Error(`Failed to generate flashcards from AI knowledge: ${e.message}`);
+      }
+    }
+
+    // Step 2: Generate Search Query (for web-only or ai-web)
     console.log('2. Generating refined search query...');
     let searchQuery = topic;
     try {
