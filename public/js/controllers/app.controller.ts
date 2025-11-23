@@ -11,10 +11,13 @@ export class AppController {
   private generatorView: any;
   private studyView: any;
   private quizView: any;
+  private deckHistory: any[] = [];
+
   constructor() {
     this.generatorView = new GeneratorView();
     this.studyView = new StudyView();
     this.quizView = new QuizView();
+    this.deckHistory = [];
 
     this.init();
   }
@@ -153,33 +156,104 @@ export class AppController {
     });
 
     // Handle harder cards request
-    eventBus.on('deck:harder', async () => {
+    eventBus.on('deck:harder', async (data) => {
       const topic = deckModel.currentTopic;
       if (!topic) {
         alert('No topic found to generate harder cards.');
         return;
       }
 
+      const difficulty = data?.difficulty || 'basics';
+      let topicSuffix = '';
+
+      if (difficulty === 'deep-dive') {
+        topicSuffix = ' (Advanced Deep Dive)';
+      } else {
+        topicSuffix = ' (Fundamentals)';
+      }
+
+      const enhancedTopic = `${topic}${topicSuffix}`;
+
       // Show loading
       this.generatorView.showLoading();
 
       try {
-        console.log('Generating harder flashcards for:', topic);
+        console.log('Generating harder flashcards for:', enhancedTopic);
         const data = await apiService.post('/generate', {
-          topic: `${topic} (Advanced Concepts)`,
-          count: 10
+          topic: difficulty === 'deep-dive' ? topic : enhancedTopic,
+          count: 10,
+          mode: difficulty === 'deep-dive' ? 'deep-dive' : 'standard',
+          parentTopic: (window as any).currentParentTopic
         });
 
         if (data.cards && data.cards.length > 0) {
-          eventBus.emit('deck:loaded', data.cards);
+          // Save deck
+          const deck = {
+            id: Date.now().toString(),
+            topic: topic,
+            cards: data.cards,
+            timestamp: Date.now()
+          };
 
-          // Save to history
-          await apiService.post('/decks', {
-            topic: `${topic} (Advanced)`,
-            cards: data.cards
-          });
+          // Add to history
+          this.deckHistory.unshift(deck);
+          this.renderDeckHistory();
+
+          // Save to backend
+          await apiService.post('/decks', deck);
+
+          // Switch to study tab
+          this.currentDeck = deck;
+          deckModel.setCards(deck.cards);
+          this.studyView.renderCard(deckModel.getCurrentCard());
+          this.studyView.updateStats(deckModel.getStats());
+          this.switchTab('study');
+
+          // Handle Recommendations
+          const recommendedContainer = document.getElementById('recommended-paths');
+          const recommendedList = document.getElementById('recommended-list');
+
+          if (data.recommendedTopics && data.recommendedTopics.length > 0) {
+            if (recommendedContainer && recommendedList) {
+              recommendedContainer.classList.remove('hidden');
+              recommendedList.innerHTML = data.recommendedTopics.map((subTopic: string) => `
+                    <button class="recommended-topic-btn w-full text-left p-4 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all group" data-topic="${subTopic}" data-parent="${topic}">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-700 group-hover:text-indigo-700">${subTopic}</span>
+                            <span class="material-icons text-gray-400 group-hover:text-indigo-500 text-sm">arrow_forward</span>
+                        </div>
+                    </button>
+                `).join('');
+
+              // Add listeners
+              recommendedList.querySelectorAll('.recommended-topic-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                  const target = e.currentTarget as HTMLElement;
+                  const newTopic = target.dataset.topic;
+                  const parent = target.dataset.parent;
+
+                  // Set context and trigger generation
+                  (window as any).currentParentTopic = parent;
+                  const topicInput = document.getElementById('topic-input') as HTMLInputElement;
+                  if (topicInput) {
+                    topicInput.value = newTopic || '';
+                    // Switch back to create tab if not already (though we are likely there)
+                    this.switchTab('create');
+                    // Trigger generation
+                    const generateBtn = document.getElementById('generate-btn');
+                    if (generateBtn) generateBtn.click();
+                  }
+                });
+              });
+            }
+          } else {
+            // Hide if no recommendations (unless we want to keep previous ones? No, clear them for new topic)
+            if (recommendedContainer) recommendedContainer.classList.add('hidden');
+            (window as any).currentParentTopic = null; // Reset context
+          }
+
         } else {
-          alert('Failed to generate harder cards. Please try again.');
+          throw new Error('No flashcards generated');
         }
       } catch (error) {
         console.error('Generation error:', error);
@@ -189,6 +263,8 @@ export class AppController {
       }
     });
 
+
+
     // Handle review request
     eventBus.on('deck:review', () => {
       // Restart the current deck
@@ -196,5 +272,41 @@ export class AppController {
         deckModel.setCards(deckModel.cards);
       }
     });
+  }
+
+  renderDeckHistory() {
+    const historyList = document.getElementById('deck-history-list');
+    if (!historyList) return;
+
+    if (this.deckHistory.length === 0) {
+      historyList.innerHTML = '<div class="text-gray-500 text-sm italic">No recent decks found.</div>';
+      return;
+    }
+
+    historyList.innerHTML = this.deckHistory.map(deck => `
+      <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer" onclick="window.loadDeck('${deck.id}')">
+        <div class="font-medium text-gray-900 mb-1">${deck.topic}</div>
+        <div class="text-sm text-gray-500">${deck.cards.length} cards • ${new Date(deck.timestamp).toLocaleDateString()}</div>
+      </div>
+    `).join('');
+
+    // Expose loadDeck globally
+    (window as any).loadDeck = (id: string) => {
+      const deck = this.deckHistory.find(d => d.id === id);
+      if (deck) {
+        this.currentDeck = deck;
+        deckModel.setCards(deck.cards);
+        this.studyView.renderCard(deckModel.getCurrentCard());
+        this.studyView.updateStats(deckModel.getStats());
+        this.switchTab('study');
+      }
+    };
+  }
+
+  switchTab(tabId: string) {
+    const tabBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    if (tabBtn) {
+      (tabBtn as HTMLElement).click();
+    }
   }
 }

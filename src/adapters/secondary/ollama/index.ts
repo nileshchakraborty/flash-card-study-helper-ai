@@ -15,7 +15,12 @@ export class OllamaAdapter implements AIServicePort {
     const systemPrompt = `You are a helpful study assistant that creates flashcards.`;
     const prompt = `Create exactly ${count} flashcards about "${topic}".
 
-IMPORTANT: Return ONLY a valid JSON array. Each object must have these exact fields:
+IMPORTANT: Return ONLY a valid JSON array.
+- Do NOT use numbered lists.
+- Do NOT use markdown code blocks.
+- Start directly with '[' and end with ']'.
+
+Each object must have these exact fields:
 - "question": the front of the flashcard (a question or term)
 - "answer": the back of the flashcard (the answer or definition)
 
@@ -23,9 +28,7 @@ Example format:
 [
   {"question": "What is photosynthesis?", "answer": "The process by which plants convert light into energy"},
   {"question": "What is mitosis?", "answer": "Cell division that produces two identical daughter cells"}
-]
-
-Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
+]`;
 
     const response = await this.callOllama(prompt, systemPrompt);
     console.log('Raw AI response:', response);
@@ -58,7 +61,10 @@ Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
 
   async generateFlashcardsFromText(text: string, topic: string, count: number, pageInfo?: any): Promise<Flashcard[]> {
     const systemPrompt = `You are a helpful study assistant. Create ${count} flashcards from the provided text about: ${topic}.`;
-    const prompt = `Text: ${text.substring(0, 10000)}\n\nReturn ONLY a valid JSON array of objects with "question" and "answer" fields. No markdown.`;
+    const prompt = `Text: ${text.substring(0, 10000)}\n\nReturn ONLY a valid JSON array of objects with "question" and "answer" fields.
+    - Do NOT use numbered lists.
+    - Do NOT use markdown code blocks.
+    - Start directly with '[' and end with ']'.`;
 
     const response = await this.callOllama(prompt, systemPrompt);
     return this.extractJSON(response).map((card: any, index: number) => ({
@@ -74,6 +80,36 @@ Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
     const systemPrompt = "You are a concise tutor. Explain the answer simply.";
     const prompt = `Question: ${question} \nContext: ${context} \n\nProvide a brief, 2 - sentence explanation.`;
     return this.callOllama(prompt, systemPrompt);
+  }
+
+  async generateSummary(topic: string): Promise<string> {
+    const systemPrompt = "You are a knowledgeable expert. Provide a concise summary.";
+    const prompt = `Summarize what you know about "${topic}" in 3-4 sentences. Focus on key concepts and definitions.`;
+    return this.callOllama(prompt, systemPrompt);
+  }
+
+  async generateSearchQuery(topic: string, parentTopic?: string): Promise<string> {
+    const systemPrompt = "You are a search engine expert. Generate a single, optimal Google search query.";
+    let prompt = `Generate a search query for google search to get best knowledge about ${topic}. Return ONLY the query string, no quotes or explanation.`;
+
+    if (parentTopic) {
+      prompt = `Generate a search query for "${topic}" specifically in the context of "${parentTopic}". 
+      Example: If topic is "Streams" and parent is "Java", query should be "Java Streams API tutorial".
+      Return ONLY the query string, no quotes or explanation.`;
+    }
+
+    const response = await this.callOllama(prompt, systemPrompt);
+    return response.replace(/^"|"$/g, '').trim();
+  }
+
+  async generateSubTopics(topic: string): Promise<string[]> {
+    const systemPrompt = "You are an expert curriculum designer.";
+    const prompt = `Identify 3-5 advanced sub-topics for "${topic}" that would be suitable for a deep dive study session.
+    
+    Return ONLY a valid JSON array of strings. Example: ["Subtopic 1", "Subtopic 2", "Subtopic 3"]`;
+
+    const response = await this.callOllama(prompt, systemPrompt);
+    return this.extractJSON(response);
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
@@ -147,6 +183,14 @@ Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
       // Remove markdown code blocks if present
       let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
+      // Remove numbered list markers (e.g., "1. ", "2. ") if they appear before objects
+      // This is risky if the text content has numbers, but we assume it's outside JSON structure
+      // Better approach: Try to find the first '['
+      const firstBracket = cleaned.indexOf('[');
+      if (firstBracket >= 0) {
+        cleaned = cleaned.substring(firstBracket);
+      }
+
       // Try to find JSON array
       const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
       if (arrayMatch) {
@@ -165,19 +209,22 @@ Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
         console.log('Successfully parsed entire text');
         return result;
       } catch (e) {
-        // If simple parse fails, try to fix common issues
-        if (!cleaned.endsWith(']')) {
-          if (cleaned.endsWith('}')) {
-            cleaned += ']';
-          } else if (cleaned.endsWith('"')) {
-            cleaned += '}]';
-          }
-          try {
-            const result = JSON.parse(cleaned);
-            console.log('Successfully parsed fixed JSON');
-            return result;
-          } catch (e2) {
-            // Continue to regex fallback
+        // Robust fix for truncated JSON arrays
+        if (cleaned.startsWith('[')) {
+          // Find the last closing brace '}'
+          const lastBrace = cleaned.lastIndexOf('}');
+          if (lastBrace > 0) {
+            // Take everything up to the last brace
+            const truncated = cleaned.substring(0, lastBrace + 1);
+            // Close the array
+            const fixed = truncated + ']';
+            try {
+              const result = JSON.parse(fixed);
+              console.log('Successfully parsed fixed JSON (truncated at last object)');
+              return result;
+            } catch (e2) {
+              console.warn('Failed to parse truncated fix:', e2.message);
+            }
           }
         }
       }
@@ -189,35 +236,39 @@ Return ONLY the JSON array, no markdown, no explanation, no code blocks.`;
 
       // Regex fallback to extract objects looking like {"question": "...", "answer": "..."}
       const cards: any[] = [];
-      // Match "question": "..." and "answer": "..." patterns
-      // This is a simple heuristic and might need adjustment based on actual output
-      const questionRegex = /"(?:question|front)"\s*:\s*"([^"]*)"/g;
-      const answerRegex = /"(?:answer|back)"\s*:\s*"([^"]*)"/g;
 
-      let qMatch;
-      const questions = [];
-      while ((qMatch = questionRegex.exec(text)) !== null) {
-        questions.push(qMatch[1]);
-      }
+      // Improved regex to handle newlines and escaped quotes better
+      const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
 
-      let aMatch;
-      const answers = [];
-      while ((aMatch = answerRegex.exec(text)) !== null) {
-        answers.push(aMatch[1]);
-      }
-
-      // Combine found questions and answers
-      const count = Math.min(questions.length, answers.length);
-      for (let i = 0; i < count; i++) {
-        cards.push({
-          question: questions[i],
-          answer: answers[i]
-        });
+      let match;
+      while ((match = objectRegex.exec(text)) !== null) {
+        try {
+          // We need to unescape the strings since we captured them raw
+          const question = JSON.parse(`"${match[1]}"`);
+          const answer = JSON.parse(`"${match[2]}"`);
+          cards.push({ question, answer });
+        } catch (e) {
+          // Fallback if JSON.parse fails on the string
+          cards.push({ question: match[1], answer: match[2] });
+        }
       }
 
       if (cards.length > 0) {
         console.log('Successfully extracted', cards.length, 'cards via regex');
         return cards;
+      }
+
+      // Try to handle numbered lists like 1. { ... }
+      const objectRegexOld = /{\s*"question":\s*"[^"]*",\s*"answer":\s*"[^"]*"\s*}/g;
+      const objectMatches = text.match(objectRegexOld);
+      if (objectMatches && objectMatches.length > 0) {
+        try {
+          const extracted = objectMatches.map(s => JSON.parse(s));
+          console.log('Successfully extracted', extracted.length, 'cards via object regex');
+          return extracted;
+        } catch (e) {
+          console.warn('Failed to parse object matches');
+        }
       }
 
       return [];
