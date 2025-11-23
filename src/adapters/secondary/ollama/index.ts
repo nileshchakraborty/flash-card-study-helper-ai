@@ -178,100 +178,93 @@ Example format:
   }
 
   private extractJSON(text: string): any {
-    try {
-      console.log('Attempting to parse:', text.substring(0, 200));
-      // Remove markdown code blocks if present
-      let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    // 1. Clean the text
+    let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
-      // Remove numbered list markers (e.g., "1. ", "2. ") if they appear before objects
-      // This is risky if the text content has numbers, but we assume it's outside JSON structure
-      // Better approach: Try to find the first '['
-      const firstBracket = cleaned.indexOf('[');
-      if (firstBracket >= 0) {
-        cleaned = cleaned.substring(firstBracket);
-      }
+    // Fix common JSON issues before parsing
+    // Replace real newlines in strings with \n
+    cleaned = cleaned.replace(/(?<=: ")(.*?)(?=")/gs, (match) => {
+      return match.replace(/\n/g, '\\n');
+    });
 
-      // Try to find JSON array
-      const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        try {
-          const result = JSON.parse(arrayMatch[0]);
-          console.log('Successfully parsed JSON array with', result.length, 'items');
-          return result;
-        } catch (e) {
-          console.warn('Failed to parse matched array, trying to fix...');
-        }
-      }
+    // Find the outer array brackets
+    const firstBracket = cleaned.indexOf('[');
+    const lastBracket = cleaned.lastIndexOf(']');
 
-      // Try to parse the whole text
+    if (firstBracket >= 0 && lastBracket > firstBracket) {
+      const candidate = cleaned.substring(firstBracket, lastBracket + 1);
       try {
-        const result = JSON.parse(cleaned);
-        console.log('Successfully parsed entire text');
+        const result = JSON.parse(candidate);
         return result;
       } catch (e) {
-        // Robust fix for truncated JSON arrays
-        if (cleaned.startsWith('[')) {
-          // Find the last closing brace '}'
-          const lastBrace = cleaned.lastIndexOf('}');
-          if (lastBrace > 0) {
-            // Take everything up to the last brace
-            const truncated = cleaned.substring(0, lastBrace + 1);
-            // Close the array
-            const fixed = truncated + ']';
-            try {
-              const result = JSON.parse(fixed);
-              console.log('Successfully parsed fixed JSON (truncated at last object)');
-              return result;
-            } catch (e2) {
-              console.warn('Failed to parse truncated fix:', e2.message);
-            }
-          }
-        }
+        // Continue to fallbacks
       }
-
-      throw new Error('JSON parse failed');
-    } catch (e) {
-      console.error('Failed to parse JSON from AI response. Error:', e);
-      console.log('Attempting regex fallback extraction...');
-
-      // Regex fallback to extract objects looking like {"question": "...", "answer": "..."}
-      const cards: any[] = [];
-
-      // Improved regex to handle newlines and escaped quotes better
-      const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
-
-      let match;
-      while ((match = objectRegex.exec(text)) !== null) {
-        try {
-          // We need to unescape the strings since we captured them raw
-          const question = JSON.parse(`"${match[1]}"`);
-          const answer = JSON.parse(`"${match[2]}"`);
-          cards.push({ question, answer });
-        } catch (e) {
-          // Fallback if JSON.parse fails on the string
-          cards.push({ question: match[1], answer: match[2] });
-        }
-      }
-
-      if (cards.length > 0) {
-        console.log('Successfully extracted', cards.length, 'cards via regex');
-        return cards;
-      }
-
-      // Try to handle numbered lists like 1. { ... }
-      const objectRegexOld = /{\s*"question":\s*"[^"]*",\s*"answer":\s*"[^"]*"\s*}/g;
-      const objectMatches = text.match(objectRegexOld);
-      if (objectMatches && objectMatches.length > 0) {
-        try {
-          const extracted = objectMatches.map(s => JSON.parse(s));
-          console.log('Successfully extracted', extracted.length, 'cards via object regex');
-          return extracted;
-        } catch (e) {
-          console.warn('Failed to parse object matches');
-        }
-      }
-
-      return [];
     }
+
+    // 2. Try parsing as-is
+    try {
+      const result = JSON.parse(cleaned);
+      return Array.isArray(result) ? result : [result];
+    } catch (e) {
+      // Continue
+    }
+
+    // 3. Regex Fallback (Improved)
+    const cards: any[] = [];
+
+    // Regex to capture {"question": "...", "answer": "..."} patterns
+    // Handles escaped quotes and newlines
+    const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+
+    let match;
+    while ((match = objectRegex.exec(text)) !== null) {
+      try {
+        // Sanitize before parsing
+        const qRaw = match[1].replace(/\n/g, '\\n');
+        const aRaw = match[2].replace(/\n/g, '\\n');
+
+        const question = JSON.parse(`"${qRaw}"`);
+        const answer = JSON.parse(`"${aRaw}"`);
+        cards.push({ question, answer });
+      } catch (e) {
+        // Last resort fallback
+        cards.push({ question: match[1], answer: match[2] });
+      }
+    }
+
+    // 4. Text Format Fallback (Question: ... Answer: ...)
+    // Matches "Question: <text> Answer: <text>" with optional newlines, bold markers, and case insensitivity
+    // Also handles numbered lists like "1. **Card:** ... **Answer:** ..."
+    const textRegex = /(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?(?:Card|Question)(?:\*\*)?:?\s*(.+?)\s*(?:\*\*)?Answer(?:\*\*)?:?\s*(.+?)(?=(?:\n\s*(?:\d+\.|\[Card|\*\*Card)|$))/gis;
+
+    let textMatch;
+    while ((textMatch = textRegex.exec(text)) !== null) {
+      const question = textMatch[1].trim();
+      const answer = textMatch[2].trim();
+      if (question && answer) {
+        cards.push({ question, answer });
+      }
+    }
+
+    if (cards.length > 0) {
+      return cards;
+    }
+
+    // 5. Last resort: Try to find any JSON objects in the text
+    try {
+      const matches = text.match(/\{[^{}]+\}/g);
+      if (matches) {
+        const results = matches.map(m => {
+          try { return JSON.parse(m); } catch { return null; }
+        }).filter(r => r && r.question && r.answer);
+
+        if (results.length > 0) return results;
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    console.error('Failed to parse JSON from AI response:', text.substring(0, 500) + '...');
+    return [];
   }
 }

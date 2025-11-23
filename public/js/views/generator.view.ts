@@ -94,37 +94,119 @@ export class GeneratorView extends BaseView {
   }
 
   async handleUpload() {
-    const file = this.elements.fileInput.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
+    const files = this.elements.fileInput.files;
+    if (!files || files.length === 0) return;
 
     this.showLoading();
     try {
-      // Note: apiService.request handles JSON, but upload needs FormData
-      // We'll use fetch directly here or extend apiService later.
-      // For now, let's use fetch to keep it simple as it's a special case.
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
+      // Import dynamically to avoid circular deps if any, or just standard import
+      const { FileProcessingService } = await import('../services/FileProcessingService.js');
 
-      if (!response.ok) throw new Error('Upload failed');
+      console.log('Processing', files.length, 'files...');
+      const text = await FileProcessingService.processFiles(Array.from(files));
+      console.log('Extracted text length:', text.length);
 
-      const data = await response.json();
-      if (data.cards) {
-        eventBus.emit('deck:loaded', data.cards);
+      if (!text.trim()) {
+        throw new Error('No text could be extracted from the files.');
+      }
+
+      // Use LLM Orchestrator
+      const orchestrator = (window as any).llmOrchestrator;
+      if (!orchestrator) {
+        throw new Error('LLM Orchestrator not initialized');
+      }
+
+      // Ensure model is loaded (if not, it might try to load default or fail)
+      // Ideally we check orchestrator.isModelLoaded() or load a default
+      if (!orchestrator.isModelLoaded()) {
+        // Trigger load of recommended model? 
+        // For now, let's assume the user has set it up or we force a default remote/local load
+        const { config } = orchestrator.getRecommendedStrategy();
+        await orchestrator.loadModel(config);
+      }
+
+      const topic = this.elements.uploadForm.querySelector('#upload-topic')?.value || 'Uploaded Content';
+
+      const prompt = `
+        You are a helpful study assistant. Create 10 flashcards from the provided text about: ${topic}.
+        
+        Text:
+        ${text.substring(0, 15000)} 
+        
+        Return ONLY a valid JSON array of objects with "question" and "answer" fields.
+        - Do NOT use numbered lists.
+        - Do NOT use markdown code blocks.
+        - Start directly with '[' and end with ']'.
+        
+        Example:
+        [{"question": "Q1", "answer": "A1"}, {"question": "Q2", "answer": "A2"}]
+      `;
+
+      console.log('Generating flashcards with LLM...');
+      const response = await orchestrator.generate(prompt);
+      console.log('LLM Response:', response);
+
+      // Parse JSON from response (reuse logic or simple parse)
+      let cards = [];
+      try {
+        // Simple extraction
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          cards = JSON.parse(jsonMatch[0]);
+        } else {
+          cards = JSON.parse(response);
+        }
+      } catch (e) {
+        console.warn('Failed to parse LLM response directly, trying regex fallback');
+        // Fallback regex
+        const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+        let match;
+        while ((match = objectRegex.exec(response)) !== null) {
+          try {
+            cards.push({
+              question: JSON.parse(`"${match[1]}"`),
+              answer: JSON.parse(`"${match[2]}"`)
+            });
+          } catch (e) { }
+        }
+      }
+
+      // Text Format Fallback (Question: ... Answer: ...)
+      if (cards.length === 0) {
+        const textRegex = /(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?(?:Card|Question)(?:\*\*)?:?\s*(.+?)\s*(?:\*\*)?Answer(?:\*\*)?:?\s*(.+?)(?=(?:\n\s*(?:\d+\.|\[Card|\*\*Card)|$))/gis;
+        let textMatch;
+        while ((textMatch = textRegex.exec(response)) !== null) {
+          const question = textMatch[1].trim();
+          const answer = textMatch[2].trim();
+          if (question && answer) {
+            cards.push({ question, answer });
+          }
+        }
+      }
+
+      if (cards.length > 0) {
+        // Format cards
+        const formattedCards = cards.map((c, i) => ({
+          id: `upload-${Date.now()}-${i}`,
+          front: c.question,
+          back: c.answer,
+          topic: topic
+        }));
+
+        eventBus.emit('deck:loaded', formattedCards);
 
         // Save to history
         await apiService.post('/decks', {
-          topic: file.name,
-          cards: data.cards
+          topic: topic,
+          cards: formattedCards
         });
         this.loadDeckHistory();
+      } else {
+        throw new Error('Failed to generate valid flashcards from response');
       }
+
     } catch (error) {
-      alert('Failed to upload file.');
+      alert('Failed to process files: ' + error.message);
       console.error(error);
     } finally {
       this.hideLoading();

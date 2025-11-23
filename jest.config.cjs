@@ -1,6 +1,6 @@
 module.exports = {
     preset: 'ts-jest/presets/default-esm',
-    testEnvironment: 'node',
+    testEnvironment: 'jsdom',
     extensionsToTreatAsEsm: ['.ts'],
     moduleNameMapper: {
         '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -10,6 +10,7 @@ module.exports = {
             'ts-jest',
             {
                 useESM: true,
+                tsconfig: 'tsconfig.json'
             },
         ],
     },
