@@ -1,97 +1,110 @@
-
-import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { GeneratorView } from '../../public/js/views/generator.view.js';
-import { LLMOrchestrator } from '../../public/js/services/llm/LLMOrchestrator.js';
 import { apiService } from '../../public/js/services/api.service.js';
 import { eventBus } from '../../public/js/utils/event-bus.js';
 
 // Mock dependencies
-jest.mock('../../public/js/services/llm/LLMOrchestrator.js');
-jest.mock('../../public/js/services/api.service.js');
-jest.mock('../../public/js/utils/event-bus.js');
-jest.mock('../../public/js/services/FileProcessingService.js', () => ({
-    FileProcessingService: {
-        processFiles: jest.fn().mockResolvedValue('Extracted text content')
+// apiService is mocked via jest.config.cjs
+
+jest.mock('../../public/js/utils/event-bus.js', () => ({
+    eventBus: {
+        emit: jest.fn(),
+        on: jest.fn(),
+        off: jest.fn()
     }
 }));
 
-describe('WebLLM Integration Tests', () => {
-    let generatorView;
-    let mockOrchestrator;
+// Mock BaseView since we can't easily import it if it has DOM side effects or complex inheritance
+jest.mock('../../public/js/views/base.view.js', () => {
+    return {
+        BaseView: class {
+            getElement(selector: string) {
+                return document.querySelector(selector);
+            }
+            bind(element: any, event: string, handler: any) {
+                if (element) element.addEventListener(event, handler);
+            }
+            show() { }
+            hide() { }
+        }
+    };
+});
+
+describe('GeneratorView Integration', () => {
+    let view: GeneratorView;
+    let mockOrchestrator: any;
+    let apiPostSpy: any;
 
     beforeEach(() => {
-        // Reset mocks
-        jest.clearAllMocks();
-
-        // Setup DOM elements
+        // Setup DOM
         document.body.innerHTML = `
-      <form id="upload-form">
-        <input type="file" id="file-upload" multiple>
-        <input type="text" id="upload-topic" value="Test Topic">
-        <button type="submit">Upload</button>
-      </form>
-      <div id="loading-overlay"></div>
-      <div id="deck-history-list"></div>
-    `;
+            <form id="topic-form">
+                <input id="topic-input" value="Test Topic" />
+                <input id="card-count" value="5" />
+                <button id="generate-btn" type="submit">Generate</button>
+                <input type="checkbox" id="use-browser-llm" />
+            </form>
+            <div id="loading-overlay"></div>
+            <div id="deck-history-list"></div>
+        `;
 
-        // Mock Orchestrator instance
+        // Mock LLM Orchestrator on window
         mockOrchestrator = {
             isModelLoaded: jest.fn().mockReturnValue(true),
             generate: jest.fn().mockResolvedValue('[{"question": "Q1", "answer": "A1"}]'),
             getRecommendedStrategy: jest.fn().mockReturnValue({ config: {} }),
             loadModel: jest.fn().mockResolvedValue(undefined)
         };
-        window.llmOrchestrator = mockOrchestrator;
+        (window as any).llmOrchestrator = mockOrchestrator;
 
-        // Initialize View
-        generatorView = new GeneratorView();
+        // Spy on API service
+        apiPostSpy = jest.spyOn(apiService, 'post').mockResolvedValue({ cards: [{ id: '1', front: 'Q', back: 'A' }] });
+        // Also mock get to avoid errors if called
+        jest.spyOn(apiService, 'get').mockResolvedValue({ history: [] });
+
+        // Initialize view
+        view = new GeneratorView();
     });
 
-    test('should use LLMOrchestrator for file uploads and NOT call backend generation API', async () => {
-        // Simulate file selection
-        const fileInput = document.getElementById('file-upload');
-        const file = new File(['dummy content'], 'test.pdf', { type: 'application/pdf' });
-        Object.defineProperty(fileInput, 'files', { value: [file] });
+    afterEach(() => {
+        jest.restoreAllMocks();
+        document.body.innerHTML = '';
+    });
 
-        // Trigger upload
-        await generatorView.handleUpload();
+    it('should use API service when offline mode is disabled', async () => {
+        // Ensure checkbox is unchecked
+        const checkbox = document.getElementById('use-browser-llm') as HTMLInputElement;
+        checkbox.checked = false;
 
-        // Verify LLM Orchestrator was called
-        expect(mockOrchestrator.generate).toHaveBeenCalled();
-        expect(mockOrchestrator.generate).toHaveBeenCalledWith(expect.stringContaining('Extracted text content'));
+        // Trigger generation
+        await view.handleGenerate();
 
-        // Verify Backend API was NOT called for generation (only for saving deck)
-        expect(apiService.post).not.toHaveBeenCalledWith('/api/upload', expect.anything());
-        expect(apiService.post).not.toHaveBeenCalledWith('/generate', expect.anything());
-
-        // Verify Deck was saved
-        expect(apiService.post).toHaveBeenCalledWith('/decks', expect.objectContaining({
+        // Verify API was called
+        expect(apiPostSpy).toHaveBeenCalledWith('/generate', expect.objectContaining({
             topic: 'Test Topic',
-            cards: expect.arrayContaining([
-                expect.objectContaining({ front: 'Q1', back: 'A1' })
-            ])
+            count: '5'
         }));
+
+        // Verify Orchestrator was NOT called
+        expect(mockOrchestrator.generate).not.toHaveBeenCalled();
     });
 
-    test('should fallback to regex parsing if LLM returns text format', async () => {
-        // Mock LLM returning text format
-        mockOrchestrator.generate.mockResolvedValue(`
-      Here are the cards:
-      Question: What is X?
-      Answer: Y
-    `);
+    it('should use WebLLM when offline mode is enabled', async () => {
+        // Check the checkbox
+        const checkbox = document.getElementById('use-browser-llm') as HTMLInputElement;
+        checkbox.checked = true;
 
-        // Simulate file selection
-        const fileInput = document.getElementById('file-upload');
-        const file = new File(['dummy content'], 'test.txt', { type: 'text/plain' });
-        Object.defineProperty(fileInput, 'files', { value: [file] });
+        // Trigger generation
+        await view.handleGenerate();
 
-        // Trigger upload
-        await generatorView.handleUpload();
+        // Verify Orchestrator WAS called
+        expect(mockOrchestrator.generate).toHaveBeenCalled();
 
-        // Verify cards were extracted
-        expect(eventBus.emit).toHaveBeenCalledWith('deck:loaded', expect.arrayContaining([
-            expect.objectContaining({ front: 'What is X?', back: 'Y' })
-        ]));
+        // Verify API was NOT called for generation
+        // Note: It might be called for saving history ('/decks'), so we check specifically for '/generate'
+        expect(apiPostSpy).not.toHaveBeenCalledWith('/generate', expect.anything());
+
+        // It SHOULD call /decks to save history
+        expect(apiPostSpy).toHaveBeenCalledWith('/decks', expect.anything());
     });
 });

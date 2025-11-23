@@ -1,5 +1,5 @@
 import { LLMOrchestrator } from '../services/llm/LLMOrchestrator';
-import { ModelConfig } from '../services/llm/types';
+import type { ModelConfig } from '../services/llm/types.js';
 
 export class ModelManagerUI {
     private orchestrator: LLMOrchestrator;
