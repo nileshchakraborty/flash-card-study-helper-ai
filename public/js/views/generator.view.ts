@@ -15,7 +15,8 @@ export class GeneratorView extends BaseView {
       deckHistoryList: this.getElement('#deck-history-list'),
       uploadForm: this.getElement('#upload-form'),
       fileInput: this.getElement('#file-upload'),
-      uploadBtn: this.getElement('#upload-form button[type="submit"]')
+      uploadBtn: this.getElement('#upload-form button[type="submit"]'),
+      useBrowserLLM: this.getElement('#use-browser-llm')
     };
 
     this.init();
@@ -64,25 +65,71 @@ export class GeneratorView extends BaseView {
   async handleGenerate() {
     const topic = this.elements.topicInput.value;
     const count = this.elements.cardCount.value;
+    const useBrowser = this.elements.useBrowserLLM && this.elements.useBrowserLLM.checked;
 
     this.showLoading();
     try {
-      console.log('Generating flashcards for:', topic, 'count:', count);
-      const data = await apiService.post('/generate', { topic, count });
-      console.log('Received response:', data);
+      console.log('Generating flashcards for:', topic, 'count:', count, 'mode:', useBrowser ? 'browser' : 'server');
 
-      if (data.cards && data.cards.length > 0) {
-        console.log('Emitting deck:loaded with', data.cards.length, 'cards');
-        eventBus.emit('deck:loaded', data.cards);
+      let cards = [];
+
+      if (useBrowser) {
+        // Use LLM Orchestrator
+        const orchestrator = (window as any).llmOrchestrator;
+        if (!orchestrator) {
+          throw new Error('LLM Orchestrator not initialized');
+        }
+
+        // Ensure model is loaded
+        if (!orchestrator.isModelLoaded()) {
+          const { config } = orchestrator.getRecommendedStrategy();
+          await orchestrator.loadModel(config, (progress, message) => {
+            console.log(`Loading model: ${Math.round(progress * 100)}% - ${message}`);
+            // Optional: Update UI with progress
+          });
+        }
+
+        const prompt = `
+          You are a helpful study assistant. Create ${count} flashcards about: ${topic}.
+          Return ONLY a valid JSON array of objects with "question" and "answer" fields.
+          - Do NOT use numbered lists.
+          - Do NOT use markdown code blocks.
+          - Start directly with '[' and end with ']'.
+          
+          Example:
+          [{"question": "Q1", "answer": "A1"}, {"question": "Q2", "answer": "A2"}]
+        `;
+
+        console.log('Generating with Browser LLM...');
+        const response = await orchestrator.generate(prompt);
+        console.log('LLM Response:', response);
+
+        const rawCards = this.parseLLMResponse(response);
+        cards = rawCards.map((c, i) => ({
+          id: `gen-${Date.now()}-${i}`,
+          front: c.question,
+          back: c.answer,
+          topic: topic
+        }));
+
+      } else {
+        const data = await apiService.post('/generate', { topic, count });
+        console.log('Received response:', data);
+        cards = data.cards || [];
+      }
+
+      if (cards && cards.length > 0) {
+        console.log('Emitting deck:loaded with', cards.length, 'cards');
+        eventBus.emit('deck:loaded', cards);
 
         // Save to history
         await apiService.post('/decks', {
           topic,
-          cards: data.cards
+          cards: cards
         });
         this.loadDeckHistory(); // Refresh history
       } else {
-        console.error('No cards in response:', data);
+        console.error('No cards generated');
         alert('No flashcards were generated. Please try again.');
       }
     } catch (error) {
@@ -146,43 +193,8 @@ export class GeneratorView extends BaseView {
       const response = await orchestrator.generate(prompt);
       console.log('LLM Response:', response);
 
-      // Parse JSON from response (reuse logic or simple parse)
-      let cards = [];
-      try {
-        // Simple extraction
-        const jsonMatch = response.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          cards = JSON.parse(jsonMatch[0]);
-        } else {
-          cards = JSON.parse(response);
-        }
-      } catch (e) {
-        console.warn('Failed to parse LLM response directly, trying regex fallback');
-        // Fallback regex
-        const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
-        let match;
-        while ((match = objectRegex.exec(response)) !== null) {
-          try {
-            cards.push({
-              question: JSON.parse(`"${match[1]}"`),
-              answer: JSON.parse(`"${match[2]}"`)
-            });
-          } catch (e) { }
-        }
-      }
-
-      // Text Format Fallback (Question: ... Answer: ...)
-      if (cards.length === 0) {
-        const textRegex = /(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?(?:Card|Question)(?:\*\*)?:?\s*(.+?)\s*(?:\*\*)?Answer(?:\*\*)?:?\s*(.+?)(?=(?:\n\s*(?:\d+\.|\[Card|\*\*Card)|$))/gis;
-        let textMatch;
-        while ((textMatch = textRegex.exec(response)) !== null) {
-          const question = textMatch[1].trim();
-          const answer = textMatch[2].trim();
-          if (question && answer) {
-            cards.push({ question, answer });
-          }
-        }
-      }
+      // Parse JSON from response
+      const cards = this.parseLLMResponse(response);
 
       if (cards.length > 0) {
         // Format cards
@@ -254,6 +266,46 @@ export class GeneratorView extends BaseView {
         }
       });
     });
+  }
+
+  parseLLMResponse(response) {
+    let cards = [];
+    try {
+      // Simple extraction
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        cards = JSON.parse(jsonMatch[0]);
+      } else {
+        cards = JSON.parse(response);
+      }
+    } catch (e) {
+      console.warn('Failed to parse LLM response directly, trying regex fallback');
+      // Fallback regex
+      const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+      let match;
+      while ((match = objectRegex.exec(response)) !== null) {
+        try {
+          cards.push({
+            question: JSON.parse(`"${match[1]}"`),
+            answer: JSON.parse(`"${match[2]}"`)
+          });
+        } catch (e) { }
+      }
+    }
+
+    // Text Format Fallback (Question: ... Answer: ...)
+    if (cards.length === 0) {
+      const textRegex = /(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?(?:Card|Question)(?:\*\*)?:?\s*(.+?)\s*(?:\*\*)?Answer(?:\*\*)?:?\s*(.+?)(?=(?:\n\s*(?:\d+\.|\[Card|\*\*Card)|$))/gis;
+      let textMatch;
+      while ((textMatch = textRegex.exec(response)) !== null) {
+        const question = textMatch[1].trim();
+        const answer = textMatch[2].trim();
+        if (question && answer) {
+          cards.push({ question, answer });
+        }
+      }
+    }
+    return cards;
   }
 
   showLoading() {

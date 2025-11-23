@@ -4,6 +4,7 @@ module.exports = {
     extensionsToTreatAsEsm: ['.ts'],
     moduleNameMapper: {
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@mlc-ai/web-llm$': '<rootDir>/tests/mocks/web-llm.js',
     },
     transform: {
         '^.+\\.tsx?$': [

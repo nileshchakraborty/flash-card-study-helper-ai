@@ -1,6 +1,7 @@
 import type { LLMRuntime, ModelConfig, GenerationOptions } from '../types.js';
 import { LLMRuntimeType } from '../types.js';
 import * as webllm from '@mlc-ai/web-llm';
+import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 
 export class WebLLMRuntime implements LLMRuntime {
     type = LLMRuntimeType.WEB_LLM;
@@ -51,7 +52,7 @@ export class WebLLMRuntime implements LLMRuntime {
             throw new Error("WebLLM runtime not initialized");
         }
 
-        const messages: webllm.ChatCompletionMessageParam[] = [
+        const messages: ChatCompletionMessageParam[] = [
             { role: "user", content: prompt }
         ];
 
