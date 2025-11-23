@@ -38,6 +38,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "lru-cache": "^11.2.2",
     "multer": "^2.0.2",
     "pdf-parse": "^1.1.4",
     "pdfjs-dist": "^5.4.394",

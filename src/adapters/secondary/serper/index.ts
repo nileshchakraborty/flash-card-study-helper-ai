@@ -1,11 +1,15 @@
 import axios from 'axios';
-import type {SearchServicePort} from '../../../core/ports/interfaces.js';
+import type { SearchServicePort } from '../../../core/ports/interfaces.js';
+import type { CacheService } from '../../../core/services/CacheService.js';
 
 export class SerperAdapter implements SearchServicePort {
   private apiKey: string;
-  
-  constructor() {
+  private cache?: CacheService<any[]>;
+
+  constructor(cache?: CacheService<any[]>) {
     this.apiKey = process.env.SERPER_API_KEY || '';
+    this.cache = cache;
+
     if (!this.apiKey) {
       console.warn('⚠️  SERPER_API_KEY not found in environment variables');
       console.warn('⚠️  Web scraping will be disabled. Add SERPER_API_KEY to .env file');
@@ -13,22 +17,38 @@ export class SerperAdapter implements SearchServicePort {
       console.log('✅ SERPER_API_KEY loaded successfully');
     }
   }
-  
+
   async search(query: string): Promise<any[]> {
     if (!this.apiKey) {
       console.warn('Serper API key not configured, skipping web search');
       return [];
     }
-    
+
+    // Check cache first
+    const cacheKey = `serper:${query}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) {
+        return cached;
+      }
+    }
+
     try {
       console.log('Searching with Serper for:', query);
       const response = await axios.post(
         'https://google.serper.dev/search',
-        {q: query},
-        {headers: {'X-API-KEY': this.apiKey, 'Content-Type': 'application/json'}}
+        { q: query },
+        { headers: { 'X-API-KEY': this.apiKey, 'Content-Type': 'application/json' } }
       );
-      console.log('Serper returned', response.data.organic?.length || 0, 'results');
-      return response.data.organic || [];
+      const results = response.data.organic || [];
+      console.log('Serper returned', results.length, 'results');
+
+      // Store in cache
+      if (this.cache) {
+        this.cache.set(cacheKey, results);
+      }
+
+      return results;
     } catch (error) {
       console.error('Search failed:', error);
       return [];

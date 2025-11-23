@@ -89,16 +89,37 @@ export class GeneratorView extends BaseView {
           });
         }
 
-        const prompt = `
-          You are a helpful study assistant. Create ${count} flashcards about: ${topic}.
-          Return ONLY a valid JSON array of objects with "question" and "answer" fields.
-          - Do NOT use numbered lists.
-          - Do NOT use markdown code blocks.
-          - Start directly with '[' and end with ']'.
-          
-          Example:
-          [{"question": "Q1", "answer": "A1"}, {"question": "Q2", "answer": "A2"}]
-        `;
+        const prompt = `You are a helpful study assistant creating educational flashcards. You create QUESTIONS and ANSWERS, NOT code examples.
+
+⚠️ CRITICAL RULES - FOLLOW EXACTLY:
+1. Each flashcard = ONE question + ONE answer
+2. Questions must be complete sentences ending with "?"
+3. Answers must be 1-3 sentence explanations in plain English
+4. NEVER include code snippets, variable names, or syntax in questions
+5. NEVER copy/paste code as answers
+6. Ask ABOUT concepts, not show code
+
+✅ GOOD EXAMPLES:
+Q: "What does the append() method do in Python?"
+A: "The append() method adds a single element to the end of a list. It modifies the list in-place and returns None."
+
+Q: "How do you open and read a file safely in Python?"
+A: "Use the 'with open(filename, mode) as f:' statement. This automatically closes the file even if errors occur."
+
+❌ BAD EXAMPLES (DO NOT DO THIS):
+Q: "_list = []"
+A: "# create our list..."
+
+Q: "with open(txt_file_path, 'r') as f:"
+A: "for line in f: if ':' in line: ..."
+
+JSON FORMAT:
+- Return ONLY a valid JSON array
+- Start with [ and end with ]
+- No markdown, no code blocks
+- Format: [{"question": "...", "answer": "..."}]
+
+Now create ${count} flashcards about: ${topic}`;
 
         console.log('Generating with Browser LLM...');
         const response = await orchestrator.generate(prompt);
@@ -174,20 +195,33 @@ export class GeneratorView extends BaseView {
 
       const topic = this.elements.uploadForm.querySelector('#upload-topic')?.value || 'Uploaded Content';
 
-      const prompt = `
-        You are a helpful study assistant. Create 10 flashcards from the provided text about: ${topic}.
-        
-        Text:
-        ${text.substring(0, 15000)} 
-        
-        Return ONLY a valid JSON array of objects with "question" and "answer" fields.
-        - Do NOT use numbered lists.
-        - Do NOT use markdown code blocks.
-        - Start directly with '[' and end with ']'.
-        
-        Example:
-        [{"question": "Q1", "answer": "A1"}, {"question": "Q2", "answer": "A2"}]
-      `;
+      const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.
+
+⚠️ TASK: Create 10 educational flashcards about: ${topic}
+
+Text:
+${text.substring(0, 15000)}
+
+⚠️ CRITICAL RULES:
+1. Ask questions ABOUT the concepts in the text
+2. Provide explanatory answers in plain English
+3. NEVER copy code snippets as  questions or answers
+4. Questions must end with "?"
+5. Answers must be 1-3 sentences explaining the concept
+
+✅ CORRECT EXAMPLE:
+Q: "What is the purpose of the 'with' statement when working with files?"
+A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
+
+❌ WRONG (DO NOT DO THIS):
+Q: "with open(txt_file_path, 'r') as f:"
+A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
+
+JSON FORMAT:
+- Return ONLY: [{"question": "...", "answer": "..."}]
+- No code blocks, no markdown, pure JSON array
+
+Create 10 flashcards now:`;
 
       console.log('Generating flashcards with LLM...');
       const response = await orchestrator.generate(prompt);

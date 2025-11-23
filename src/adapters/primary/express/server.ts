@@ -154,8 +154,14 @@ export class ExpressServer {
     });
 
     // Serve index.html for all other routes (SPA)
-    this.app.get('*', (req, res) => {
-      res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+    // Use middleware instead of wildcard route for Express v5 compatibility
+    this.app.use((req, res, next) => {
+      // Only serve index.html for non-API routes
+      if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+      } else {
+        next();
+      }
     });
   }
 

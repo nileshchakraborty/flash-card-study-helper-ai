@@ -5,11 +5,19 @@ import { LLMRuntimeType } from './types.js';
 import { WebLLMRuntime } from './runtimes/WebLLMRuntime.js';
 import { TransformersRuntime } from './runtimes/TransformersRuntime.js';
 import { RemoteRuntime } from './runtimes/RemoteRuntime.js';
+import { WebLLMCache } from './WebLLMCache.js';
 
 export class LLMOrchestrator {
     private runtime: LLMRuntime | null = null;
     private capabilities: DeviceCapabilities | null = null;
     private currentConfig: ModelConfig | null = null;
+    private cache: WebLLMCache;
+
+    constructor() {
+        this.cache = new WebLLMCache(86400); // 24 hours TTL
+        // Clean up expired entries on initialization
+        this.cache.deleteExpired();
+    }
 
     async initialize(): Promise<void> {
         this.capabilities = await DeviceCapabilityService.detectCapabilities();
@@ -59,7 +67,23 @@ export class LLMOrchestrator {
         if (!this.runtime || !this.runtime.isReady) {
             throw new Error("No model loaded");
         }
-        return this.runtime.generate(prompt, options);
+
+        // Check cache first
+        const cacheKey = await WebLLMCache.hashKey(`${this.currentConfig?.id}:${prompt}`);
+        const cached = await this.cache.get(cacheKey);
+        if (cached !== null) {
+            return cached;
+        }
+
+        // Generate new response
+        const response = await this.runtime.generate(prompt, options);
+
+        // Store in cache
+        if (response) {
+            await this.cache.set(cacheKey, response);
+        }
+
+        return response;
     }
 
     isModelLoaded(): boolean {
@@ -68,5 +92,12 @@ export class LLMOrchestrator {
 
     getCurrentConfig(): ModelConfig | null {
         return this.currentConfig;
+    }
+
+    /**
+     * Clear the cache (useful for testing or freeing up storage)
+     */
+    async clearCache(): Promise<void> {
+        await this.cache.clear();
     }
 }

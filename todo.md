@@ -1,0 +1,1 @@
+1. Now lets enable llm cache and use browser cache and server side lru_cache library to cache web response and ai responses so that we can generate more flashcards and quiz for the user based on single search and query run. make ai model calls cached to reduce token usage and cache web response from serper to parse for next requests. 

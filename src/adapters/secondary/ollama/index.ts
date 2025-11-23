@@ -1,34 +1,60 @@
 import axios from 'axios';
 import type { AIServicePort } from '../../../core/ports/interfaces.js';
 import type { Flashcard, QuizQuestion } from '../../../core/domain/models.js';
+import type { CacheService } from '../../../core/services/CacheService.js';
+import { CacheService as CacheServiceClass } from '../../../core/services/CacheService.js';
 
 export class OllamaAdapter implements AIServicePort {
   private baseUrl: string;
   private model: string;
+  private cache?: CacheService<any>;
 
-  constructor() {
+  constructor(cache?: CacheService<any>) {
     this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     this.model = process.env.OLLAMA_MODEL || 'llama3.2:latest';
+    this.cache = cache;
   }
 
   async generateFlashcards(topic: string, count: number): Promise<Flashcard[]> {
-    const systemPrompt = `You are a helpful study assistant that creates flashcards.`;
+    // Check cache
+    const cacheKey = `ollama:flashcards:${topic}:${count}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
+    const systemPrompt = `You are a helpful study assistant that creates educational flashcards for learning. You create QUESTIONS and ANSWERS, NOT code examples.`;
     const prompt = `Create exactly ${count} flashcards about "${topic}".
 
-IMPORTANT: Return ONLY a valid JSON array.
-- Do NOT use numbered lists.
-- Do NOT use markdown code blocks.
-- Start directly with '[' and end with ']'.
+⚠️ CRITICAL RULES - FOLLOW EXACTLY:
+1. Each flashcard = ONE question + ONE answer
+2. Questions must be complete sentences ending with "?"
+3. Answers must be 1-3 sentence explanations in plain English
+4. NEVER include code snippets, variable names, or syntax in questions
+5. NEVER copy/paste code as answers
+6. Ask ABOUT concepts, not show code
 
-Each object must have these exact fields:
-- "question": the front of the flashcard (a question or term)
-- "answer": the back of the flashcard (the answer or definition)
+✅ GOOD FLASHCARD EXAMPLES:
+Q: "What does the append() method do in Python?"
+A: "The append() method adds a single element to the end of a list. It modifies the list in-place and returns None."
 
-Example format:
-[
-  {"question": "What is photosynthesis?", "answer": "The process by which plants convert light into energy"},
-  {"question": "What is mitosis?", "answer": "Cell division that produces two identical daughter cells"}
-]`;
+Q: "How do you open and read a file safely in Python?"
+A: "Use the 'with open(filename, mode) as f:' statement. This automatically closes the file even if errors occur, preventing resource leaks."
+
+❌ BAD FLASHCARD EXAMPLES (DO NOT DO THIS):
+Q: "_list = []"
+A: "# create our list..."
+
+Q: "with open(txt_file_path, 'r') as f:"
+A: "for line in f: if ':' in line: ..."
+
+JSON FORMAT:
+- Return ONLY a valid JSON array
+- Start with [ and end with ]
+- No markdown, no code blocks, no explanations
+- Format: [{"question": "...", "answer": "..."}]
+
+Now create ${count} flashcards:`;
 
     const response = await this.callOllama(prompt, systemPrompt);
     console.log('Raw AI response:', response);
@@ -36,8 +62,9 @@ Example format:
     console.log('Parsed JSON:', parsed);
 
     // Handle both array of objects and array of strings
+    let result: Flashcard[] = [];
     if (Array.isArray(parsed)) {
-      return parsed.map((item: any, index: number) => {
+      result = parsed.map((item: any, index: number) => {
         if (typeof item === 'string') {
           // Convert string to flashcard format
           return {
@@ -56,24 +83,65 @@ Example format:
         } as any;
       });
     }
-    return [];
+
+    // Store in cache
+    if (this.cache && result.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   async generateFlashcardsFromText(text: string, topic: string, count: number, pageInfo?: any): Promise<Flashcard[]> {
-    const systemPrompt = `You are a helpful study assistant. Create ${count} flashcards from the provided text about: ${topic}.`;
-    const prompt = `Text: ${text.substring(0, 10000)}\n\nReturn ONLY a valid JSON array of objects with "question" and "answer" fields.
-    - Do NOT use numbered lists.
-    - Do NOT use markdown code blocks.
-    - Start directly with '[' and end with ']'.`;
+    // Check cache
+    const textHash = CacheServiceClass.hashKey(text.substring(0, 10000));
+    const cacheKey = `ollama:flashcards-text:${textHash}:${topic}:${count}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
+    const systemPrompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.`;
+    const prompt = `Text: ${text.substring(0, 10000)}
+
+⚠️ TASK: Create ${count} educational flashcards about: ${topic}
+
+⚠️ CRITICAL RULES:
+1. Ask questions ABOUT the concepts in the text
+2. Provide explanatory answers in plain English  
+3. NEVER copy code snippets as questions or answers
+4. Questions must end with "?"
+5. Answers must be 1-3 sentences explaining the concept
+
+✅ CORRECT EXAMPLE:
+Q: "What is the purpose of the 'with' statement when working with files?"
+A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
+
+❌ WRONG (DO NOT DO THIS):
+Q: "with open(txt_file_path, 'r') as f:"
+A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
+
+JSON FORMAT:
+- Return ONLY: [{"question": "...", "answer": "..."}]
+- No code blocks, no markdown, pure JSON array
+
+Create ${count} flashcards now:`;
 
     const response = await this.callOllama(prompt, systemPrompt);
-    return this.extractJSON(response).map((card: any, index: number) => ({
+    const result = this.extractJSON(response).map((card: any, index: number) => ({
       id: `file-${Date.now()}-${index}`,
       front: card.question || card.front,
       back: card.answer || card.back,
       topic: topic,
       source: pageInfo ? { page: pageInfo.page } : undefined
     }));
+
+    // Store in cache
+    if (this.cache && result.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   async generateBriefAnswer(question: string, context: string): Promise<string> {
@@ -83,12 +151,33 @@ Example format:
   }
 
   async generateSummary(topic: string): Promise<string> {
+    // Check cache
+    const cacheKey = `ollama:summary:${topic}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
     const systemPrompt = "You are a knowledgeable expert. Provide a concise summary.";
     const prompt = `Summarize what you know about "${topic}" in 3-4 sentences. Focus on key concepts and definitions.`;
-    return this.callOllama(prompt, systemPrompt);
+    const result = await this.callOllama(prompt, systemPrompt);
+
+    // Store in cache
+    if (this.cache && result) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   async generateSearchQuery(topic: string, parentTopic?: string): Promise<string> {
+    // Check cache
+    const cacheKey = `ollama:query:${topic}:${parentTopic || ''}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
     const systemPrompt = "You are a search engine expert. Generate a single, optimal Google search query.";
     let prompt = `Generate a search query for google search to get best knowledge about ${topic}. Return ONLY the query string, no quotes or explanation.`;
 
@@ -99,17 +188,38 @@ Example format:
     }
 
     const response = await this.callOllama(prompt, systemPrompt);
-    return response.replace(/^"|"$/g, '').trim();
+    const result = response.replace(/^"|"$/g, '').trim();
+
+    // Store in cache
+    if (this.cache && result) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   async generateSubTopics(topic: string): Promise<string[]> {
+    // Check cache
+    const cacheKey = `ollama:subtopics:${topic}`;
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
     const systemPrompt = "You are an expert curriculum designer.";
     const prompt = `Identify 3-5 advanced sub-topics for "${topic}" that would be suitable for a deep dive study session.
     
     Return ONLY a valid JSON array of strings. Example: ["Subtopic 1", "Subtopic 2", "Subtopic 3"]`;
 
     const response = await this.callOllama(prompt, systemPrompt);
-    return this.extractJSON(response);
+    const result = this.extractJSON(response);
+
+    // Store in cache
+    if (this.cache && result && result.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
