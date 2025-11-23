@@ -159,6 +159,10 @@ export class ExpressServer {
     });
   }
 
+  public getApp(): express.Application {
+    return this.app;
+  }
+
   public start(port: number) {
     this.app.listen(port, () => {
       console.log(`Server running on port ${port}`);

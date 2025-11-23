@@ -18,5 +18,5 @@ const studyService = new StudyService(ollamaAdapter, serperAdapter, fsAdapter);
 // Initialize Primary Adapter (Server) with Core Service
 const expressServer = new ExpressServer(studyService);
 
-// Export the Express app for Vercel serverless
+// Export the Express app for Vercel
 export default expressServer.getApp();
