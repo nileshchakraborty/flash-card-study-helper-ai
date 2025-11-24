@@ -1,238 +1,211 @@
 # Flash Card Study Helper AI
 
-An AI-powered flash card study application with swipeable cards, file uploads, and interactive quizzes.
+📚 **Overview**  
+Flash Card Study Helper AI is an AI‑powered flash‑card application that lets you generate, study, and quiz yourself on any topic. It supports:
 
-## Features
+- Swipeable flashcards (Tinder‑style) for intuitive studying  
+- Topic‑based generation via **local LLM (Ollama)** or **browser‑based WebLLM** (offline)  
+- **Deep Dive** mode for advanced, multi‑step learning  
+- File uploads (PDF, PNG, JPG, GIF) with OCR & PDF parsing  
+- Interactive quizzes and AI‑generated study plans  
+- **Metrics tracking** for every generation (runtime, knowledge source, duration, success, etc.)
 
-- **Swipeable Flashcards**: Tinder-like swipe interface for studying
-    - Swipe left (or click "Revise") to put cards back in the deck
-    - Swipe right (or click "Next") to mark cards as mastered
-    - Works on both mobile (touch) and desktop (mouse/buttons)
+> **Note:** The UI now automatically detects when **“Enable Offline AI”** (WebLLM) is active and uses the appropriate runtime – no manual checkbox needed.
 
-- **Topic-Based Generation**: Generate flashcards from any topic using AI
-    - Enter a topic and number of cards
-    - AI generates relevant flashcards automatically
+---
 
-- **File Upload**: Convert PDFs and images into flashcards
-    - Upload PDFs, PNG, JPG, GIF files
-    - Drag and drop support
-    - Automatic text extraction and flashcard generation
-
-- **Interactive Quiz**: Test your knowledge
-    - Generate quizzes from your flashcards
-    - Answer questions and get instant feedback
-    - Review correct and incorrect answers
-
-- **Study Plan**: AI-generated study plans based on your progress
-    - Automatically creates daily study plans
-    - Tracks left/right swipes for revision planning
-    - Recreates plans based on your learning progress
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Node.js 14.0.0 or higher
+- **Node.js** ≥ 14  
+- **Ollama** (for local LLM) – optional if you prefer WebLLM only  
 
 ### Installation
+```bash
+# 1️⃣ Clone the repo
+git clone [https://github.com/your-repo/flash-card-study-helper-ai](https://github.com/your-repo/flash-card-study-helper-ai)
+cd flash-card-study-helper-ai
 
-1. Clone or download this repository
-2. Navigate to the project directory
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+# 2️⃣ Install dependencies
+npm install
 
-4. **Configure Environment Variables**:
-    - Copy the example environment file:
-      ```bash
-      cp .env.example .env
-      ```
-    - Edit `.env` and set your configuration:
-        - `OLLAMA_BASE_URL` - Ollama server URL (default: http://localhost:11434)
-        - `OLLAMA_MODEL` - Ollama model to use (default: llama3.2:latest)
-        - `SERPER_API_KEY` - Get a free API key from https://serper.dev
-        - `PORT` - Server port (default: 3000)
-        - `DEBUG_OLLAMA` - Set to 'true' for debug logging (optional)
+# 3️⃣ Set up environment variables
+cp .env.example .env
+# Edit .env → set OLLAMA_BASE_URL, OLLAMA_MODEL, SERPER_API_KEY, etc.
 
-5. **Install and Setup Ollama** (for AI features):
-    - Download and install Ollama from https://ollama.ai
-    - Pull a model (recommended: llama3.2 or mistral):
-      ```bash
-      ollama pull llama3.2
-      ```
-    - Or use any other model you prefer
-    - Make sure Ollama is running (it starts automatically after installation)
+# Ollama Setup (optional)
+```bash
+# Install Ollama (https://ollama.ai)
+ollama pull llama3.2   # or any Ollama‑compatible model
+```
 
-### Running the Application
-
-Start the server:
-
+# Run the Application
 ```bash
 npm start
+# Open http://localhost:3000 in your browser
 ```
-
-The application will be available at `http://localhost:3000`
 
 ### Development
+```bash
+npm run demo   # runs a quick demo of core functionality
+npm run build  # builds the frontend (esbuild)
+```
 
-Run the demo script to see the core functionality:
+---
+
+## 🎯 Usage
+
+### 1️⃣ Create Flashcards
+- Create Cards tab → enter a topic and card count.
+- Enable Offline AI (bottom‑right) to use WebLLM; otherwise Ollama is used.
+- Click Generate Flashcards → cards appear in the Study tab.
+
+### 2️⃣ Deep Dive Mode
+- After finishing a deck, select Deep Dive (radio button).
+- Click Move to Harder Questions → the system generates advanced cards based on the current topic.
+
+### 3️⃣ Quiz
+- Quiz tab → set number of questions → answer and review results.
+
+### 4️⃣ Study Plan
+- The app builds a daily study plan based on your swipe history.
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | /api/flashcards | Retrieve all flashcards |
+| POST | /api/flashcards | Add flashcards manually |
+| POST | /api/upload | Upload PDFs/images for conversion |
+| POST | /api/generate | Generate flashcards (supports `runtime: 'ollama'` and `runtime: 'webllm'`) |
+| GET | /api/quiz?size=5 | Generate a quiz |
+| POST | /api/quiz/grade | Grade quiz answers |
+| POST | /api/swipe | Record swipe action |
+| GET | /api/swipe-history | Swipe statistics |
+| GET | /api/study-plan | Generate study plan |
+| POST | /api/reset | Reset the deck |
+| GET | /api/health | Health check (Ollama & Serper) |
+
+Example – Ollama generation
 
 ```bash
-npm run demo
+curl -X POST http://localhost:3000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"React Hooks","count":3,"runtime":"ollama","knowledgeSource":"ai-only"}'
 ```
 
-## Usage
-
-1. **Create Flashcards**:
-    - Go to the "Create Cards" tab
-    - Enter a topic and generate flashcards, or
-    - Upload PDF/image files to convert them
-
-2. **Study**:
-    - Go to the "Study" tab
-    - Swipe cards left (revise) or right (mastered)
-    - View your study plan on the right
-
-3. **Take Quiz**:
-    - Go to the "Quiz" tab
-    - Set the number of questions
-    - Answer questions and review results
-
-## API Endpoints
-
-- `GET /api/flashcards` - Get all flashcards
-- `POST /api/flashcards` - Add flashcards manually
-- `POST /api/upload` - Upload and convert files
-- `POST /api/generate` - Generate flashcards from topic
-- `GET /api/quiz?size=5` - Generate a quiz
-- `POST /api/quiz/grade` - Grade quiz answers
-- `POST /api/swipe` - Record swipe action
-- `GET /api/swipe-history` - Get swipe statistics
-- `GET /api/study-plan` - Generate study plan
-- `POST /api/reset` - Reset the deck
-- `GET /api/health` - Check Ollama and library availability
-
-## AI Integration
-
-The application uses **Ollama** for AI-powered flashcard generation:
-
-### Features
-
-- **PDF Parsing**: Uses `pdf-parse` to extract text from PDF files
-- **Image OCR**: Uses `tesseract.js` to extract text from images
-- **AI Flashcard Generation**: Uses Ollama to intelligently generate flashcards from:
-    - Extracted text from PDFs/images
-    - Topic-based generation with web search (via Serper API)
-    - Web content is cached locally for faster subsequent requests
-
-### Configuration
-
-#### Configuration via .env File
-
-All configuration is done through the `.env` file in the root directory. Copy `.env.example` to `.env` and edit it:
+Example – WebLLM generation
 
 ```bash
-cp .env.example .env
+curl -X POST http://localhost:3000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"Kubernetes","count":2,"runtime":"webllm","knowledgeSource":"ai-web"}'
 ```
 
-Then edit `.env` with your settings:
+---
 
-```env
-# Ollama Configuration
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2:latest
+## 🤖 AI Integration
 
-# Serper API Configuration (for web search)
-SERPER_API_KEY=your_serper_api_key_here
+### Ollama (Server‑side)
+Generates flashcards, summaries, search queries, and deep‑dive content.
+Configurable via .env (OLLAMA_BASE_URL, OLLAMA_MODEL).
 
-# Server Configuration
-PORT=3000
+### WebLLM (Browser‑side)
+Runs entirely in the browser when Enable Offline AI is active.
+The UI now automatically selects runtime: 'webllm' based on the ModelManagerUI state.
 
-# Debug Mode (optional)
-DEBUG_OLLAMA=false
+### Knowledge Sources
+
+- ai-only – Pure LLM generation.
+- web-only – Web search only (no LLM).
+- ai-web – Combined LLM + web search (default).
+
+---
+
+## 📊 Metrics Service
+
+All generation attempts are logged to .metrics/generations.jsonl with:
+
+```json
+{
+  "runtime":"ollama|webllm",
+  "knowledgeSource":"ai-only|web-only|ai-web",
+  "mode":"standard|deep-dive",
+  "topic":"Your Topic",
+  "cardCount":5,
+  "duration":1234,
+  "success":true,
+  "timestamp":1763942894820
+}
 ```
 
-**Note:**
+Metrics are loaded on server start and used for analytics & future model training.
 
-- Without `SERPER_API_KEY`, the app will fall back to direct Ollama generation (without web search)
-- Get a free Serper API key from https://serper.dev
-- The `.env` file is automatically loaded when the server starts
+---
 
-### Supported Models
-
-Any Ollama-compatible model works. Recommended models:
-
-- `llama3.2:latest` - Fast and efficient
-- `mistral` - Good balance of speed and quality
-- `llama3` - Higher quality, slower
-- `codellama` - Good for technical content
-
-### Health Check
-
-Check if Ollama is properly configured:
+## 🛠️ Project Structure
 
 ```bash
-curl http://localhost:3000/api/health
-```
-
-### Fallback Mode
-
-If Ollama is not available, the app will:
-
-- Still parse PDFs and images
-- Use simple sentence-based flashcard conversion
-- Show warnings in the console
-
-## Project Structure
-
-```
 flash-card-study-helper-ai/
-├── server.js              # Backend server with API endpoints
-├── main.js                # Core flashcard classes (Node.js)
-├── main.ts                # TypeScript version of core classes
-├── package.json           # Project configuration
+├── src/
+│   ├── adapters/
+│   │   ├── secondary/
+│   │   │   ├── ollama/          # Ollama adapter
+│   │   │   └── serper/          # Web search adapter
+│   │   └── primary/
+│   │       └── express/         # API server
+│   ├── core/
+│   │   ├── ports/               # Interfaces
+│   │   └── services/
+│   │       ├── StudyService.ts  # Orchestrates generation & deep‑dive
+│   │       └── MetricsService.ts# Tracks generation metrics
+│   └── index.ts                 # Application entry point
 ├── public/
-│   ├── index.html        # Frontend HTML
-│   ├── app.js            # Frontend JavaScript
-│   ├── style.css         # Styles
-│   └── flashcard-lib.js  # Browser-compatible flashcard classes
-└── uploads/              # Uploaded files directory (created automatically)
+│   ├── js/
+│   │   ├── services/
+│   │   │   ├── api.service.ts          # Wrapper for API calls
+│   │   │   ├── llm/
+│   │   │   │   └── LLMOrchestrator.ts   # Handles WebLLM model loading
+│   │   │   └── ConfigurationService.ts # (now deprecated – runtime auto‑detect)
+│   │   └── views/
+│   │       ├── generator.view.ts       # UI for card generation
+│   │       └── quiz.view.ts
+│   └── index.html
+├── .metrics/                    # JSONL logs
+├── .env & .env.example
+└── README.md
 ```
 
-## Technologies
+---
 
-- **Backend**: Node.js with native HTTP server
-- **Frontend**: Vanilla JavaScript (ES6 modules)
-- **Styling**: CSS3 with modern design
-- **File Handling**: Multipart form data parsing
-- **AI/ML**:
-    - **Ollama** - Local LLM for flashcard generation
-    - **pdf-parse** - PDF text extraction
-    - **tesseract.js** - OCR for image text extraction
-    - **axios** - HTTP client for Ollama and Serper APIs
-    - **cheerio** - Web scraping and HTML parsing
-- **Web Search**:
-    - **Serper API** - Google search API for finding relevant content
-    - **Local Caching** - Caches web content for 24 hours
+## 📦 Future Enhancements (Roadmap)
 
-## Browser Support
+- Real‑time AI service integration (e.g., OpenAI, Anthropic)
+- User authentication & data persistence
+- Spaced‑repetition algorithm
+- Export / import flashcards
+- Multiple decks & sharing
+- Advanced analytics & progress dashboards
+- Quiz Mode with AI grading 
+- Metrics service for tracking generation metrics
+- Backend API with health checks
 
-- Modern browsers with ES6 module support
-- Mobile browsers with touch event support
-- Desktop browsers with mouse/pointer support
+---
 
-## License
+## 📝 License
 
 MIT
 
-## Future Enhancements
+---
 
-- Real AI service integration
-- User authentication and data persistence
-- Spaced repetition algorithm
-- Export/import flashcards
-- Multiple decks support
-- Progress analytics
-- Social sharing features
+## 📚 Quick Reference – Enabling Offline AI
 
+1. Click Enable Offline AI (bottom‑right).
+2. The UI now automatically sets runtime: 'webllm' for the next generation request.
+3. No manual checkbox is needed – the change is handled in 
+generator.view.ts by checking llmOrchestrator.isModelLoaded().
+
+
+Enjoy building smarter study sessions! 🎓✨
