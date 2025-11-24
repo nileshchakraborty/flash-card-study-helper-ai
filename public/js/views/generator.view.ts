@@ -65,81 +65,28 @@ export class GeneratorView extends BaseView {
   async handleGenerate() {
     const topic = this.elements.topicInput.value;
     const count = this.elements.cardCount.value;
-    const useBrowser = this.elements.useBrowserLLM && this.elements.useBrowserLLM.checked;
+    const useBrowser = this.elements.useBrowserLLM?.checked;
 
     this.showLoading();
     try {
-      console.log('Generating flashcards for:', topic, 'count:', count, 'mode:', useBrowser ? 'browser' : 'server');
+      console.log('Generating flashcards for:', topic, 'count:', count, 'runtime:', useBrowser ? 'webllm' : 'ollama');
 
-      let cards = [];
+      // Get configuration
+      const { ConfigurationService } = await import('../services/ConfigurationService.js');
+      const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
-      if (useBrowser) {
-        // Use LLM Orchestrator
-        const orchestrator = (window as any).llmOrchestrator;
-        if (!orchestrator) {
-          throw new Error('LLM Orchestrator not initialized');
-        }
+      // Single API call - backend handles everything including WebLLM
+      const data = await apiService.post('/generate', {
+        topic,
+        count,
+        runtime: useBrowser ? 'webllm' : 'ollama',
+        knowledgeSource
+      });
 
-        // Ensure model is loaded
-        if (!orchestrator.isModelLoaded()) {
-          const { config } = orchestrator.getRecommendedStrategy();
-          await orchestrator.loadModel(config, (progress, message) => {
-            console.log(`Loading model: ${Math.round(progress * 100)}% - ${message}`);
-            // Optional: Update UI with progress
-          });
-        }
+      const cards = data.cards || [];
+      console.log('Received response:', data);
 
-        const prompt = `You are a helpful study assistant creating educational flashcards. You create QUESTIONS and ANSWERS, NOT code examples.
-
-⚠️ CRITICAL RULES - FOLLOW EXACTLY:
-1. Each flashcard = ONE question + ONE answer
-2. Questions must be complete sentences ending with "?"
-3. Answers must be 1-3 sentence explanations in plain English
-4. NEVER include code snippets, variable names, or syntax in questions
-5. NEVER copy/paste code as answers
-6. Ask ABOUT concepts, not show code
-
-✅ GOOD EXAMPLES:
-Q: "What does the append() method do in Python?"
-A: "The append() method adds a single element to the end of a list. It modifies the list in-place and returns None."
-
-Q: "How do you open and read a file safely in Python?"
-A: "Use the 'with open(filename, mode) as f:' statement. This automatically closes the file even if errors occur."
-
-❌ BAD EXAMPLES (DO NOT DO THIS):
-Q: "_list = []"
-A: "# create our list..."
-
-Q: "with open(txt_file_path, 'r') as f:"
-A: "for line in f: if ':' in line: ..."
-
-JSON FORMAT:
-- Return ONLY a valid JSON array
-- Start with [ and end with ]
-- No markdown, no code blocks
-- Format: [{"question": "...", "answer": "..."}]
-
-Now create ${count} flashcards about: ${topic}`;
-
-        console.log('Generating with Browser LLM...');
-        const response = await orchestrator.generate(prompt);
-        console.log('LLM Response:', response);
-
-        const rawCards = this.parseLLMResponse(response);
-        cards = rawCards.map((c, i) => ({
-          id: `gen-${Date.now()}-${i}`,
-          front: c.question,
-          back: c.answer,
-          topic: topic
-        }));
-
-      } else {
-        const data = await apiService.post('/generate', { topic, count });
-        console.log('Received response:', data);
-        cards = data.cards || [];
-      }
-
-      if (cards && cards.length > 0) {
+      if (cards.length > 0) {
         console.log('Emitting deck:loaded with', cards.length, 'cards');
         eventBus.emit('deck:loaded', cards);
 
