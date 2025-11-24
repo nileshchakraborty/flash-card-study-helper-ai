@@ -13,6 +13,8 @@ dotenv.config();
 // Initialize Cache Services (lightweight for serverless)
 const serperCache = new CacheService({ ttlSeconds: 3600, maxEntries: 50 });
 const llmCache = new CacheService({ ttlSeconds: 86400, maxEntries: 100 });
+const swaggerUI = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
 // Initialize Metrics Service
 const metricsService = new MetricsService('/tmp/.metrics'); // Use /tmp for serverless
@@ -33,5 +35,7 @@ const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metr
 // Initialize Primary Adapter (Server) with Core Service
 const expressServer = new ExpressServer(studyService);
 
+const app = expressServer.getApp().use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSpec));
+
 // Export the Express app for Vercel
-export default expressServer.getApp();
+export default app;
