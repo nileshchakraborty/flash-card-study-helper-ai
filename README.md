@@ -1,7 +1,7 @@
 # Flash Card Study Helper AI
 
 📚 **Overview**
-AI‑powered flash‑card study application with swipeable cards, file uploads, and interactive quizzes.
+An AI‑powered flash‑card study application with swipeable cards, file uploads, and interactive quizzes.
 
 ## Features
 - **Swipeable Flashcards** – Tinder‑like swipe interface for studying

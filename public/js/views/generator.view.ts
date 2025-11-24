@@ -65,26 +65,90 @@ export class GeneratorView extends BaseView {
   async handleGenerate() {
     const topic = this.elements.topicInput.value;
     const count = this.elements.cardCount.value;
-    const useBrowser = this.elements.useBrowserLLM?.checked;
+    // Determine runtime based on presence of LLM Orchestrator (WebLLM)
+    const orchestrator = (window as any).llmOrchestrator;
+    const useBrowser = !!orchestrator; // if orchestrator exists, we will use client‑side generation
+    // runtime variable kept for logging purposes
+    const runtime = useBrowser ? 'webllm' : 'ollama';
 
     this.showLoading();
     try {
-      console.log('Generating flashcards for:', topic, 'count:', count, 'runtime:', useBrowser ? 'webllm' : 'ollama');
+      let cards = [];
 
-      // Get configuration
-      const { ConfigurationService } = await import('../services/ConfigurationService.js');
-      const knowledgeSource = ConfigurationService.getKnowledgeSource();
+      if (useBrowser) {
+        console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: webllm (client-side)');
 
-      // Single API call - backend handles everything including WebLLM
-      const data = await apiService.post('/generate', {
-        topic,
-        count,
-        runtime: useBrowser ? 'webllm' : 'ollama',
-        knowledgeSource
-      });
+        const orchestrator = (window as any).llmOrchestrator;
+        if (!orchestrator) {
+          throw new Error('LLM Orchestrator not initialized for client-side generation.');
+        }
 
-      const cards = data.cards || [];
-      console.log('Received response:', data);
+        // Ensure model is loaded (if not, it might try to load default or fail)
+        if (!orchestrator.isModelLoaded()) {
+          const { config } = orchestrator.getRecommendedStrategy();
+          await orchestrator.loadModel(config);
+        }
+
+        const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.
+
+⚠️ TASK: Create ${count} educational flashcards about: ${topic}
+
+⚠️ CRITICAL RULES:
+1. Ask questions ABOUT the concepts
+2. Provide explanatory answers in plain English
+3. NEVER copy code snippets as questions or answers
+4. Questions must end with "?"
+5. Answers must be 1-3 sentences explaining the concept
+
+✅ CORRECT EXAMPLE:
+Q: "What is the purpose of the 'with' statement when working with files?"
+A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
+
+❌ WRONG (DO NOT DO THIS):
+Q: "with open(txt_file_path, 'r') as f:"
+A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
+
+JSON FORMAT:
+- Return ONLY: [{"question": "...", "answer": "..."}]
+- No code blocks, no markdown, pure JSON array
+
+Create ${count} flashcards`;
+
+        console.log('Generating flashcards with client-side LLM...');
+        const response = await orchestrator.generate(prompt);
+        console.log('Client-side LLM Response:', response);
+
+        cards = this.parseLLMResponse(response);
+
+        if (cards.length > 0) {
+          // Format cards for consistency with backend-generated ones
+          cards = cards.map((c, i) => ({
+            id: `gen-${Date.now()}-${i}`,
+            front: c.question,
+            back: c.answer,
+            topic: topic
+          }));
+        } else {
+          throw new Error('Failed to generate valid flashcards from client-side LLM response');
+        }
+
+      } else {
+        console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: ollama (server-side)');
+
+        // Get configuration
+        const { ConfigurationService } = await import('../services/ConfigurationService.js');
+        const knowledgeSource = ConfigurationService.getKnowledgeSource();
+
+        // Single API call - backend handles everything including WebLLM
+        const data = await apiService.post('/generate', {
+          topic,
+          count,
+          runtime: useBrowser ? 'webllm' : 'ollama',
+          knowledgeSource
+        });
+        cards = data.cards || [];
+        console.log('Received response from backend:', data);
+      }
 
       if (cards.length > 0) {
         console.log('Emitting deck:loaded with', cards.length, 'cards');
@@ -102,7 +166,7 @@ export class GeneratorView extends BaseView {
       }
     } catch (error) {
       console.error('Generation error:', error);
-      alert('Failed to generate flashcards. Please try again.');
+      alert('Failed to generate flashcards. Please try again. Error: ' + error.message);
     } finally {
       this.hideLoading();
     }
