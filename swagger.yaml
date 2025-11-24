@@ -1,0 +1,572 @@
+openapi: 3.0.1
+info:
+  title: Flash Card Study Helper AI API
+  version: 1.0.0
+  description: API contract between frontend and backend for flashcard generation, search, upload, quiz and analytics.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+paths:
+  /api/generate:
+    post:
+      summary: Generate flashcards
+      description: Generate flashcards for a given topic. Supports Ollama and WebLLM runtimes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateRequest'
+      responses:
+        '200':
+          description: Successful generation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/search:
+    post:
+      summary: Search the web
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/scrape:
+    post:
+      summary: Scrape provided URLs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScrapeRequest'
+      responses:
+        '200':
+          description: Scraped content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScrapeResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/upload:
+    post:
+      summary: Upload a file (PDF, image) for flashcard generation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+      responses:
+        '200':
+          description: Generated cards from uploaded file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/brief-answer:
+    post:
+      summary: Get a brief answer for a question using context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BriefAnswerRequest'
+      responses:
+        '200':
+          description: Brief answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BriefAnswerResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/flashcards:
+    get:
+      summary: Retrieve all flashcards (initial load)
+      responses:
+        '200':
+          description: Empty array or stored cards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlashcardsResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/quiz:
+    post:
+      summary: Generate a quiz from provided cards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizRequest'
+      responses:
+        '200':
+          description: Quiz questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/quiz/generate-advanced:
+    post:
+      summary: Generate advanced quiz based on previous results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvancedQuizRequest'
+      responses:
+        '200':
+          description: Advanced quiz data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvancedQuizResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/quiz/history:
+    get:
+      summary: Retrieve quiz history
+      responses:
+        '200':
+          description: List of past quizzes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizHistoryResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Save a quiz result
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizResultRequest'
+      responses:
+        '200':
+          description: Save confirmation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResultResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/decks:
+    get:
+      summary: Retrieve deck history
+      responses:
+        '200':
+          description: List of decks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeckHistoryResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Save a generated deck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeckSaveRequest'
+      responses:
+        '200':
+          description: Save confirmation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeckSaveResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/swipe:
+    post:
+      summary: Record a swipe action (left/right)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwipeRequest'
+      responses:
+        '200':
+          description: Acknowledgement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwipeResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/health:
+    get:
+      summary: Health check for backend services
+      responses:
+        '200':
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    GenerateRequest:
+      type: object
+      required:
+        - topic
+        - count
+      properties:
+        topic:
+          type: string
+          description: Topic for flashcard generation
+        count:
+          type: integer
+          description: Number of flashcards to generate
+        runtime:
+          type: string
+          enum: [ollama, webllm]
+          description: Which AI runtime to use
+        knowledgeSource:
+          type: string
+          enum: [ai-only, web-only, ai-web]
+          description: Source of knowledge for generation
+        mode:
+          type: string
+          enum: [standard, deep-dive]
+          description: Generation mode
+    GenerateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+        recommendedTopics:
+          type: array
+          items:
+            type: string
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+    Flashcard:
+      type: object
+      properties:
+        id:
+          type: string
+        front:
+          type: string
+        back:
+          type: string
+        topic:
+          type: string
+    Metadata:
+      type: object
+      properties:
+        runtime:
+          type: string
+        knowledgeSource:
+          type: string
+        timestamp:
+          type: integer
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+    SearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              link:
+                type: string
+              snippet:
+                type: string
+    ScrapeRequest:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+    ScrapeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        content:
+          type: string
+    UploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        topic:
+          type: string
+    UploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+    BriefAnswerRequest:
+      type: object
+      required:
+        - question
+        - context
+      properties:
+        question:
+          type: string
+        context:
+          type: string
+    BriefAnswerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        briefAnswer:
+          type: string
+    FlashcardsResponse:
+      type: object
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+    QuizRequest:
+      type: object
+      required:
+        - cards
+        - topic
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+        topic:
+          type: string
+    QuizResponse:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizQuestion'
+    QuizQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        cardId:
+          type: string
+        question:
+          type: string
+        correctAnswer:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+    AdvancedQuizRequest:
+      type: object
+      required:
+        - previousResults
+        - mode
+      properties:
+        previousResults:
+          type: array
+          items:
+            type: object
+        mode:
+          type: string
+    AdvancedQuizResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        quiz:
+          type: object
+    QuizHistoryResponse:
+      type: object
+      properties:
+        history:
+          type: array
+          items:
+            type: object
+    QuizResultRequest:
+      type: object
+      properties:
+        result:
+          type: object
+    QuizResultResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        id:
+          type: string
+    DeckHistoryResponse:
+      type: object
+      properties:
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deck'
+    Deck:
+      type: object
+      properties:
+        id:
+          type: string
+        topic:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+        timestamp:
+          type: integer
+    DeckSaveRequest:
+      type: object
+      required:
+        - topic
+        - cards
+      properties:
+        topic:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+    DeckSaveResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        id:
+          type: string
+    SwipeRequest:
+      type: object
+      required:
+        - direction
+        - cardId
+      properties:
+        direction:
+          type: string
+          enum: [left, right]
+        cardId:
+          type: string
+    SwipeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+    HealthResponse:
+      type: object
+      properties:
+        ollama:
+          type: boolean
+        serper:
+          type: boolean
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
