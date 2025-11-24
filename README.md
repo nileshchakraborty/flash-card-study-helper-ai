@@ -1,14 +1,28 @@
 # Flash Card Study Helper AI
 
-📚 **Overview**  
-Flash Card Study Helper AI is an AI‑powered flash‑card application that lets you generate, study, and quiz yourself on any topic. It supports:
+📚 **Overview**
+AI‑powered flash‑card study application with swipeable cards, file uploads, and interactive quizzes.
 
-- Swipeable flashcards (Tinder‑style) for intuitive studying  
-- Topic‑based generation via **local LLM (Ollama)** or **browser‑based WebLLM** (offline)  
-- **Deep Dive** mode for advanced, multi‑step learning  
-- File uploads (PDF, PNG, JPG, GIF) with OCR & PDF parsing  
-- Interactive quizzes and AI‑generated study plans  
-- **Metrics tracking** for every generation (runtime, knowledge source, duration, success, etc.)
+## Features
+- **Swipeable Flashcards** – Tinder‑like swipe interface for studying
+  - Swipe left (or click “Revise”) to put cards back in the deck
+  - Swipe right (or click “Next”) to mark cards as mastered
+  - Works on both mobile (touch) and desktop (mouse/buttons)
+- **Topic‑Based Generation** – Generate flashcards from any topic using AI
+  - Enter a topic and number of cards
+  - AI generates relevant flashcards automatically
+- **File Upload** – Convert PDFs and images into flashcards
+  - Upload PDFs, PNG, JPG, GIF files
+  - Drag and drop support
+  - Automatic text extraction and flashcard generation
+- **Interactive Quiz** – Test your knowledge
+  - Generate quizzes from your flashcards
+  - Answer questions and get instant feedback
+  - Review correct and incorrect answers
+- **Study Plan** – AI‑generated study plans based on your progress
+  - Automatically creates daily study plans
+  - Tracks left/right swipes for revision planning
+  - Recreates plans based on your learning progress
 
 > **Note:** The UI now automatically detects when **“Enable Offline AI”** (WebLLM) is active and uses the appropriate runtime – no manual checkbox needed.
 
