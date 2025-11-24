@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 import { OllamaAdapter } from './adapters/secondary/ollama/index.js';
+import { WebLLMAdapter } from './adapters/secondary/webllm/index.js';
 import { SerperAdapter } from './adapters/secondary/serper/index.js';
 import { FileSystemAdapter } from './adapters/secondary/fs/index.js';
 import { StudyService } from './core/services/StudyService.js';
+import { MetricsService } from './core/services/MetricsService.js';
 import { ExpressServer } from './adapters/primary/express/server.js';
 import { CacheService } from './core/services/CacheService.js';
 
@@ -24,17 +26,31 @@ console.log('🗂️  Cache initialized:', {
     llm: { ttl: `${process.env.CACHE_LLM_TTL_SECONDS || '86400'}s`, max: process.env.CACHE_LLM_MAX_ENTRIES || '500' }
 });
 
-// 1. Initialize Adapters with Cache
+// 1. Initialize Metrics Service
+const metricsService = new MetricsService('.metrics');
+console.log('📊 Metrics service initialized');
+
+// 2. Initialize AI Adapters (both Ollama and WebLLM)
 const ollamaAdapter = new OllamaAdapter(llmCache);
+const webllmAdapter = new WebLLMAdapter(llmCache);
+
+const aiAdapters = {
+    ollama: ollamaAdapter,
+    webllm: webllmAdapter
+};
+
+console.log('🤖 AI adapters initialized:', Object.keys(aiAdapters).join(', '));
+
+// 3. Initialize Other Adapters
 const serperAdapter = new SerperAdapter(serperCache);
 const fsAdapter = new FileSystemAdapter();
 
-// 2. Initialize Core Service with Adapters
-const studyService = new StudyService(ollamaAdapter, serperAdapter, fsAdapter);
+// 4. Initialize Core Service with Multiple Adapters and Metrics
+const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metricsService);
 
-// 3. Initialize Primary Adapter (Server) with Core Service
+// 5. Initialize Primary Adapter (Server) with Core Service
 const server = new ExpressServer(studyService);
 
-// 4. Start Application
+// 6. Start Application
 const PORT = parseInt(process.env.PORT || '3000');
 server.start(PORT);

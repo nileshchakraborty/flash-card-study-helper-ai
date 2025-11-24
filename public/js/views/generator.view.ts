@@ -65,47 +65,28 @@ export class GeneratorView extends BaseView {
   async handleGenerate() {
     const topic = this.elements.topicInput.value;
     const count = this.elements.cardCount.value;
-    const useBrowser = this.elements.useBrowserLLM && this.elements.useBrowserLLM.checked;
+    const useBrowser = this.elements.useBrowserLLM?.checked;
 
     this.showLoading();
     try {
-      console.log('Generating flashcards for:', topic, 'count:', count, 'mode:', useBrowser ? 'browser' : 'server');
+      console.log('Generating flashcards for:', topic, 'count:', count, 'runtime:', useBrowser ? 'webllm' : 'ollama');
 
-      let cards = [];
+      // Get configuration
+      const { ConfigurationService } = await import('../services/ConfigurationService.js');
+      const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
-      if (useBrowser) {
-        // Use LLM Orchestrator with WebLLMGenerator
-        const orchestrator = (window as any).llmOrchestrator;
-        if (!orchestrator) {
-          throw new Error('LLM Orchestrator not initialized');
-        }
+      // Single API call - backend handles everything including WebLLM
+      const data = await apiService.post('/generate', {
+        topic,
+        count,
+        runtime: useBrowser ? 'webllm' : 'ollama',
+        knowledgeSource
+      });
 
-        // Ensure model is loaded
-        if (!orchestrator.isModelLoaded()) {
-          const { config } = orchestrator.getRecommendedStrategy();
-          await orchestrator.loadModel(config, (progress, message) => {
-            console.log(`Loading model: ${Math.round(progress * 100)}% - ${message}`);
-          });
-        }
+      const cards = data.cards || [];
+      console.log('Received response:', data);
 
-        // Use WebLLMGenerator for full flow (same as backend)
-        const { WebLLMGenerator } = await import('../services/WebLLMGenerator.js');
-        const generator = new WebLLMGenerator(orchestrator);
-
-        // Get knowledge source from ConfigurationService
-        const { ConfigurationService } = await import('../services/ConfigurationService.js');
-        const knowledgeSource = ConfigurationService.getKnowledgeSource();
-
-        console.log(`Generating with WebLLM (knowledge source: ${knowledgeSource})...`);
-        cards = await generator.generateFlashcards(topic, count, knowledgeSource);
-
-      } else {
-        const data = await apiService.post('/generate', { topic, count });
-        console.log('Received response:', data);
-        cards = data.cards || [];
-      }
-
-      if (cards && cards.length > 0) {
+      if (cards.length > 0) {
         console.log('Emitting deck:loaded with', cards.length, 'cards');
         eventBus.emit('deck:loaded', cards);
 

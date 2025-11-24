@@ -25,7 +25,7 @@ export interface StoragePort {
 
 // Input Ports (Driving)
 export interface StudyUseCase {
-  generateFlashcards(topic: string, count: number, mode?: 'standard' | 'deep-dive', knowledgeSource?: 'ai-only' | 'web-only' | 'ai-web', parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }>;
+  generateFlashcards(topic: string, count: number, mode?: 'standard' | 'deep-dive', knowledgeSource?: 'ai-only' | 'web-only' | 'ai-web', runtime?: 'ollama' | 'webllm', parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }>;
   processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]>;
   getBriefAnswer(question: string, context: string): Promise<string>;
   generateQuiz(topic: string, count: number): Promise<QuizQuestion[]>;

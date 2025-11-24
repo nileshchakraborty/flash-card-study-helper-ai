@@ -1,0 +1,15 @@
+{"runtime":"ollama","knowledgeSource":"ai-only","mode":"standard","topic":"Python","cardCount":2,"duration":4982,"success":true,"timestamp":1763942620915}
+{"runtime":"ollama","knowledgeSource":"web-only","mode":"standard","topic":"JavaScript closures","cardCount":2,"duration":5387,"success":true,"timestamp":1763942637426}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"TypeScript","cardCount":0,"duration":7773,"success":true,"timestamp":1763942865941}
+{"runtime":"ollama","knowledgeSource":"ai-only","mode":"standard","topic":"React Hooks","cardCount":2,"duration":3093,"success":true,"timestamp":1763942894820}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Redis","cardCount":2,"duration":8920,"success":true,"timestamp":1763943118018}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Python decorators","cardCount":2,"duration":6710,"success":true,"timestamp":1763943250461}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Machine Learning","cardCount":3,"duration":7913,"success":true,"timestamp":1763943278228}
+{"runtime":"webllm","knowledgeSource":"ai-web","mode":"standard","topic":"Web Components","cardCount":2,"duration":6496,"success":true,"timestamp":1763943305253}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL","cardCount":2,"duration":8629,"success":true,"timestamp":1763943346310}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL","cardCount":2,"duration":610,"success":true,"timestamp":1763943411685}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"GraphQL","cardCount":9,"duration":12632,"success":true,"timestamp":1763943466835}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Kubernetes","cardCount":2,"duration":7574,"success":true,"timestamp":1763943618885}
+{"runtime":"webllm","knowledgeSource":"ai-web","mode":"standard","topic":"calculus","cardCount":2,"duration":6503,"success":true,"timestamp":1763943878213}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"calculus","cardCount":10,"duration":12889,"success":true,"timestamp":1763943898319}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Euler's Method, Multivariable Calculus, Differential Equations, Variational Calculus, Integral Equations (Fundamentals)","cardCount":10,"duration":19271,"success":true,"timestamp":1763943942384}

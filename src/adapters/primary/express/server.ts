@@ -25,15 +25,25 @@ export class ExpressServer {
     // Flashcards
     this.app.post('/api/generate', async (req, res) => {
       try {
-        const { topic, count, mode, knowledgeSource, parentTopic } = req.body;
+        const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
         const result = await this.studyService.generateFlashcards(
           topic,
           count || 10,
           mode,
           knowledgeSource || 'ai-web',
+          runtime || 'ollama', // Default to ollama for backward compatibility
           parentTopic
         );
-        res.json({ success: true, cards: result.cards, recommendedTopics: result.recommendedTopics });
+        res.json({
+          success: true,
+          cards: result.cards,
+          recommendedTopics: result.recommendedTopics,
+          metadata: {
+            runtime: runtime || 'ollama',
+            knowledgeSource: knowledgeSource || 'ai-web',
+            timestamp: Date.now()
+          }
+        });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
