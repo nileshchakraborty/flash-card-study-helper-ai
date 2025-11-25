@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 import type { StudyUseCase } from '../../../core/ports/interfaces.js';
 
 export class ExpressServer {
@@ -19,6 +21,10 @@ export class ExpressServer {
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use(express.static('public'));
+
+    // Swagger UI
+    const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
   }
 
   private setupRoutes() {
@@ -189,6 +195,14 @@ export class ExpressServer {
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
+    });
+
+    // Health check
+    this.app.get('/api/health', (req, res) => {
+      res.json({
+        ollama: true, // In a real app, check connection
+        serper: true  // In a real app, check connection
+      });
     });
 
     // Serve index.html for all other routes (SPA)
