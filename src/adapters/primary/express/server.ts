@@ -4,22 +4,47 @@ import multer from 'multer';
 import path from 'path';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { AuthService } from '../../../core/services/AuthService.js';
+import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
+import { authenticate } from './middleware/auth.middleware.js';
 import type { StudyUseCase } from '../../../core/ports/interfaces.js';
+import type { QueueService } from '../../../core/services/QueueService.js';
+import type { FlashcardCacheService } from '../../../core/services/FlashcardCacheService.js';
 
 export class ExpressServer {
   private app: express.Application;
   private upload: multer.Multer;
+  private authService: AuthService;
 
-  constructor(private studyService: StudyUseCase) {
+  constructor(
+    private studyService: StudyUseCase,
+    private queueService?: QueueService,
+    private flashcardCache?: FlashcardCacheService
+  ) {
     this.app = express();
     this.upload = multer({ storage: multer.memoryStorage() });
+    this.authService = new AuthService();
+    this.setupPassport();
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  private setupPassport() {
+    passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
+      callbackURL: '/api/auth/google/callback'
+    }, (accessToken, refreshToken, profile, done) => {
+      return done(null, profile);
+    }));
   }
 
   private setupMiddleware() {
     this.app.use(cors());
     this.app.use(express.json());
+    this.app.use(passport.initialize());
     this.app.use(express.static('public'));
 
     // Swagger UI
@@ -28,28 +53,116 @@ export class ExpressServer {
   }
 
   private setupRoutes() {
-    // Flashcards
-    this.app.post('/api/generate', async (req, res) => {
+    // Auth Routes
+    this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+    this.app.get('/api/auth/google/callback',
+      passport.authenticate('google', { session: false, failureRedirect: '/' }),
+      async (req, res) => {
+        const user = req.user as any;
+        const token = await this.authService.encryptToken({
+          id: user.id,
+          email: user.emails?.[0]?.value,
+          name: user.displayName
+        });
+        // Redirect to frontend with token
+        res.redirect(`/?token=${token}`);
+      }
+    );
+
+    // Flashcards (Protected - Async via Queue)
+    this.app.post('/api/generate', apiRateLimiter, authenticate, async (req, res) => {
       try {
         const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
-        const result = await this.studyService.generateFlashcards(
-          topic,
-          count || 10,
-          mode,
-          knowledgeSource || 'ai-web',
-          runtime || 'ollama', // Default to ollama for backward compatibility
-          parentTopic
-        );
-        res.json({
-          success: true,
-          cards: result.cards,
-          recommendedTopics: result.recommendedTopics,
-          metadata: {
-            runtime: runtime || 'ollama',
-            knowledgeSource: knowledgeSource || 'ai-web',
-            timestamp: Date.now()
+
+        // Check cache first
+        if (this.flashcardCache) {
+          const cachedResult = this.flashcardCache.get(
+            topic,
+            count || 10,
+            mode,
+            knowledgeSource
+          );
+
+          if (cachedResult) {
+            res.json({
+              success: true,
+              cached: true,
+              ...cachedResult
+            });
+            return;
           }
-        });
+        }
+
+        // If queue is available, offload to background job
+        if (this.queueService) {
+          const jobId = await this.queueService.addGenerateJob({
+            topic,
+            count: count || 10,
+            mode,
+            knowledgeSource: knowledgeSource || 'ai-web',
+            runtime: runtime || 'ollama',
+            parentTopic,
+            userId: (req as any).user?.id
+          });
+
+          res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Job queued for processing',
+            statusUrl: `/api/jobs/${jobId}`
+          });
+        } else {
+          // Fallback to synchronous processing if queue not available
+          const result = await this.studyService.generateFlashcards(
+            topic,
+            count || 10,
+            mode,
+            knowledgeSource || 'ai-web',
+            runtime || 'ollama',
+            parentTopic
+          );
+          res.json({
+            success: true,
+            cards: result.cards,
+            recommendedTopics: result.recommendedTopics,
+            metadata: {
+              runtime: runtime || 'ollama',
+              knowledgeSource: knowledgeSource || 'ai-web',
+              timestamp: Date.now()
+            }
+          });
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Job Status Endpoint
+    this.app.get('/api/jobs/:id', authenticate, async (req, res) => {
+      try {
+        if (!this.queueService) {
+          res.status(404).json({ error: 'Queue service not available' });
+          return;
+        }
+
+        const status = await this.queueService.getJobStatus(req.params.id);
+        res.json(status);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Queue Statistics (Admin)
+    this.app.get('/api/queue/stats', authenticate, async (req, res) => {
+      try {
+        if (!this.queueService) {
+          res.status(404).json({ error: 'Queue service not available' });
+          return;
+        }
+
+        const stats = await this.queueService.getQueueStats();
+        res.json(stats);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -77,7 +190,7 @@ export class ExpressServer {
       }
     });
 
-    this.app.post('/api/upload', this.upload.single('file'), async (req, res) => {
+    this.app.post('/api/upload', apiRateLimiter, authenticate, this.upload.single('file'), async (req, res) => {
       try {
         const file = req.file;
         const topic = req.body.topic || 'General';
@@ -116,7 +229,7 @@ export class ExpressServer {
     });
 
     // Quiz
-    this.app.post('/api/quiz', async (req, res) => {
+    this.app.post('/api/quiz', apiRateLimiter, authenticate, async (req, res) => {
       try {
         const { cards, topic } = req.body;
         // Generate quiz questions from provided cards
