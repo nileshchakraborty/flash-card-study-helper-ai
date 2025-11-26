@@ -322,9 +322,9 @@ Create ${count} flashcards now:`;
     // 3. Regex Fallback (Improved)
     const cards: any[] = [];
 
-    // Regex to capture {"question": "...", "answer": "..."} patterns
+    // Regex to capture {"question": "...", "answer": "..."} or {"front": "...", "back": "..."} patterns
     // Handles escaped quotes and newlines
-    const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+    const objectRegex = /\{\s*"(?:question|front)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"(?:answer|back)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
 
     let match;
     while ((match = objectRegex.exec(text)) !== null) {
@@ -339,6 +339,23 @@ Create ${count} flashcards now:`;
       } catch (e) {
         // Last resort fallback
         cards.push({ question: match[1], answer: match[2] });
+      }
+    }
+
+    // Also try to match loose "front": "..." "back": "..." patterns (not in JSON object)
+    if (cards.length === 0) {
+      const looseRegex = /"front"\s*:\s*"((?:[^"\\]|\\.)*)"\s*[,\s]*"back"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+      let looseMatch;
+      while ((looseMatch = looseRegex.exec(text)) !== null) {
+        try {
+          const qRaw = looseMatch[1].replace(/\n/g, '\\n');
+          const aRaw = looseMatch[2].replace(/\n/g, '\\n');
+          const question = JSON.parse(`"${qRaw}"`);
+          const answer = JSON.parse(`"${aRaw}"`);
+          cards.push({ question, answer });
+        } catch (e) {
+          cards.push({ question: looseMatch[1], answer: looseMatch[2] });
+        }
       }
     }
 
@@ -365,8 +382,18 @@ Create ${count} flashcards now:`;
       const matches = text.match(/\{[^{}]+\}/g);
       if (matches) {
         const results = matches.map(m => {
-          try { return JSON.parse(m); } catch { return null; }
-        }).filter(r => r && r.question && r.answer);
+          try { 
+            const parsed = JSON.parse(m);
+            // Check for both question/answer and front/back formats
+            if ((parsed.question && parsed.answer) || (parsed.front && parsed.back)) {
+              return {
+                question: parsed.question || parsed.front,
+                answer: parsed.answer || parsed.back
+              };
+            }
+            return null;
+          } catch { return null; }
+        }).filter(r => r !== null);
 
         if (results.length > 0) return results;
       }

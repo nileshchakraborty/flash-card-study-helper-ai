@@ -1,225 +1,367 @@
-# Flash Card Study Helper AI
+# Flash Card Study Helper API
 
-📚 **Overview**
-An AI‑powered flash‑card study application with swipeable cards, file uploads, and interactive quizzes.
+**A backend-focused service for AI-powered flashcard generation and study assistance.**
 
-## Features
-- **Swipeable Flashcards** – Tinder‑like swipe interface for studying
-  - Swipe left (or click “Revise”) to put cards back in the deck
-  - Swipe right (or click “Next”) to mark cards as mastered
-  - Works on both mobile (touch) and desktop (mouse/buttons)
-- **Topic‑Based Generation** – Generate flashcards from any topic using AI
-  - Enter a topic and number of cards
-  - AI generates relevant flashcards automatically
-- **File Upload** – Convert PDFs and images into flashcards
-  - Upload PDFs, PNG, JPG, GIF files
-  - Drag and drop support
-  - Automatic text extraction and flashcard generation
-- **Interactive Quiz** – Test your knowledge
-  - Generate quizzes from your flashcards
-  - Answer questions and get instant feedback
-  - Review correct and incorrect answers
-- **Study Plan** – AI‑generated study plans based on your progress
-  - Automatically creates daily study plans
-  - Tracks left/right swipes for revision planning
-  - Recreates plans based on your learning progress
+This project implements a **Clean Architecture**-based API that leverages LLMs (Ollama, WebLLM) and web search (Serper) to generate high-quality educational content. The frontend is provided as a reference implementation to demonstrate the API's capabilities.
 
-> **Note:** The UI now automatically detects when **“Enable Offline AI”** (WebLLM) is active and uses the appropriate runtime – no manual checkbox needed.
+## 🏗 Architecture
 
----
+The system follows **Clean Architecture** principles to ensure separation of concerns, maintainability, and testability:
+
+- **Core (Domain)**: Contains business logic and interfaces.
+  - `StudyService`: Orchestrates generation, quiz creation, and deep dive logic.
+  - `MetricsService`: Tracks usage and performance metrics.
+- **Ports**: Defines interfaces for external dependencies.
+  - `StudyUseCase`: Primary port for the application.
+  - `LLMPort`, `SearchPort`: Secondary ports for AI and Search services.
+- **Adapters**: Implements the ports.
+  - **Primary**: Express Server (REST API).
+  - **Secondary**: 
+    - `HybridOllamaAdapter`: Connects to Ollama via MCP or direct (with fallback).
+    - `WebLLMAdapter`: Connects to browser-based LLM (via client bridge).
+    - `HybridSerperAdapter`: Connects to Serper.dev via MCP or direct (with fallback).
+    - `FileSystemAdapter`: Handles file I/O.
+- **MCP Layer** (Optional, Feature Flag):
+  - `MCPClientWrapper`: Connects to MCP server with circuit breaker.
+  - `MCP Server`: Standalone process with tools for Ollama, Serper, etc.
+  - Automatic fallback to direct adapters on failure.
+- **Resilience Layer**:
+  - `QueueService` (BullMQ): Background job processing with retry and DLQ.
+  - `ResilienceService` (Opossum): Circuit breakers for external dependencies.
+  - `LoggerService` (Winston): Structured logging.
+  - `FlashcardCacheService`: In-memory cache for instant repeated queries.
+
+### Request Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as Express Server
+    participant Q as Queue (BullMQ)
+    participant W as Worker
+    participant CB as Circuit Breaker
+    participant EXT as External API
+    participant R as Redis
+
+    C->>API: POST /api/generate
+    API->>Q: Add Job
+    Q->>R: Store Job
+    API-->>C: 202 Accepted (jobId)
+    C->>API: GET /api/jobs/:id (poll)
+    API->>Q: Get Job Status
+    Q->>R: Query Job
+    API-->>C: Status: waiting/active/completed
+    
+    Note over W: Background Processing
+    W->>Q: Pull Job
+    W->>CB: Execute via Circuit Breaker
+    alt Circuit Closed
+        CB->>EXT: Call External API
+        EXT-->>CB: Response
+        CB-->>W: Success
+    else Circuit Open
+        CB-->>W: Fallback/Error
+    end
+    W->>Q: Update Job (completed/failed)
+    
+    C->>API: GET /api/jobs/:id
+    API->>Q: Get Result
+    API-->>C: 200 OK (cards)
+```
+
+### Resilience Patterns
+
+```mermaid
+graph TB
+    Request["API Request"] --> RateLimit["fa:fa-shield Rate Limiter"]
+    RateLimit --> Auth["fa:fa-lock Authentication"]
+    Auth --> Queue["fa:fa-list Queue (BullMQ)"]
+    Queue --> Worker["fa:fa-cog Worker"]
+    Worker --> CircuitBreaker["fa:fa-bolt Circuit Breaker"]
+    
+    CircuitBreaker -->|Closed| ExternalAPI["fa:fa-server External API"]
+    CircuitBreaker -->|Open| Fallback["fa:fa-life-ring Fallback"]
+    
+    Worker -->|Success| CompleteJob["fa:fa-check Complete Job"]
+    Worker -->|Failure| Retry{"Retry?"}
+    Retry -->|Yes, Backoff| Queue
+    Retry -->|No, Exhausted| DLQ["fa:fa-skull Dead Letter Queue"]
+    
+    style Queue fill:#e1f5ff
+    style CircuitBreaker fill:#fff3cd
+    style DLQ fill:#f8d7da
+```
+
+## 📖 API Documentation
+
+Interactive API documentation is available via **Swagger UI**:
+
+- **URL**: `http://localhost:3000/api-docs`
+- **Specification**: `swagger.yaml`
+
+Explore and test all endpoints directly from your browser.
+
+## ✨ Key Features
+
+### Security & Authentication
+- 🔐 **OAuth 2.0** (Google) for user authentication
+- 🔒 **JWE Token Encryption** for secure sessions
+- 🛡️ **Rate Limiting** (API: 100/15min, Auth: 5/hour)
+- ✅ **Auth Middleware** protecting sensitive endpoints
+
+### Performance & Resilience
+- ⚡ **In-Memory Caching** for instant repeated queries (1 hour TTL)
+- 🔄 **Background Queue** with retry and Dead Letter Queue (BullMQ)
+- 🔌 **Circuit Breakers** preventing cascading failures (Opossum)
+- 📊 **Structured Logging** for observability (Winston)
+- 🎯 **Proactive Deep Dive** - auto-generates related topics in background
+
+### MCP Integration (Optional)
+- 🌐 **Model Context Protocol** server for external service calls
+- 🔀 **Hybrid Adapters** with automatic fallback
+- 🚦 **Feature Flag** (`USE_MCP_SERVER`) for safe rollout
+- 💪 **Zero Downtime** - works with or without MCP
+
+### AI & Search
+- 🤖 Multiple LLM runtimes (Ollama, WebLLM)
+- 🔍 Web search integration (Serper)
+- 📄 PDF/Image processing for flashcard generation
+- 🎓 Quiz generation from flashcards
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js** ≥ 14  
-- **Ollama** (for local LLM) – optional if you prefer WebLLM only  
+- **Node.js** ≥ 18 (tested with v22)
+- **Redis** (for queue management)
+- **Ollama** (optional, for local LLM - default model: llama3.2:latest)
+
+> **Note**: This project uses `tsx` for TypeScript execution in development mode, which provides better compatibility with Node.js v22+ and ESM modules.
 
 ### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd flash-card-study-helper-ai
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   **Required Variables:**
+   ```bash
+   # Google OAuth (for authentication)
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   
+   # JWE Token Encryption
+   JWE_SECRET_KEY=your_32_char_secret_key
+   
+   # Serper API (for web search)
+   SERPER_API_KEY=your_serper_api_key
+   
+   # Ollama Configuration
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=llama3.2:latest
+   
+   # Redis (for queue)
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
+   
+   # MCP Feature Flag (optional, default: false)
+   USE_MCP_SERVER=false
+   ```
+
+### Running the Service
+
+**Development Mode** (Recommended for development)
 ```bash
-# 1️⃣ Clone the repo
-git clone [https://github.com/your-repo/flash-card-study-helper-ai](https://github.com/your-repo/flash-card-study-helper-ai)
-cd flash-card-study-helper-ai
+# Start Redis
+brew services start redis  # or docker run -p 6379:6379 redis
 
-# 2️⃣ Install dependencies
-npm install
-
-# 3️⃣ Set up environment variables
-cp .env.example .env
-# Edit .env → set OLLAMA_BASE_URL, OLLAMA_MODEL, SERPER_API_KEY, etc.
-
-# Ollama Setup (optional)
-```bash
-# Install Ollama (https://ollama.ai)
-ollama pull llama3.2   # or any Ollama‑compatible model
+# Run in development mode (uses tsx for hot TypeScript execution)
+npm run dev
 ```
 
-# Run the Application
+**Production Mode**
 ```bash
-npm start
-# Open http://localhost:3000 in your browser
+# Build backend and frontend
+npm run build:all
+
+# Start Redis
+brew services start redis  # or docker run -p 6379:6379 redis
+
+# Start server
+npm run serve
 ```
 
-### Development
+**With MCP Server** (Optional)
 ```bash
-npm run demo   # runs a quick demo of core functionality
-npm run build  # builds the frontend (esbuild)
+# Build MCP server
+npx tsc -p mcp-server/tsconfig.json
+
+# Enable MCP
+export USE_MCP_SERVER=true
+
+# Start in development mode
+npm run dev
 ```
 
----
+- **API Root**: `http://localhost:3000/api`
+- **Swagger UI**: `http://localhost:3000/api-docs`
+- **Demo Client**: `http://localhost:3000`
+- **Health Check**: `http://localhost:3000/api/health`
 
-## 🎯 Usage
+## 📡 Key API Endpoints
 
-### 1️⃣ Create Flashcards
-- Create Cards tab → enter a topic and card count.
-- Enable Offline AI (bottom‑right) to use WebLLM; otherwise Ollama is used.
-- Click Generate Flashcards → cards appear in the Study tab.
+### Flashcard Generation
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| **POST** | `/api/generate` | Generate flashcards (async, returns jobId) | Yes |
+| **GET** | `/api/jobs/:id` | Poll job status and retrieve results | Yes |
+| **POST** | `/api/upload` | Upload PDF/Image for processing | Yes |
 
-### 2️⃣ Deep Dive Mode
-- After finishing a deck, select Deep Dive (radio button).
-- Click Move to Harder Questions → the system generates advanced cards based on the current topic.
+### Authentication
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| **GET** | `/api/auth/google` | Initiate Google OAuth flow | No |
+| **GET** | `/api/auth/google/callback` | OAuth callback (returns JWE token) | No |
 
-### 3️⃣ Quiz
-- Quiz tab → set number of questions → answer and review results.
+### Admin & Monitoring
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| **GET** | `/api/health` | Service health check | No |
+| **GET** | `/api/queue/stats` | Queue statistics (jobs processed, DLQ, etc.) | Yes |
+| **GET** | `/api-docs` | Interactive Swagger UI documentation | No |
 
-### 4️⃣ Study Plan
-- The app builds a daily study plan based on your swipe history.
-
----
-
-## 📡 API Endpoints
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | /api/flashcards | Retrieve all flashcards |
-| POST | /api/flashcards | Add flashcards manually |
-| POST | /api/upload | Upload PDFs/images for conversion |
-| POST | /api/generate | Generate flashcards (supports `runtime: 'ollama'` and `runtime: 'webllm'`) |
-| GET | /api/quiz?size=5 | Generate a quiz |
-| POST | /api/quiz/grade | Grade quiz answers |
-| POST | /api/swipe | Record swipe action |
-| GET | /api/swipe-history | Swipe statistics |
-| GET | /api/study-plan | Generate study plan |
-| POST | /api/reset | Reset the deck |
-| GET | /api/health | Health check (Ollama & Serper) |
-
-Example – Ollama generation
-
-```bash
-curl -X POST http://localhost:3000/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"topic":"React Hooks","count":3,"runtime":"ollama","knowledgeSource":"ai-only"}'
-```
-
-Example – WebLLM generation
-
-```bash
-curl -X POST http://localhost:3000/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"topic":"Kubernetes","count":2,"runtime":"webllm","knowledgeSource":"ai-web"}'
-```
-
----
+*See Swagger UI for complete API reference and request/response schemas.*
 
 ## 🤖 AI Integration
 
-### Ollama (Server‑side)
-Generates flashcards, summaries, search queries, and deep‑dive content.
-Configurable via .env (OLLAMA_BASE_URL, OLLAMA_MODEL).
+The service supports multiple AI runtimes:
 
-### WebLLM (Browser‑side)
-Runs entirely in the browser when Enable Offline AI is active.
-The UI now automatically selects runtime: 'webllm' based on the ModelManagerUI state.
+1.  **Ollama (Server-side)** - Default
+    - Runs locally on the server
+    - Powerful models (llama3.2, mistral, etc.)
+    - Can use MCP server or direct connection
+    - Configured via `.env`
 
-### Knowledge Sources
+2.  **WebLLM (Client-side)**
+    - Runs in user's browser (WebGPU)
+    - Zero server cost
+    - Always uses direct connection (no MCP)
 
-- ai-only – Pure LLM generation.
-- web-only – Web search only (no LLM).
-- ai-web – Combined LLM + web search (default).
+### MCP Architecture (Optional)
 
----
-
-## 📊 Metrics Service
-
-All generation attempts are logged to .metrics/generations.jsonl with:
-
-```json
-{
-  "runtime":"ollama|webllm",
-  "knowledgeSource":"ai-only|web-only|ai-web",
-  "mode":"standard|deep-dive",
-  "topic":"Your Topic",
-  "cardCount":5,
-  "duration":1234,
-  "success":true,
-  "timestamp":1763942894820
-}
+```mermaid
+graph LR
+    Request[API Request] --> Hybrid[Hybrid Adapter]
+    Hybrid --> |MCP Enabled| MCPClient[MCP Client + Circuit Breaker]
+    Hybrid --> |MCP Disabled/Failed| Direct[Direct Adapter]
+    
+    MCPClient --> |Success| MCPServer[MCP Server]
+    MCPClient --> |Failure| Direct
+    
+    MCPServer --> Ollama[Ollama API]
+    MCPServer --> Serper[Serper API]
+    
+    Direct --> Ollama
+    Direct --> Serper
+    
+    style MCPClient fill:#fff3cd
+    style Direct fill:#d4edda
 ```
 
-Metrics are loaded on server start and used for analytics & future model training.
+**Benefits:**
+- Standardized interface for all external services
+- Circuit breaker on all MCP calls
+- Automatic fallback to direct adapters
+- Zero breaking changes (opt-in via feature flag)
 
----
-
-## 🛠️ Project Structure
+## 🛠 Project Structure
 
 ```bash
 flash-card-study-helper-ai/
+├── mcp-server/          # MCP Server (Optional)
+│   ├── tools/           # MCP Tools (Ollama, Serper, etc.)
+│   └── index.ts         # MCP Server Entry Point
 ├── src/
 │   ├── adapters/
-│   │   ├── secondary/
-│   │   │   ├── ollama/          # Ollama adapter
-│   │   │   └── serper/          # Web search adapter
-│   │   └── primary/
-│   │       └── express/         # API server
+│   │   ├── primary/     # Express Server, Middleware
+│   │   └── secondary/   # External Service Adapters
+│   │       ├── mcp/     # MCP Client Wrapper
+│   │       ├── ollama/  # Ollama Adapters (Direct + Hybrid)
+│   │       └── serper/  # Serper Adapters (Direct + Hybrid)
 │   ├── core/
-│   │   ├── ports/               # Interfaces
-│   │   └── services/
-│   │       ├── StudyService.ts  # Orchestrates generation & deep‑dive
-│   │       └── MetricsService.ts# Tracks generation metrics
-│   └── index.ts                 # Application entry point
-├── public/
-│   ├── js/
-│   │   ├── services/
-│   │   │   ├── api.service.ts          # Wrapper for API calls
-│   │   │   ├── llm/
-│   │   │   │   └── LLMOrchestrator.ts   # Handles WebLLM model loading
-│   │   │   └── ConfigurationService.ts # (now deprecated – runtime auto‑detect)
-│   │   └── views/
-│   │       ├── generator.view.ts       # UI for card generation
-│   │       └── quiz.view.ts
-│   └── index.html
-├── .metrics/                    # JSONL logs
-├── .env & .env.example
-└── README.md
+│   │   ├── domain/      # Business Models
+│   │   ├── ports/       # Interface Definitions
+│   │   └── services/    # Core Business Logic
+│   └── index.ts         # Composition Root
+├── public/              # Frontend Demo
+├── tests/               # Unit & Integration Tests
+└── swagger.yaml         # OpenAPI Specification
 ```
 
----
+## 🧪 Testing
 
-## 📦 Future Enhancements (Roadmap)
+```bash
+# Run all tests
+npm test
 
-- Real‑time AI service integration (e.g., OpenAI, Anthropic)
-- User authentication & data persistence
-- Spaced‑repetition algorithm
-- Export / import flashcards
-- Multiple decks & sharing
-- Advanced analytics & progress dashboards
-- Quiz Mode with AI grading 
-- Metrics service for tracking generation metrics
-- Backend API with health checks
+# Run with coverage
+npm test -- --coverage
+```
 
----
+**Test Coverage:**
+- ✅ Unit tests for all core services (Cache, Auth, Resilience)
+- ✅ Integration tests for API endpoints
+- ✅ Workflow tests for cache-queue integration
+
+## 🔧 Configuration Reference
+
+### Feature Flags
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_MCP_SERVER` | `false` | Enable MCP server integration |
+
+### Caching
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CACHE_LLM_TTL_SECONDS` | `86400` | LLM response cache TTL (1 day) |
+| `CACHE_SERPER_TTL_SECONDS` | `3600` | Serper result cache TTL (1 hour) |
+
+### Rate Limiting
+
+- API endpoints: 100 requests per 15 minutes
+- Auth endpoints: 5 requests per hour
+
+## 📊 Monitoring
+
+### Health Check
+```bash
+curl http://localhost:3000/api/health
+# Response: {"ollama":true,"serper":true}
+```
+
+### Queue Stats
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:3000/api/queue/stats
+```
+
+### Logs
+- **Console**: Structured JSON logs (Winston)
+- **Files**: `error.log`, `combined.log`
 
 ## 📝 License
 
 MIT
-
----
-
-## 📚 Quick Reference – Enabling Offline AI
-
-1. Click Enable Offline AI (bottom‑right).
-2. The UI now automatically sets runtime: 'webllm' for the next generation request.
-3. No manual checkbox is needed – the change is handled in 
-generator.view.ts by checking llmOrchestrator.isModelLoaded().
-
-
-Enjoy building smarter study sessions! 🎓✨

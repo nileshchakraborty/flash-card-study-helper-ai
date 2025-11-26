@@ -5,19 +5,21 @@ import {eventBus} from '../utils/event-bus.js';
 export class QuizModel {
   questions: any[] = [];
   currentIndex: number = 0;
-  back: Record<string, any> = {};
+  answers: Record<string, any> = {};
   history: any[] = [];
   mode: string = 'standard'; // standard, web, advanced
+  currentTopic: string = 'General';
   
   constructor() {
     // Properties are now initialized directly on the class
   }
   
-  startQuiz(questions, mode = 'standard') {
+  startQuiz(questions, mode = 'standard', topic = 'General') {
     this.questions = questions;
     this.mode = mode;
     this.currentIndex = 0;
     this.answers = {};
+    this.currentTopic = topic;
     eventBus.emit('quiz:started', this.getCurrentQuestion());
   }
   
@@ -47,38 +49,45 @@ export class QuizModel {
     return false;
   }
   
-  async submitQuiz(topic = 'General') {
+  async submitQuiz(topic?: string) {
+    const quizTopic = topic || this.currentTopic || 'General';
     let score = 0;
     const results = this.questions.map(q => {
       const userAnswer = this.answers[q.id];
       const isCorrect = userAnswer === q.correctAnswer;
       if (isCorrect) score++;
       return {
-        cardId: q.id,
+        cardId: q.id || q.cardId,
         question: q.question,
         userAnswer,
         correctAnswer: q.correctAnswer,
         correct: isCorrect,
-        expected: q.correctAnswer // Ensure expected is passed for UI
+        expected: q.correctAnswer || q.expected // Ensure expected is passed for UI
       };
     });
     
     const quizResult = {
       score,
       total: this.questions.length,
-      topic,
+      topic: quizTopic,
       results,
       timestamp: Date.now()
     };
     
     try {
-      const response = await apiService.post('/quiz/history', quizResult);
-      quizResult.id = response.id; // Add ID from server
+      const response = await apiService.post('/api/quiz/history', quizResult);
+      if (response && response.id) {
+        quizResult.id = response.id; // Add ID from server
+      }
       this.history.unshift(quizResult); // Add to local history
       eventBus.emit('quiz:completed', quizResult);
       eventBus.emit('quiz:history-updated', this.history);
     } catch (error) {
       console.error('Failed to save quiz result:', error);
+      // Still emit events even if save fails
+      this.history.unshift(quizResult);
+      eventBus.emit('quiz:completed', quizResult);
+      eventBus.emit('quiz:history-updated', this.history);
     }
     
     return quizResult;

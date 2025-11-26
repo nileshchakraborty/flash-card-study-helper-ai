@@ -53,12 +53,62 @@ export class QuizView extends BaseView {
   }
 
   bindEvents() {
+    // Quiz form submission
+    const quizForm = this.getElement('#quiz-form');
+    if (quizForm) {
+      this.bind(quizForm, 'submit', async (e) => {
+        e.preventDefault();
+        const countInput = this.getElement('#quiz-size') as HTMLInputElement;
+        const topicInput = this.getElement('#quiz-topic-input') as HTMLInputElement;
+        const timerInput = this.getElement('#quiz-timer') as HTMLSelectElement;
+        
+        const count = parseInt(countInput?.value || '5');
+        const topic = topicInput?.value || 'General';
+        const timer = parseInt(timerInput?.value || '0');
+        
+        // Store timer setting
+        (window as any).quizTimer = timer;
+        
+        eventBus.emit('quiz:request-start', { count, topic, timer });
+      });
+    }
+
+    // Quiz from cards button
+    const quizFromCardsBtn = this.getElement('#quiz-from-cards');
+    if (quizFromCardsBtn) {
+      this.bind(quizFromCardsBtn, 'click', () => {
+        // Hide web options, show form
+        if (this.elements.webOptions) {
+          this.elements.webOptions.classList.add('hidden');
+        }
+        const topicInput = this.getElement('#quiz-topic-input') as HTMLInputElement;
+        if (topicInput) {
+          topicInput.value = '';
+        }
+        // Import deckModel to get current topic
+        import('../models/deck.model.js').then(({ deckModel }) => {
+          if (topicInput && deckModel.currentTopic) {
+            topicInput.value = deckModel.currentTopic;
+          }
+        });
+      });
+    }
+
+    // Quiz from web button
+    if (this.elements.webQuizBtn) {
+      this.bind(this.elements.webQuizBtn, 'click', () => {
+        if (this.elements.webOptions) {
+          this.elements.webOptions.classList.toggle('hidden');
+        }
+      });
+    }
+
+    // Legacy start button (if exists)
     if (this.elements.startBtn) {
       this.bind(this.elements.startBtn, 'click', async () => {
-        const count = document.getElementById('quiz-count').value;
-        const topic = 'General'; // Or from deck
-        // For simplicity, we'll generate from current deck or API
-        // Ideally, this should be handled by controller or model
+        const countInput = this.getElement('#quiz-count') as HTMLInputElement;
+        const count = parseInt(countInput?.value || '5');
+        const topic = 'General';
         eventBus.emit('quiz:request-start', { count, topic });
       });
     }
@@ -78,12 +128,6 @@ export class QuizView extends BaseView {
     if (this.elements.closePopupBtn) {
       this.bind(this.elements.closePopupBtn, 'click', () => this.hide(this.elements.popup));
     }
-
-    if (this.elements.webQuizBtn) {
-      this.bind(this.elements.webQuizBtn, 'click', () => {
-        this.elements.webOptions.classList.toggle('hidden');
-      });
-    }
   }
 
   showQuestionUI() {
@@ -93,58 +137,102 @@ export class QuizView extends BaseView {
   }
 
   showResultsUI(result) {
+    this.hide(this.elements.setup);
     this.hide(this.elements.questions);
     this.show(this.elements.results);
 
-    const scoreEl = this.getElement('#quiz-score');
-    if (scoreEl) scoreEl.textContent = `${result.score}/${result.total}`;
-
-    const answersDiv = this.getElement('#quiz-answers');
-    if (answersDiv) {
-      answersDiv.innerHTML = '';
-      result.results.forEach((res, idx) => {
-        const div = document.createElement('div');
-        div.className = `quiz-answer-item ${res.correct ? 'correct' : 'incorrect'}`;
-        div.innerHTML = `
-          <div class="answer-header">
-            <span class="answer-number">Question ${idx + 1}</span>
-            <span class="answer-status">${res.correct ? '✓ Correct' : '✗ Incorrect'}</span>
+    const percentage = Math.round((result.score / result.total) * 100);
+    const resultsHTML = `
+      <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Quiz Results</h2>
+        <div class="text-4xl font-bold ${percentage >= 70 ? 'text-green-600' : 'text-orange-500'} mb-2">
+          ${result.score}/${result.total}
+        </div>
+        <div class="text-lg text-gray-600">${percentage}% Correct</div>
+      </div>
+      <div class="space-y-4" id="quiz-answers">
+        ${result.results.map((res: any, idx: number) => `
+          <div class="p-4 rounded-lg border-2 ${res.correct ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-semibold text-gray-900">Question ${idx + 1}</span>
+              <span class="text-sm font-medium ${res.correct ? 'text-green-700' : 'text-red-700'}">
+                ${res.correct ? '✓ Correct' : '✗ Incorrect'}
+              </span>
+            </div>
+            <div class="text-gray-800 mb-2"><strong>Q:</strong> ${res.question}</div>
+            <div class="text-sm text-gray-600 mb-1"><strong>Correct Answer:</strong> ${res.correctAnswer || res.expected}</div>
+            ${!res.correct ? `<div class="text-sm text-red-600"><strong>Your Answer:</strong> ${res.userAnswer || '(No answer provided)'}</div>` : ''}
           </div>
-          <div class="answer-question"><strong>Q:</strong> ${res.question}</div>
-          <div class="answer-expected"><strong>Expected:</strong> ${res.expected}</div>
-          <div class="answer-given"><strong>Your Answer:</strong> ${res.userAnswer || '(No answer provided)'}</div>
-        `;
-        answersDiv.appendChild(div);
-      });
+        `).join('')}
+      </div>
+    `;
+    
+    if (this.elements.results) {
+      this.elements.results.innerHTML = resultsHTML;
     }
   }
 
   renderQuestion(question) {
     if (!question) return;
 
-    this.elements.questionText.textContent = question.question;
-    this.elements.optionsContainer.innerHTML = '';
+    // Find or create question text element
+    const questionText = this.getElement('#quiz-content') || this.elements.questionText;
+    if (questionText) {
+      // Clear existing content
+      questionText.innerHTML = '';
+      
+      // Create question element
+      const questionDiv = document.createElement('div');
+      questionDiv.className = 'mb-6';
+      questionDiv.innerHTML = `
+        <h3 class="text-xl font-semibold text-gray-900 mb-4">${question.question}</h3>
+        <div class="space-y-3" id="quiz-options-container"></div>
+      `;
+      questionText.appendChild(questionDiv);
+      
+      const optionsContainer = questionText.querySelector('#quiz-options-container');
+      
+      // Render options
+      if (optionsContainer && question.options) {
+        question.options.forEach((option, index) => {
+          const btn = document.createElement('button');
+          const isSelected = quizModel.answers[question.id] === option;
+          btn.className = `w-full text-left p-4 rounded-lg border-2 transition-all ${
+            isSelected 
+              ? 'border-primary bg-primary/10 text-primary' 
+              : 'border-gray-200 hover:border-gray-300 bg-white'
+          }`;
+          btn.textContent = option;
+          btn.onclick = () => {
+            quizModel.answerQuestion(question.id, option);
+            this.renderQuestion(question); // Re-render to update selection
+          };
+          optionsContainer.appendChild(btn);
+        });
+      }
+    }
 
-    question.options.forEach((option, index) => {
-      const btn = document.createElement('button');
-      btn.className = `quiz-option ${quizModel.answers[question.id] === option ? 'selected' : ''}`;
-      btn.textContent = option;
-      btn.onclick = () => {
-        quizModel.answerQuestion(question.id, option);
-        this.renderQuestion(question); // Re-render to update selection
-      };
-      this.elements.optionsContainer.appendChild(btn);
-    });
-
-    // Update buttons state
-    this.elements.prevBtn.disabled = quizModel.currentIndex === 0;
+    // Update navigation buttons
+    if (this.elements.prevBtn) {
+      this.elements.prevBtn.disabled = quizModel.currentIndex === 0;
+    }
 
     if (quizModel.currentIndex === quizModel.questions.length - 1) {
-      this.hide(this.elements.nextBtn);
-      this.show(this.elements.submitBtn);
+      if (this.elements.nextBtn) this.hide(this.elements.nextBtn);
+      if (this.elements.submitBtn) this.show(this.elements.submitBtn);
     } else {
-      this.show(this.elements.nextBtn);
-      this.hide(this.elements.submitBtn);
+      if (this.elements.nextBtn) this.show(this.elements.nextBtn);
+      if (this.elements.submitBtn) this.hide(this.elements.submitBtn);
+    }
+
+    // Update question counter
+    const currentQuestionEl = this.getElement('#current-question');
+    const totalQuestionsEl = this.getElement('#total-questions');
+    if (currentQuestionEl) {
+      currentQuestionEl.textContent = String(quizModel.currentIndex + 1);
+    }
+    if (totalQuestionsEl) {
+      totalQuestionsEl.textContent = String(quizModel.questions.length);
     }
   }
 
@@ -259,5 +347,19 @@ export class QuizView extends BaseView {
 
   async loadHistory() {
     await quizModel.loadHistory();
+  }
+
+  showLoading() {
+    const loadingOverlay = this.getElement('#loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove('hidden');
+    }
+  }
+
+  hideLoading() {
+    const loadingOverlay = this.getElement('#loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('hidden');
+    }
   }
 }

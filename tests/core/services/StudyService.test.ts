@@ -1,3 +1,4 @@
+/** @jest-environment node */
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { StudyService } from '../../../src/core/services/StudyService.js';
 import type { AIServicePort, SearchServicePort, StoragePort } from '../../../src/core/ports/interfaces.js';
@@ -8,9 +9,11 @@ const mockAiAdapter: jest.Mocked<AIServicePort> = {
   generateFlashcardsFromText: jest.fn(),
   generateBriefAnswer: jest.fn(),
   generateAdvancedQuiz: jest.fn(),
-  generateQuizFromFlashcards: jest.fn()
+  generateQuizFromFlashcards: jest.fn(),
+  generateSummary: jest.fn(),
+  generateSearchQuery: jest.fn(),
+  generateSubTopics: jest.fn()
 };
-
 const mockSearchAdapter: jest.Mocked<SearchServicePort> = {
   search: jest.fn()
 };
@@ -27,19 +30,28 @@ describe('StudyService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    studyService = new StudyService(mockAiAdapter, mockSearchAdapter, mockStorageAdapter);
+    studyService = new StudyService({ ollama: mockAiAdapter }, mockSearchAdapter, mockStorageAdapter);
   });
 
   describe('generateFlashcards', () => {
     it('should use AI knowledge when search returns no results', async () => {
       mockSearchAdapter.search.mockResolvedValue([]);
-      mockAiAdapter.generateFlashcards.mockResolvedValue([{ id: '1', front: 'Q', back: 'A', topic: 'test' }]);
+      // Mock generateFlashcardsFromText to return empty (no context scenario)
+      mockAiAdapter.generateFlashcardsFromText.mockResolvedValue([]);
+      // This will be called as fallback when no context
+      mockAiAdapter.generateFlashcards.mockResolvedValue([
+        { id: '1', front: 'Q', back: 'A', topic: 'test' }
+      ]);
+      // These might fail, which is fine
+      mockAiAdapter.generateSummary.mockRejectedValue(new Error('Not implemented'));
+      mockAiAdapter.generateSearchQuery.mockRejectedValue(new Error('Not implemented'));
 
       const result = await studyService.generateFlashcards('test topic', 5);
 
-      expect(mockSearchAdapter.search).toHaveBeenCalledWith('test topic');
+      expect(mockSearchAdapter.search).toHaveBeenCalled();
+      // When no context is available, it falls back to generateFlashcards
       expect(mockAiAdapter.generateFlashcards).toHaveBeenCalledWith('test topic', 5);
-      expect(result).toHaveLength(1);
+      expect(result.cards).toHaveLength(1);
     });
   });
 

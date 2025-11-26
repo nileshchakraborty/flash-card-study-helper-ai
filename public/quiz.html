@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Quiz - MindFlip AI</title>
+    <link href="/manifest.json" rel="manifest" />
+    <meta content="#6b7280" name="theme-color" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="style.css" rel="stylesheet" />
+</head>
+
+<body class="bg-gray-50 font-sans antialiased">
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-primary">MindFlip AI - Quiz</h1>
+                <p class="text-gray-600">Test your knowledge</p>
+            </div>
+            <a href="/" class="text-gray-600 hover:text-gray-900">
+                <span class="material-icons">home</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Quiz Setup -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6" id="quiz-setup">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Start a Quiz</h2>
+
+                <!-- Pick A Quiz Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Pick A Quiz</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button
+                            class="p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all text-left group"
+                            id="quiz-from-cards">
+                            <span class="material-icons text-gray-400 group-hover:text-gray-900 mb-2">style</span>
+                            <div class="font-medium text-gray-900">From Flashcards</div>
+                            <div class="text-sm text-gray-500">Test yourself on your current deck</div>
+                        </button>
+                        <button
+                            class="p-4 border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all text-left group"
+                            id="quiz-from-web">
+                            <span class="material-icons text-gray-400 group-hover:text-gray-900 mb-2">public</span>
+                            <div class="font-medium text-gray-900">Generate from Web</div>
+                            <div class="text-sm text-gray-500">Create a new quiz from any topic</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quiz Options (Simplified) -->
+                <div class="text-center py-8">
+                    <p class="text-gray-500 mb-4">Quiz functionality loading...</p>
+                    <a href="/"
+                        class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all inline-block">
+                        Return to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="dist/speed-insights-init.js"></script>
+    <script>
+        // Placeholder - can integrate quiz.view.ts later
+        console.log('Quiz page loaded');
+    </script>
+</body>
+</body>
+
+</html>
