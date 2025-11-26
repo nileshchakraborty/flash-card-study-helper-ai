@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../../../../core/services/AuthService.js';
 
-const authService = new AuthService();
+const authService = AuthService.getInstance();
+
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;

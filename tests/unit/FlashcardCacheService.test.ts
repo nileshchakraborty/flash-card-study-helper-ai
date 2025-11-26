@@ -1,4 +1,5 @@
-import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService';
+/** @jest-environment node */
+import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
 
 describe('FlashcardCacheService', () => {
     let cacheService: FlashcardCacheService;

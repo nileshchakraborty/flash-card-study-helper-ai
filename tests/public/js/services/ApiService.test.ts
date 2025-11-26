@@ -3,16 +3,64 @@ import {ApiService} from '../../../../public/js/services/api.service.js';
 
 describe('ApiService', () => {
   let apiService: ApiService;
-  let fetchSpy: any;
+  let fetchSpy: jest.Mock;
+  let originalFetch: any;
   
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Store original fetch if it exists
+    originalFetch = (global as any).fetch || (typeof window !== 'undefined' ? (window as any).fetch : undefined);
+    
+    // Mock fetch as a function
+    fetchSpy = jest.fn();
+    
+    // Set on both global and window for compatibility
+    (global as any).fetch = fetchSpy;
+    if (typeof window !== 'undefined') {
+      (window as any).fetch = fetchSpy;
+    }
+    
+    // Mock window.location and other browser APIs for jsdom
+    if (typeof window !== 'undefined') {
+      // Mock location.search getter
+      delete (window as any).location;
+      (window as any).location = {
+        search: '',
+        pathname: '/',
+      };
+      
+      // Mock history
+      (window as any).history = {
+        replaceState: jest.fn(),
+      };
+      
+      // Mock localStorage
+      const localStorageMock = {
+        getItem: jest.fn(),
+        setItem: jest.fn(),
+        removeItem: jest.fn(),
+        clear: jest.fn(),
+      };
+      (window as any).localStorage = localStorageMock;
+    }
+    
     apiService = new ApiService('/api');
-    fetchSpy = jest.spyOn(global, 'fetch');
   });
   
   afterEach(() => {
-    fetchSpy.mockRestore();
+    // Restore original fetch if it existed
+    if (originalFetch) {
+      (global as any).fetch = originalFetch;
+      if (typeof window !== 'undefined') {
+        (window as any).fetch = originalFetch;
+      }
+    } else {
+      delete (global as any).fetch;
+      if (typeof window !== 'undefined') {
+        delete (window as any).fetch;
+      }
+    }
   });
   
   describe('get', () => {

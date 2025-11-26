@@ -11,6 +11,7 @@ import { QueueService } from './core/services/QueueService.js';
 import { ResilienceService } from './core/services/ResilienceService.js';
 import { LoggerService } from './core/services/LoggerService.js';
 import { FlashcardCacheService } from './core/services/FlashcardCacheService.js';
+import { WebLLMService } from './core/services/WebLLMService.js';
 import { MCPClientWrapper } from './adapters/secondary/mcp/MCPClientWrapper.js';
 import { HybridOllamaAdapter } from './adapters/secondary/ollama/HybridOllamaAdapter.js';
 import { HybridSerperAdapter } from './adapters/secondary/serper/HybridSerperAdapter.js';
@@ -70,7 +71,11 @@ console.log('📊 Metrics service initialized');
 // 4. Initialize AI Adapters (Hybrid with MCP fallback)
 const directOllamaAdapter = new OllamaAdapter(llmCache);
 const ollamaAdapter = new HybridOllamaAdapter(mcpClient, directOllamaAdapter, useMCP);
-const webllmAdapter = new WebLLMAdapter(llmCache);
+
+// Initialize WebLLM Service first, then adapter
+const webllmService = new WebLLMService(llmCache);
+const webllmAdapter = new WebLLMAdapter(llmCache, webllmService);
+webllmAdapter.setWebLLMService(webllmService);
 
 const aiAdapters = {
     ollama: ollamaAdapter,
@@ -84,13 +89,14 @@ const directSerperAdapter = new SerperAdapter(serperCache);
 const serperAdapter = new HybridSerperAdapter(mcpClient, directSerperAdapter, useMCP);
 const fsAdapter = new FileSystemAdapter();
 
-// 4. Initialize Resilience and Queue Services
+// 5. Initialize Resilience and Queue Services
 const logger = new LoggerService();
 const resilienceService = new ResilienceService();
 const queueService = new QueueService();
 const flashcardCache = new FlashcardCacheService(3600); // 1 hour TTL
 
 logger.info('🛡️  Resilience services initialized');
+logger.info('🌐 WebLLM service initialized');
 
 // 5. Initialize Core Service with Multiple Adapters and Metrics
 const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metricsService);
@@ -142,8 +148,8 @@ queueService.initWorker(async (job) => {
 
 logger.info('⚙️  Queue worker initialized');
 
-// 7. Initialize Primary Adapter (Server) with Core Service, Queue, and Cache
-const server = new ExpressServer(studyService, queueService, flashcardCache);
+// 7. Initialize Primary Adapter (Server) with Core Service, Queue, Cache, and WebLLM Service
+const server = new ExpressServer(studyService, queueService, flashcardCache, webllmService);
 
 // 8. Start Application
 const PORT = parseInt(process.env.PORT || '3000');

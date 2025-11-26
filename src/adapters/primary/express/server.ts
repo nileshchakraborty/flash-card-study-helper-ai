@@ -6,28 +6,36 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authenticate } from './middleware/auth.middleware.js';
 import type { StudyUseCase } from '../../../core/ports/interfaces.js';
 import type { QueueService } from '../../../core/services/QueueService.js';
 import type { FlashcardCacheService } from '../../../core/services/FlashcardCacheService.js';
+import type { WebLLMService } from '../../../core/services/WebLLMService.js';
 
 export class ExpressServer {
   private app: express.Application;
+  private httpServer: any;
+  private wss: WebSocketServer | null = null;
   private upload: multer.Multer;
   private authService: AuthService;
 
   constructor(
     private studyService: StudyUseCase,
     private queueService?: QueueService,
-    private flashcardCache?: FlashcardCacheService
+    private flashcardCache?: FlashcardCacheService,
+    private webllmService?: WebLLMService
   ) {
     this.app = express();
+    this.httpServer = createServer(this.app);
     this.upload = multer({ storage: multer.memoryStorage() });
-    this.authService = new AuthService();
+    this.authService = AuthService.getInstance();
     this.setupPassport();
     this.setupMiddleware();
+    this.setupWebSocket();
     this.setupRoutes();
   }
 
@@ -50,6 +58,58 @@ export class ExpressServer {
     // Swagger UI
     const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
     this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  }
+
+  private setupWebSocket() {
+    if (!this.webllmService) return;
+
+    this.wss = new WebSocketServer({
+      server: this.httpServer,
+      path: '/api/webllm/ws'
+    });
+
+    this.wss.on('connection', (ws, req) => {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const sessionId = url.searchParams.get('sessionId');
+
+      if (!sessionId) {
+        ws.close(1008, 'Missing sessionId');
+        return;
+      }
+
+      // Verify session exists
+      const session = this.webllmService!.getSession(sessionId);
+      if (!session) {
+        ws.close(1008, 'Invalid sessionId');
+        return;
+      }
+
+      // Attach WebSocket to session
+      this.webllmService!.attachWebSocket(sessionId, ws);
+
+      // Handle messages from client
+      ws.on('message', async (data: Buffer) => {
+        try {
+          const message = JSON.parse(data.toString());
+
+          if (message.type === 'generate') {
+            await this.webllmService!.handleGenerationRequest(sessionId, message);
+          } else if (message.type === 'response') {
+            // Client sending back results
+            this.webllmService!.handleClientResponse(sessionId, message);
+          }
+        } catch (error: any) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            error: error.message
+          }));
+        }
+      });
+
+      ws.on('close', () => {
+        this.webllmService!.closeSession(sessionId);
+      });
+    });
   }
 
   private setupRoutes() {
@@ -231,7 +291,7 @@ export class ExpressServer {
     });
 
     // Quiz
-    this.app.post('/api/quiz', apiRateLimiter, authenticate, async (req, res) => {
+    this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
       try {
         const { cards, topic } = req.body;
         // Generate quiz questions from provided cards
@@ -345,8 +405,15 @@ export class ExpressServer {
   }
 
   public start(port: number) {
-    this.app.listen(port, () => {
+    this.httpServer.listen(port, () => {
       console.log(`Server running on port ${port}`);
+      if (this.wss) {
+        console.log(`WebSocket server ready at ws://localhost:${port}/api/webllm/ws`);
+      }
     });
+  }
+
+  public getHttpServer() {
+    return this.httpServer;
   }
 }

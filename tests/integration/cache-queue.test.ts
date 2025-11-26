@@ -1,3 +1,4 @@
+import { jest, beforeAll, afterAll, afterEach, describe, it, expect } from '@jest/globals';
 import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
@@ -57,6 +58,14 @@ describe('Cache-Queue Integration', () => {
     afterEach(() => {
         jest.clearAllMocks();
         flashcardCache.clear();
+    });
+
+    afterAll(async () => {
+        // Clean up server and resources
+        if (server) {
+            // Close any open connections
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     });
 
     describe('POST /api/generate with cache', () => {

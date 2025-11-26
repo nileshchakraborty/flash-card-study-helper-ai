@@ -86,37 +86,100 @@ export class AppController {
     });
 
     // Handle quiz start request
-    // Handle quiz start request
-    eventBus.on('quiz:request-start', async ({ count, topic }) => {
-      // Logic to generate quiz
-      // If generating from current deck:
-      const cards = deckModel.cards;
-      if (cards.length === 0) {
-        alert('No cards available to generate quiz from.');
-        return;
-      }
-
+    eventBus.on('quiz:request-start', async ({ count, topic, timer }) => {
       this.quizView.showLoading();
 
-      // Simple local generation for now, or call API
       try {
-        const response = await apiService.post('/quiz', {
-          cards: cards, // Send all cards, backend will pick random subset or use all for context
-          count: count,
-          topic: topic || deckModel.currentTopic || 'General'
-        });
+        let response;
+        const cards = deckModel.cards;
 
-        // If API returns questions directly (it should based on server.js)
-        if (response.questions) {
-          quizModel.startQuiz(response.questions);
+        // If topic is provided and different from current topic, generate from web
+        // Otherwise use current deck cards
+        if (topic && topic.trim() && (topic !== deckModel.currentTopic || cards.length === 0)) {
+          // Generate quiz from web/topic using StudyService
+          // First generate flashcards, then create quiz from them
+          const flashcardResponse = await apiService.post('/generate', {
+            topic: topic,
+            count: count,
+            mode: 'standard',
+            knowledgeSource: 'ai-web'
+          });
+
+          // If async job, we need to poll for results
+          if (flashcardResponse.jobId) {
+            // Poll for job completion
+            let jobStatus;
+            let attempts = 0;
+            const maxAttempts = 30; // 30 seconds max wait
+
+            while (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              jobStatus = await apiService.get(`/jobs/${flashcardResponse.jobId}`);
+
+              if (jobStatus.status === 'completed') {
+                if (jobStatus.result && jobStatus.result.cards) {
+                  // Now generate quiz from these cards
+                  const quizResponse = await apiService.post('/quiz', {
+                    cards: jobStatus.result.cards,
+                    count: count,
+                    topic: topic
+                  });
+
+                  if (quizResponse.questions) {
+                    quizModel.startQuiz(quizResponse.questions, 'standard', topic);
+                    break;
+                  }
+                }
+              } else if (jobStatus.status === 'failed') {
+                throw new Error('Failed to generate flashcards for quiz');
+              }
+              attempts++;
+            }
+
+            if (attempts >= maxAttempts) {
+              throw new Error('Quiz generation timed out');
+            }
+          } else if (flashcardResponse.cards) {
+            // Direct response with cards
+            const quizResponse = await apiService.post('/quiz', {
+              cards: flashcardResponse.cards,
+              count: count,
+              topic: topic
+            });
+
+            if (quizResponse.questions) {
+              quizModel.startQuiz(quizResponse.questions, 'standard', topic);
+            } else {
+              throw new Error('Invalid quiz response from server');
+            }
+          } else {
+            throw new Error('Failed to generate flashcards for quiz');
+          }
+        } else if (cards.length > 0) {
+          // Generate from current deck
+          const quizTopic = topic || deckModel.currentTopic || 'General';
+          response = await apiService.post('/quiz', {
+            cards: cards,
+            count: count,
+            topic: quizTopic
+          });
+
+          if (response.questions) {
+            quizModel.startQuiz(response.questions, 'standard', quizTopic);
+          } else {
+            throw new Error('Invalid quiz response from server');
+          }
         } else {
-          console.error("Unexpected quiz response", response);
-          alert("Failed to generate quiz questions");
+          alert('No cards available to generate quiz from. Please create flashcards first or enter a topic.');
+          return;
         }
 
-      } catch (error) {
+        // Switch to quiz tab if not already there
+        this.switchTab('quiz');
+
+      } catch (error: any) {
         console.error("Quiz generation failed", error);
-        alert("Failed to start quiz");
+        alert(`Failed to start quiz: ${error.message || 'Unknown error'}`);
       } finally {
         this.quizView.hideLoading();
       }

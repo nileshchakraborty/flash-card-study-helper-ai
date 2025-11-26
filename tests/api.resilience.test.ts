@@ -1,3 +1,4 @@
+import { jest, beforeAll, afterAll, describe, it, expect } from '@jest/globals';
 import request from 'supertest';
 import { ExpressServer } from '../src/adapters/primary/express/server.js';
 import { StudyService } from '../src/core/services/StudyService.js';
@@ -37,6 +38,13 @@ describe('API Resilience Tests', () => {
 
         server = new ExpressServer(mockStudyService, mockQueueService);
         app = server.getApp();
+    });
+
+    afterAll(async () => {
+        // Clean up server and resources
+        if (server) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     });
 
     describe('POST /api/generate', () => {

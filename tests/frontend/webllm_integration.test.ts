@@ -72,9 +72,8 @@ describe('GeneratorView Integration', () => {
     });
 
     it('should use API service when offline mode is disabled', async () => {
-        // Ensure checkbox is unchecked
-        const checkbox = document.getElementById('use-browser-llm') as HTMLInputElement;
-        checkbox.checked = false;
+        // Remove orchestrator from window to simulate API-only mode
+        delete (window as any).llmOrchestrator;
 
         // Trigger generation
         await view.handleGenerate();
@@ -85,7 +84,7 @@ describe('GeneratorView Integration', () => {
             count: '5'
         }));
 
-        // Verify Orchestrator was NOT called
+        // Verify Orchestrator was NOT called (it doesn't exist)
         expect(mockOrchestrator.generate).not.toHaveBeenCalled();
     });
 

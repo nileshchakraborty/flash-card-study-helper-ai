@@ -3,32 +3,71 @@
     box-sizing: border-box;
 }
 
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --card-shadow-hover: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
 body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
 }
 
 /* Primary Color Utilities */
 .bg-primary {
-    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    background: var(--primary-gradient);
+    box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.4);
+}
+
+.bg-primary:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #653a8f 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px -5px rgba(102, 126, 234, 0.5);
 }
 
 .bg-primary-dark {
-    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    background: linear-gradient(135deg, #4c63d2 0%, #5a3d7a 100%);
 }
 
 .text-primary {
-    color: #1f2937;
-    /* gray-800 */
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
 }
 
 .text-primary-dark {
-    color: #111827;
-    /* gray-900 */
+    color: #4c63d2;
 }
 
 /* Modern Button Styles */
 button:not(:disabled) {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+button:not(:disabled)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+button:not(:disabled):hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 button:not(:disabled):active {
@@ -37,44 +76,81 @@ button:not(:disabled):active {
 
 /* Input Focus Enhancements */
 input:focus,
-textarea:focus {
-    box-shadow: 0 0 0 3px rgba(31, 41, 55, 0.1);
+textarea:focus,
+select:focus {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    outline: none;
+}
+
+input, textarea, select {
+    transition: all 0.3s ease;
+}
+
+input:hover, textarea:hover, select:hover {
+    border-color: rgba(102, 126, 234, 0.5);
 }
 
 /* Card Hover Effects */
 .bg-white {
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
 }
 
 .bg-white:hover {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-4px);
+    border-color: rgba(102, 126, 234, 0.3);
 }
 
 /* Tab Navigation */
 .tab-btn {
     color: #6b7280;
     border-color: transparent;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 3px;
+    background: var(--primary-gradient);
+    transform: translateX(-50%);
+    transition: width 0.3s ease;
+    border-radius: 3px 3px 0 0;
 }
 
 .tab-btn.active {
-    color: #111827;
-    border-color: #111827;
+    color: #667eea;
+    font-weight: 600;
+}
+
+.tab-btn.active::after {
+    width: 80%;
 }
 
 .tab-btn:hover:not(.active) {
-    color: #374151;
-    border-color: #d1d5db;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
 }
 
 /* Card Stack */
 .card-stack {
     perspective: 1000px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 24px;
+    padding: 20px;
 }
 
 .card {
     cursor: grab;
     user-select: none;
     touch-action: none;
+    filter: drop-shadow(0 20px 25px rgba(0, 0, 0, 0.15));
 }
 
 .card:active {
@@ -85,7 +161,7 @@ textarea:focus {
     position: relative;
     width: 100%;
     height: 100%;
-    transition: transform 0.6s;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     transform-style: preserve-3d;
 }
 
@@ -100,21 +176,26 @@ textarea:focus {
     height: 100%;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+    border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
 .card-back {
     transform: rotateY(180deg);
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
 }
 
 /* Swipe feedback */
 .card-inner.swipe-left {
-    border-color: #ef4444;
-    background: #fef2f2;
+    border-color: #f5576c;
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    box-shadow: 0 20px 40px rgba(245, 87, 108, 0.3);
 }
 
 .card-inner.swipe-right {
-    border-color: #10b981;
-    background: #f0fdf4;
+    border-color: #4facfe;
+    background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%);
+    box-shadow: 0 20px 40px rgba(79, 172, 254, 0.3);
 }
 
 /* 3D Flip Utilities (Missing from Tailwind default) */
@@ -141,9 +222,17 @@ textarea:focus {
 
 
 /* File Upload Area */
+.file-upload-area {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border: 3px dashed rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+}
+
 .file-upload-area.dragover {
-    border-color: #6b7280;
-    background: #f9fafb;
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    transform: scale(1.02);
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
 }
 
 /* Selected Files */
@@ -425,6 +514,27 @@ textarea:focus {
     color: #6b7280;
 }
 
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Enhanced card text styling */
+.card-question,
+.card-brief-answer {
+    line-height: 1.7;
+    letter-spacing: 0.01em;
+}
+
+.card-question {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.card-brief-answer {
+    color: #4b5563;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
 
@@ -439,6 +549,10 @@ textarea:focus {
 
     .card-brief-answer {
         font-size: 16px;
+    }
+    
+    .bg-white {
+        padding: 1.5rem !important;
     }
 }
 
@@ -467,12 +581,14 @@ textarea:focus {
 
 /* Loading Spinner */
 .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid #f3f4f6;
-    border-top: 4px solid #111827;
+    width: 60px;
+    height: 60px;
+    border: 5px solid rgba(102, 126, 234, 0.1);
+    border-top: 5px solid;
+    border-image: var(--primary-gradient) 1;
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
 }
 
 @keyframes spin {
@@ -483,6 +599,35 @@ textarea:focus {
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* Enhanced animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Quiz History */
@@ -525,8 +670,24 @@ textarea:focus {
 
 /* Quiz Options */
 .quiz-option-btn.selected {
-    border-color: #111827;
-    background: #f9fafb;
-    ring: 2px;
-    ring-color: #e5e7eb;
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    transform: scale(1.02);
+}
+
+/* Glassmorphism effect */
+.glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Gradient text */
+.gradient-text {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }

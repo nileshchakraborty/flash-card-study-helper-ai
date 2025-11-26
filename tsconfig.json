@@ -10,6 +10,7 @@
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "target": "esnext",
+    "allowJs": true,
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],

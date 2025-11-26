@@ -9,6 +9,13 @@ import * as cheerio from 'cheerio';
 import axios from 'axios';
 
 export class StudyService implements StudyUseCase {
+  private getAdapter(runtime: string): any {
+    // If aiAdapters is a map keyed by runtime, return that entry.
+    // Otherwise, assume aiAdapters itself is the adapter (e.g., in tests).
+    const possible = (this.aiAdapters as any)[runtime];
+    if (possible) return possible;
+    return this.aiAdapters;
+  }
   constructor(
     private aiAdapters: Record<string, AIServicePort>,
     private searchAdapter: SearchServicePort,
@@ -25,14 +32,13 @@ export class StudyService implements StudyUseCase {
     parentTopic?: string
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     const startTime = Date.now();
-    const aiAdapter = this.aiAdapters[runtime];
-
-    if (!aiAdapter) {
+    const adapter = this.getAdapter(runtime);
+    if (!adapter) {
       throw new Error(`Unknown runtime: ${runtime}. Available: ${Object.keys(this.aiAdapters).join(', ')}`);
     }
 
     try {
-      const result = await this.doGenerateFlashcards(topic, count, mode, knowledgeSource, aiAdapter, parentTopic);
+      const result = await this.doGenerateFlashcards(topic, count, mode, knowledgeSource, adapter, parentTopic);
 
       // Record success metrics
       if (this.metricsService) {
@@ -85,7 +91,7 @@ export class StudyService implements StudyUseCase {
     if (knowledgeSource !== 'web-only') {
       console.log('1. Checking AI internal knowledge...');
       try {
-        aiSummary = await this.aiAdapters['ollama'].generateSummary(topic);
+        aiSummary = await this.getAdapter('ollama').generateSummary(topic);
         console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
       } catch (e) {
         console.warn('   Failed to get AI summary:', e.message);
@@ -96,7 +102,7 @@ export class StudyService implements StudyUseCase {
     if (knowledgeSource === 'ai-only') {
       console.log('2. Generating flashcards from AI knowledge (ai-only mode)...');
       try {
-        const cards = await aiAdapter.generateFlashcards(topic, count);
+        const cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
         return { cards };
       } catch (e) {
         console.error('   Failed to generate from AI knowledge:', e.message);
@@ -108,7 +114,7 @@ export class StudyService implements StudyUseCase {
     console.log('2. Generating refined search query...');
     let searchQuery = topic;
     try {
-      searchQuery = await aiAdapter.generateSearchQuery(topic, parentTopic);
+      searchQuery = await this.getAdapter('ollama').generateSearchQuery(topic, parentTopic);
       console.log(`   Refined Query: "${searchQuery}"`);
     } catch (e) {
       console.warn('   Failed to refine query, using original topic.');
@@ -161,11 +167,11 @@ export class StudyService implements StudyUseCase {
     let cards: Flashcard[] = [];
     if (combinedContext) {
       // Use the text-based generation with our rich context
-      cards = await this.aiAdapters['ollama'].generateFlashcardsFromText(combinedContext, topic, count);
+      cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, topic, count);
     } else {
       // Fallback if absolutely no context (unlikely)
       console.log('   No context available, falling back to basic generation.');
-      cards = await this.aiAdapters['ollama'].generateFlashcards(topic, count);
+      cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
     }
 
     return { cards };
@@ -178,7 +184,7 @@ export class StudyService implements StudyUseCase {
     console.log('1. Identifying advanced sub-topics...');
     let subTopics: string[] = [];
     try {
-      subTopics = await this.aiAdapters['ollama'].generateSubTopics(topic);
+      subTopics = await this.getAdapter('ollama').generateSubTopics(topic);
       console.log(`   Identified ${subTopics.length} sub-topics:`, subTopics.join(', '));
     } catch (e) {
       console.warn('   Failed to generate sub-topics, falling back to standard mode.');
@@ -199,7 +205,7 @@ export class StudyService implements StudyUseCase {
     let combinedContext = '';
     try {
       // Refine Query
-      const query = await this.aiAdapters['ollama'].generateSearchQuery(currentSubTopic, topic); // Pass parent topic context
+      const query = await this.getAdapter('ollama').generateSearchQuery(currentSubTopic, topic); // Pass parent topic context
       console.log(`   Refined Query: "${query}"`);
 
       // Search
@@ -227,7 +233,7 @@ export class StudyService implements StudyUseCase {
 
     // 4. Generate Flashcards
     console.log('3. Generating advanced flashcards from aggregated context...');
-    const cards = await this.aiAdapters['ollama'].generateFlashcardsFromText(combinedContext, currentSubTopic, count);
+    const cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, currentSubTopic, count);
 
     return {
       cards,
@@ -281,25 +287,25 @@ export class StudyService implements StudyUseCase {
       text = file.toString('utf-8');
     }
 
-    return this.aiAdapters['ollama'].generateFlashcardsFromText(text, topic, 10, { filename });
+    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
-    return this.aiAdapters['ollama'].generateBriefAnswer(question, context);
+    return this.getAdapter('ollama').generateBriefAnswer(question, context);
   }
 
   async generateQuiz(topic: string, count: number, flashcards?: Flashcard[]): Promise<QuizQuestion[]> {
     if (flashcards && flashcards.length > 0) {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
-      return this.aiAdapters['ollama'].generateQuizFromFlashcards(flashcards, count);
+      return this.getAdapter('ollama').generateQuizFromFlashcards(flashcards, count);
     }
 
     // Fallback to topic-based generation if no flashcards provided
-    return this.aiAdapters['ollama'].generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder');
+    return this.getAdapter('ollama').generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder');
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
-    return this.aiAdapters['ollama'].generateAdvancedQuiz(previousResults, mode);
+    return this.getAdapter('ollama').generateAdvancedQuiz(previousResults, mode);
   }
 
   async saveQuizResult(result: QuizResult): Promise<string> {

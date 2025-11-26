@@ -131,9 +131,11 @@ Explore and test all endpoints directly from your browser.
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js** ≥ 18
+- **Node.js** ≥ 18 (tested with v22)
 - **Redis** (for queue management)
 - **Ollama** (optional, for local LLM - default model: llama3.2:latest)
+
+> **Note**: This project uses `tsx` for TypeScript execution in development mode, which provides better compatibility with Node.js v22+ and ESM modules.
 
 ### Installation
 
@@ -179,19 +181,28 @@ Explore and test all endpoints directly from your browser.
 
 ### Running the Service
 
-**Option 1: Standard Mode (Direct Adapters)**
+**Development Mode** (Recommended for development)
 ```bash
-# Build backend
-npm run build
+# Start Redis
+brew services start redis  # or docker run -p 6379:6379 redis
+
+# Run in development mode (uses tsx for hot TypeScript execution)
+npm run dev
+```
+
+**Production Mode**
+```bash
+# Build backend and frontend
+npm run build:all
 
 # Start Redis
 brew services start redis  # or docker run -p 6379:6379 redis
 
 # Start server
-npm start
+npm run serve
 ```
 
-**Option 2: With MCP Server (Optional)**
+**With MCP Server** (Optional)
 ```bash
 # Build MCP server
 npx tsc -p mcp-server/tsconfig.json
@@ -199,8 +210,8 @@ npx tsc -p mcp-server/tsconfig.json
 # Enable MCP
 export USE_MCP_SERVER=true
 
-# Start server (MCP server starts automatically)
-npm start
+# Start in development mode
+npm run dev
 ```
 
 - **API Root**: `http://localhost:3000/api`

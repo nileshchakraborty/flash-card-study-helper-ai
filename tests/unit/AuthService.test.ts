@@ -1,11 +1,17 @@
-import { AuthService } from '../../src/core/services/AuthService';
+/**
+ * @jest-environment node
+ */
+import { AuthService } from '../../src/core/services/AuthService.js';
 
 describe('AuthService', () => {
     let authService: AuthService;
 
     beforeEach(() => {
-        process.env.JWE_SECRET_KEY = 'test-secret-key-32-characters!!';
-        authService = new AuthService();
+        // Use a 64-char hex string (32 bytes = 256 bits)
+        process.env.JWE_SECRET_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+        // Clear singleton instance between tests for isolation
+        (AuthService as any).instance = undefined;
+        authService = AuthService.getInstance();
     });
 
     describe('encryptToken and decryptToken', () => {
@@ -71,6 +77,29 @@ describe('AuthService', () => {
             expect(decrypted.id).toBe(complexPayload.id);
             expect(decrypted.roles).toEqual(complexPayload.roles);
             expect(decrypted.metadata).toEqual(complexPayload.metadata);
+        });
+    });
+
+    describe('singleton pattern', () => {
+        it('should return the same instance', () => {
+            const instance1 = AuthService.getInstance();
+            const instance2 = AuthService.getInstance();
+            expect(instance1).toBe(instance2);
+        });
+
+        it('should share secret key across instances for token verification', async () => {
+            const payload = { id: 'test-user', email: 'test@example.com' };
+
+            // Instance 1 encrypts 
+            const instance1 = AuthService.getInstance();
+            const token = await instance1.encryptToken(payload);
+
+            // Instance 2 should decrypt successfully (same secret)
+            const instance2 = AuthService.getInstance();
+            const decrypted = await instance2.decryptToken(token);
+
+            expect(decrypted.id).toBe(payload.id);
+            expect(decrypted.email).toBe(payload.email);
         });
     });
 });
