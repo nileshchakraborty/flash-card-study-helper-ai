@@ -6,6 +6,7 @@ import { deckModel } from '../models/deck.model.js';
 import { quizModel } from '../models/quiz.model.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
+import { initializeQuizHandlers } from '../quiz-init.js';
 
 export class AppController {
   private generatorView: any;
@@ -25,6 +26,9 @@ export class AppController {
   init() {
     this.setupTabSwitching();
     this.setupGlobalEvents();
+
+    // Initialize quiz creation and management handlers
+    initializeQuizHandlers(this.quizView);
 
     // Initial load
     this.loadInitialState();
