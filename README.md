@@ -1,4 +1,4 @@
-# Flash Card Study Helper API
+# MindFlip AI
 
 **A backend-focused service for AI-powered flashcard generation and study assistance.**
 
