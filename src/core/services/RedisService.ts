@@ -14,7 +14,13 @@ export class RedisService {
      */
     async connect(url: string): Promise<void> {
         try {
-            this.client = createClient({ url });
+            this.client = createClient({
+                url,
+                socket: {
+                    connectTimeout: 2000,
+                    reconnectStrategy: false
+                }
+            });
 
             this.client.on('error', (err) => {
                 logger.error('Redis Client Error:', err);

@@ -4,12 +4,6 @@ import { LoggerService } from './LoggerService.js';
 
 const logger = new LoggerService();
 
-const connection = new Redis({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    maxRetriesPerRequest: null
-});
-
 export interface GenerateJobData {
     topic: string;
     count: number;
@@ -23,10 +17,19 @@ export interface GenerateJobData {
 export class QueueService {
     private generateQueue: Queue;
     private deadLetterQueue: Queue;
+    private connection: Redis;
 
     constructor() {
-        this.generateQueue = new Queue('flashcard-generation', { connection });
-        this.deadLetterQueue = new Queue('flashcard-generation-dlq', { connection });
+        this.connection = new Redis({
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379'),
+            maxRetriesPerRequest: null,
+            // Add lazyConnect to avoid immediate connection attempt if not needed immediately
+            lazyConnect: true
+        });
+
+        this.generateQueue = new Queue('flashcard-generation', { connection: this.connection });
+        this.deadLetterQueue = new Queue('flashcard-generation-dlq', { connection: this.connection });
 
         logger.info('QueueService initialized');
     }
@@ -70,7 +73,7 @@ export class QueueService {
     }
 
     initWorker(processor: (job: Job<GenerateJobData>) => Promise<any>) {
-        const worker = new Worker('flashcard-generation', processor, { connection });
+        const worker = new Worker('flashcard-generation', processor, { connection: this.connection });
 
         worker.on('completed', (job) => {
             logger.info('Job completed', { jobId: job.id, topic: job.data.topic });

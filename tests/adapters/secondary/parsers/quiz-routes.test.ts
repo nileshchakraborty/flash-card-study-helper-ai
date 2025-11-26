@@ -1,12 +1,12 @@
 import request from 'supertest';
 import express from 'express';
-import { ExpressServer } from '../../../src/adapters/primary/express/server.js';
-import { StudyService } from '../../../src/core/services/StudyService.js';
-import { QueueService } from '../../../src/core/services/QueueService.js';
-import { FlashcardCacheService } from '../../../src/core/services/FlashcardCacheService.js';
-import { WebLLMService } from '../../../src/core/services/WebLLMService.js';
-import { QuizStorageService } from '../../../src/core/services/QuizStorageService.js';
-import { FlashcardStorageService } from '../../../src/core/services/FlashcardStorageService.js';
+import { ExpressServer } from '../../../../src/adapters/primary/express/server.js';
+import { StudyService } from '../../../../src/core/services/StudyService.js';
+import { QueueService } from '../../../../src/core/services/QueueService.js';
+import { FlashcardCacheService } from '../../../../src/core/services/FlashcardCacheService.js';
+import { WebLLMService } from '../../../../src/core/services/WebLLMService.js';
+import { QuizStorageService } from '../../../../src/core/services/QuizStorageService.js';
+import { FlashcardStorageService } from '../../../../src/core/services/FlashcardStorageService.js';
 
 describe('Quiz API Endpoints', () => {
     let app: express.Application;
@@ -15,8 +15,33 @@ describe('Quiz API Endpoints', () => {
     let flashcardStorage: FlashcardStorageService;
 
     beforeAll(() => {
-        // Mock services
-        const mockStudyService = {} as any;
+        // Mock StudyService with aiAdapters structure
+        const mockStudyService = {
+            aiAdapters: {
+                ollama: {
+                    generateQuizFromTopic: async (topic: string, numQuestions: number) => {
+                        return Array.from({ length: numQuestions }, (_, i) => ({
+                            id: `q${i + 1}`,
+                            question: `Question ${i + 1} about ${topic}?`,
+                            options: ['Option A', 'Option B', 'Option C', 'Option D'],
+                            correctAnswer: 0
+                        }));
+                    },
+                    generateQuizFromFlashcards: async (flashcards: any[], numQuestions: number) => {
+                        return flashcards.slice(0, numQuestions).map((fc, i) => ({
+                            id: `q${i + 1}`,
+                            question: `What is: ${fc.front}?`,
+                            options: [fc.back, 'Wrong 1', 'Wrong 2', 'Wrong 3'],
+                            correctAnswer: 0
+                        }));
+                    }
+                }
+            },
+            searchAdapter: {
+                search: async () => []
+            }
+        } as any;
+
         const mockQueueService = {} as any;
         const mockFlashcardCache = {} as any;
         const mockWebLLMService = {} as any;
@@ -37,8 +62,8 @@ describe('Quiz API Endpoints', () => {
             null  // Blob
         );
 
-        // Access the Express app from server (you may need to expose this)
-        app = (server as any).app;
+        // Get the Express app from server
+        app = server.getApp();
     });
 
     describe('POST /api/quiz - Create from topic', () => {
@@ -83,17 +108,23 @@ describe('Quiz API Endpoints', () => {
     describe('POST /api/quiz - Create from flashcards', () => {
         it('should create a quiz from flashcard IDs', async () => {
             // First create some flashcards
-            const flashcard1 = flashcardStorage.save({
+            const flashcard1 = {
+                id: 'fc-1',
                 front: 'What is React?',
                 back: 'A JavaScript library',
-                topic: 'React'
-            });
+                topic: 'React',
+                createdAt: Date.now()
+            };
+            flashcardStorage.storeFlashcard(flashcard1);
 
-            const flashcard2 = flashcardStorage.save({
+            const flashcard2 = {
+                id: 'fc-2',
                 front: 'What is JSX?',
                 back: 'JavaScript XML',
-                topic: 'React'
-            });
+                topic: 'React',
+                createdAt: Date.now()
+            };
+            flashcardStorage.storeFlashcard(flashcard2);
 
             const response = await request(app)
                 .post('/api/quiz')

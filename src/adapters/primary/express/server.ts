@@ -80,9 +80,13 @@ export class ExpressServer {
     this.app.use(passport.initialize());
     this.app.use(express.static('public'));
 
-    // Swagger UI
-    const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
-    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    // Swagger UI - handle gracefully if swagger.yaml doesn't exist
+    try {
+      const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    } catch (error) {
+      console.warn('Swagger documentation not available');
+    }
   }
 
   private setupWebSocket() {
@@ -327,20 +331,86 @@ export class ExpressServer {
       }
     });
 
-    // Quiz
+    // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
       try {
-        const { cards, topic } = req.body;
-        // Generate quiz questions from provided cards
-        const questions = cards.slice(0, Math.min(cards.length, 10)).map((card: any, index: number) => ({
-          id: `q${index + 1}`,
-          cardId: card.id,
-          question: card.front,
-          correctAnswer: card.back,
-          options: [card.back] // In real app, would generate distractors
-        }));
-        res.json({ questions });
+        const { topic, numQuestions, flashcardIds } = req.body;
+
+        // Route to appropriate quiz creation method
+        if (flashcardIds && Array.isArray(flashcardIds)) {
+          // Create quiz from flashcards
+          if (flashcardIds.length === 0) {
+            res.status(400).json({ error: 'flashcardIds array cannot be empty' });
+            return;
+          }
+
+          const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
+          if (flashcards.length === 0) {
+            res.status(404).json({ error: 'No flashcards found with provided IDs' });
+            return;
+          }
+
+          const formattedCards = flashcards.map(fc => ({
+            id: fc.id,
+            front: fc.front,
+            back: fc.back,
+            topic: fc.topic
+          }));
+
+          const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromFlashcards(
+            formattedCards,
+            numQuestions || Math.min(flashcards.length, 10)
+          );
+
+          const quiz = {
+            id: `quiz-${Date.now()}`,
+            topic: flashcards[0].topic || 'Quiz',
+            questions,
+            source: 'flashcards' as const,
+            sourceFlashcardIds: flashcardIds,
+            createdAt: Date.now()
+          };
+
+          if (this.quizStorage) {
+            this.quizStorage.storeQuiz(quiz);
+            this.flashcardStorage?.markFlashcardsUsedInQuiz(flashcardIds, quiz.id);
+          }
+
+          res.json({ quizId: quiz.id, quiz });
+        } else if (topic) {
+          // Create quiz from topic
+          let context = '';
+          try {
+            const searchResults = await this.studyService['searchAdapter'].search(topic);
+            context = searchResults.slice(0, 3).map(r => r.snippet || '').join('\n');
+          } catch (error) {
+            console.warn('Web search failed, generating quiz without context');
+          }
+
+          const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromTopic(
+            topic,
+            numQuestions || 5,
+            context
+          );
+
+          const quiz = {
+            id: `quiz-${Date.now()}`,
+            topic,
+            questions,
+            source: 'topic' as const,
+            createdAt: Date.now()
+          };
+
+          if (this.quizStorage) {
+            this.quizStorage.storeQuiz(quiz);
+          }
+
+          res.json({ quizId: quiz.id, quiz });
+        } else {
+          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
+        }
       } catch (error: any) {
+        console.error('Quiz creation error:', error);
         res.status(500).json({ error: error.message });
       }
     });
@@ -470,6 +540,25 @@ export class ExpressServer {
       }
     });
 
+    // Get quiz history - MUST come before /api/quiz/:quizId to avoid route collision
+    // Duplicate quiz history route removed - now at top before parameterized routes
+    this.app.get('/api/quiz/history', async (req, res) => {
+      try {
+        const quizzes = this.quizStorage?.getAllQuizzes() || [];
+
+        // Attach attempts to each quiz
+        const quizzesWithAttempts = quizzes.map(quiz => ({
+          ...quiz,
+          attempts: this.quizStorage?.getAttempts(quiz.id) || []
+        }));
+
+        res.json({ quizzes: quizzesWithAttempts });
+      } catch (error: any) {
+        console.warn('[API] Failed to get quiz history:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Get specific quiz
     this.app.get('/api/quiz/:quizId', async (req, res) => {
       try {
@@ -482,6 +571,59 @@ export class ExpressServer {
 
         res.json({ success: true, quiz });
       } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Submit quiz answers
+    this.app.post('/api/quiz/:id/submit', async (req, res) => {
+      try {
+        const quizId = req.params.id;
+        const { answers } = req.body;
+
+        const quiz = this.quizStorage?.getQuiz(quizId);
+        if (!quiz) {
+          res.status(404).json({ error: 'Quiz not found' });
+          return;
+        }
+
+        if (!answers || !Array.isArray(answers)) {
+          res.status(400).json({ error: 'answers array is required' });
+          return;
+        }
+
+        // Calculate score
+        let score = 0;
+        quiz.questions.forEach((question, index) => {
+          if (answers[index] === question.correctAnswer) {
+            score++;
+          }
+        });
+
+        const attempt = {
+          id: `attempt-${Date.now()}`,
+          quizId,
+          answers,  // Keep as array for now
+          score,
+          total: quiz.questions.length,
+          timestamp: Date.now(),
+          completedAt: Date.now()
+        };
+
+        // Save attempt (casting to avoid type mismatch)
+        if (this.quizStorage) {
+          this.quizStorage.storeAttempt(attempt as any);
+        }
+
+        res.json({
+          success: true,
+          score,
+          totalQuestions: quiz.questions.length,
+          percentage: Math.round((score / quiz.questions.length) * 100),
+          attempt
+        });
+      } catch (error: any) {
+        console.error('Quiz submit error:', error);
         res.status(500).json({ error: error.message });
       }
     });
@@ -547,12 +689,18 @@ export class ExpressServer {
 
     this.app.get('/api/quiz/history', async (req, res) => {
       try {
-        const history = await this.studyService.getQuizHistory();
-        res.json({ history: history || [] });
+        const quizzes = this.quizStorage?.getAllQuizzes() || [];
+
+        // Attach attempts to each quiz
+        const quizzesWithAttempts = quizzes.map(quiz => ({
+          ...quiz,
+          attempts: this.quizStorage?.getAttempts(quiz.id) || []
+        }));
+
+        res.json({ quizzes: quizzesWithAttempts });
       } catch (error: any) {
         console.warn('[API] Failed to get quiz history:', error.message);
-        // Return empty array instead of 500 error for serverless compatibility
-        res.json({ history: [], warning: 'Server-side storage unavailable' });
+        res.status(500).json({ error: error.message });
       }
     });
 

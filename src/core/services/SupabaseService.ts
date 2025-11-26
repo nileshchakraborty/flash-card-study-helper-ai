@@ -58,6 +58,7 @@ export class SupabaseService {
 
     async updateFlashcard(id: string, updates: any) {
         if (!this.client) return { data: null, error: 'Supabase not initialized' };
+        // @ts-ignore - Supabase types are restrictive without schema
         return await this.client.from('flashcards').update(updates).eq('id', id);
     }
 
