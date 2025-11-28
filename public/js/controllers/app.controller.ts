@@ -102,6 +102,16 @@ export class AppController {
         if (topic && topic.trim() && (topic !== deckModel.currentTopic || cards.length === 0)) {
           // Generate quiz from web/topic using StudyService
           // First generate flashcards, then create quiz from them
+          // Check authentication for backend generation
+          if (!apiService.isAuthenticated()) {
+            const login = confirm('Generating quizzes from new topics requires a free account. Would you like to log in?');
+            if (login) {
+              window.location.href = '/api/auth/google';
+            }
+            this.quizView.hideLoading();
+            return;
+          }
+
           const flashcardResponse = await apiService.post('/generate', {
             topic: topic,
             count: count,
@@ -240,6 +250,15 @@ export class AppController {
       }
 
       const enhancedTopic = `${topic}${topicSuffix}`;
+
+      // Check authentication for Deep Dive
+      if (!apiService.isAuthenticated()) {
+        const login = confirm('Deep Dive features require a free account to save your progress and access advanced AI models. Would you like to log in with Google?');
+        if (login) {
+          window.location.href = '/api/auth/google';
+        }
+        return;
+      }
 
       // Show loading
       this.generatorView.showLoading();

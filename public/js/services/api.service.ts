@@ -48,6 +48,10 @@ export class ApiService {
     return this.request(endpoint, { method: 'GET' });
   }
 
+  isAuthenticated() {
+    return !!localStorage.getItem('authToken');
+  }
+
   async post(endpoint, data) {
     return this.request(endpoint, {
       method: 'POST',

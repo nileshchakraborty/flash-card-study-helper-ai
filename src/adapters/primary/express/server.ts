@@ -387,10 +387,9 @@ export class ExpressServer {
             console.warn('Web search failed, generating quiz without context');
           }
 
-          const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromTopic(
+          const questions = await this.studyService.generateQuiz(
             topic,
-            numQuestions || 5,
-            context
+            numQuestions || 5
           );
 
           const quiz = {

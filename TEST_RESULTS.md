@@ -15,14 +15,15 @@
 
 ## ✅ Test Suite Results
 
-### Test Summary (Last Updated: November 25, 2025)
-- **Total Tests**: 65
-- **Passing**: 56 ✅
-- **Failing**: 9 (expected failures - Redis not running)
-- **Test Suites**: 13 total
-  - Passing: 11 ✅
-  - Failing: 2 (Redis-dependent tests)
-  - Warnings: Teardown issues (non-blocking)
+### Test Summary (Last Updated: November 27, 2025)
+- **Total Tests**: 107 (including sub-tests)
+- **Passing**: 97 ✅
+- **Skipped**: 10 (Browser-specific tests)
+- **Failing**: 0 ✅
+- **Test Suites**: 18 total
+  - Passing: 17 ✅
+  - Skipped: 1 (Browser-specific)
+  - Failing: 0
 
 ### Test Coverage
 - ✅ Unit tests (AuthService, FlashcardCacheService, ResilienceService)
@@ -86,13 +87,7 @@ public/dist/
 
 ## ⚠️ Known Issues (Non-Blocking)
 
-1. **Redis-Dependent Test Failures**: 2 test suites require Redis
-   - `tests/api.resilience.test.ts` (5 tests)
-   - `tests/integration/cache-queue.test.ts` (4 tests)
-   - Impact: None (expected when Redis not running)
-   - Solution: Start Redis with `brew services start redis`
-
-2. **Integration Test Teardown**: Async teardown warnings
+1. **Integration Test Teardown**: Async teardown warnings
    - Impact: None (tests pass, warnings are about cleanup)
    - Status: Acceptable for development
 

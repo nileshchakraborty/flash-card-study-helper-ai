@@ -120,11 +120,15 @@ POST /api/upload                   # Upload PDF/Image for processing
 #### Quiz Generation
 
 ```http
-POST /api/quiz                     # Generate quiz from flashcards
+POST /api/quiz                     # Generate quiz (from topic or flashcards)
 POST /api/quiz/generate-advanced    # Generate advanced quiz
 GET  /api/quiz/history             # Get quiz history
 POST /api/quiz/history             # Save quiz result
 ```
+
+**Quiz Generation Options:**
+- **From Topic**: Provide `topic` and optional `numQuestions`.
+- **From Flashcards**: Provide `flashcardIds` array and optional `numQuestions`.
 
 #### WebLLM Management (New)
 

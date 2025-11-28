@@ -31,6 +31,7 @@ export interface QuizAttempt {
     answers: Record<string, string>;
     score: number;
     total: number;
+    completedAt?: Date;
     timeSpent?: number;
 }
 
