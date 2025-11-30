@@ -245,4 +245,56 @@ export class QuizStorageService {
         this.attempts.clear();
         logger.info('Quiz storage cleared');
     }
+
+    /**
+     * GraphQL methods
+     */
+    async getHistory(): Promise<any[]> {
+        return this.getAllAttempts().map(attempt => ({
+            quizId: attempt.quizId,
+            score: attempt.score,
+            total: attempt.total,
+            answers: attempt.answers,
+            timestamp: attempt.timestamp
+        }));
+    }
+
+    async submitAnswers(quizId: string, answers: { questionId: string; answer: string }[]): Promise<any> {
+        const quiz = this.getQuiz(quizId);
+        if (!quiz) {
+            throw new Error('Quiz not found');
+        }
+
+        let score = 0;
+        const answersRecord: Record<string, string> = {};
+
+        answers.forEach(a => {
+            answersRecord[a.questionId] = a.answer;
+            const question = quiz.questions.find(q => q.id === a.questionId);
+            if (question && question.correctAnswer === a.answer) {
+                score++;
+            }
+        });
+
+        const attempt: QuizAttempt = {
+            id: Math.random().toString(36).substring(2, 15),
+            quizId,
+            timestamp: Date.now(),
+            answers: answersRecord,
+            score,
+            total: quiz.questions.length,
+            completedAt: new Date(),
+            timeSpent: 0 // Placeholder
+        };
+
+        this.storeAttempt(attempt);
+
+        return {
+            quizId,
+            score,
+            total: quiz.questions.length,
+            answers: answersRecord,
+            timestamp: attempt.timestamp
+        };
+    }
 }

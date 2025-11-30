@@ -113,4 +113,15 @@ export class QueueService {
 
         return { waiting, active, completed, failed, delayed };
     }
+
+    /**
+     * GraphQL placeholder methods
+     */
+    async getStats() {
+        return this.getQueueStats();
+    }
+
+    async getJob(id: string) {
+        return this.getJobStatus(id);
+    }
 }

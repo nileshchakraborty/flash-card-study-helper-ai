@@ -1,24 +1,24 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../../../../core/services/AuthService.js';
 
-const authService = AuthService.getInstance();
 
-
-export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Unauthorized: No token provided' });
-        return;
-    }
-
-    const token = authHeader.split(' ')[1];
-
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
-        const payload = await authService.decryptToken(token);
-        (req as any).user = payload;
+        // Get AuthService instance inside the function (not at module level)
+        // This ensures dotenv.config() has run before the singleton is created
+        const authService = AuthService.getInstance();
+
+        const token = req.headers.authorization?.replace('Bearer ', '');
+
+        if (!token) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        // Decrypt token using JWE
+        const user = await authService.decryptToken(token);
+        (req as any).user = user;
         next();
     } catch (error) {
-        res.status(401).json({ error: 'Unauthorized: Invalid token' });
+        return res.status(401).json({ error: 'Invalid or expired token' });
     }
-};
+}

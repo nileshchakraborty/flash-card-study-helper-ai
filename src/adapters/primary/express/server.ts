@@ -8,9 +8,15 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware as apolloExpressMiddleware } from '@apollo/server/express4';
+import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
-import { authenticate } from './middleware/auth.middleware.js';
+import { authMiddleware } from './middleware/auth.middleware.js';
+import { typeDefs } from '../../../graphql/schema.js';
+import { resolvers } from '../../../graphql/resolvers/index.js';
+import { createContext } from '../../../graphql/context.js';
 import type { StudyUseCase } from '../../../core/ports/interfaces.js';
 import type { QueueService } from '../../../core/services/QueueService.js';
 import type { FlashcardCacheService } from '../../../core/services/FlashcardCacheService.js';
@@ -30,6 +36,7 @@ export class ExpressServer {
   private authService: AuthService;
   private quizStorage: QuizStorageService;
   private flashcardStorage: FlashcardStorageService;
+  private apolloServer?: ApolloServer;
   // External services (optional)
   private redisService: RedisService | null;
   private supabaseService: SupabaseService | null;
@@ -61,8 +68,10 @@ export class ExpressServer {
     this.setupPassport();
     this.setupMiddleware();
     this.setupWebSocket();
-    this.setupRoutes();
+    // Routes are now set up in start() to ensure correct order with GraphQL
   }
+
+
 
   private setupPassport() {
     passport.use(new GoogleStrategy({
@@ -87,6 +96,43 @@ export class ExpressServer {
     } catch (error) {
       console.warn('Swagger documentation not available');
     }
+  }
+
+  private async setupGraphQL() {
+    // Create executable schema
+    const schema = makeExecutableSchema({ typeDefs, resolvers });
+
+    // Create Apollo Server instance
+    this.apolloServer = new ApolloServer({
+      schema,
+      formatError: (error) => {
+        console.error('GraphQL Error:', error);
+        return error;
+      },
+    });
+
+    // Start Apollo Server
+    await this.apolloServer.start();
+
+    // Mount GraphQL endpoint
+    // Type casting to bypass Express v5/Apollo Server v4 incompatibility
+    this.app.use(
+      '/graphql',
+      cors(),
+      express.json(),
+      apolloExpressMiddleware(this.apolloServer, {
+        context: async ({ req }) => createContext(req, {
+          authService: this.authService,
+          studyService: this.studyService,
+          quizStorage: this.quizStorage,
+          flashcardStorage: this.flashcardStorage,
+          queueService: this.queueService,
+          webllmService: this.webllmService
+        })
+      }) as any
+    );
+
+    console.log('🚀 GraphQL endpoint available at /graphql');
   }
 
   private setupWebSocket() {
@@ -160,7 +206,7 @@ export class ExpressServer {
     );
 
     // Flashcards (Protected - Async via Queue)
-    this.app.post('/api/generate', apiRateLimiter, authenticate, async (req, res) => {
+    this.app.post('/api/generate', apiRateLimiter, authMiddleware, async (req, res) => {
       try {
         const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
 
@@ -228,7 +274,7 @@ export class ExpressServer {
     });
 
     // Job Status Endpoint
-    this.app.get('/api/jobs/:id', authenticate, async (req, res) => {
+    this.app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
       try {
         if (!this.queueService) {
           res.status(404).json({ error: 'Queue service not available' });
@@ -243,7 +289,7 @@ export class ExpressServer {
     });
 
     // Queue Statistics (Admin)
-    this.app.get('/api/queue/stats', authenticate, async (req, res) => {
+    this.app.get('/api/queue/stats', authMiddleware, async (req, res) => {
       try {
         if (!this.queueService) {
           res.status(404).json({ error: 'Queue service not available' });
@@ -291,7 +337,7 @@ export class ExpressServer {
       }
     });
 
-    this.app.post('/api/upload', apiRateLimiter, authenticate, this.upload.single('file'), async (req, res) => {
+    this.app.post('/api/upload', apiRateLimiter, authMiddleware, this.upload.single('file'), async (req, res) => {
       try {
         const file = req.file;
         const topic = req.body.topic || 'General';
@@ -783,7 +829,13 @@ export class ExpressServer {
     return this.app;
   }
 
-  public start(port: number) {
+  public async start(port: number) {
+    // Setup GraphQL (must be done after construction, as it's async)
+    await this.setupGraphQL();
+
+    // Setup REST routes (must be after GraphQL to avoid capturing /graphql requests if we had a catch-all)
+    this.setupRoutes();
+
     this.httpServer.listen(port, () => {
       console.log(`Server running on port ${port}`);
       if (this.wss) {

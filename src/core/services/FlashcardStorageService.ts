@@ -175,4 +175,85 @@ export class FlashcardStorageService {
         this.topicIndex.clear();
         logger.info('Flashcard storage cleared');
     }
+
+    /**
+     * GraphQL methods for Deck management
+     * Decks are implicitly defined by their topic in this implementation.
+     */
+
+    private getDeckId(topic: string): string {
+        return `deck-${topic.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    }
+
+    async getDecks(): Promise<any[]> {
+        const topics = this.getAllTopics();
+        return topics.map(topic => {
+            const cards = this.getFlashcardsByTopic(topic);
+            const latestCard = cards.reduce((latest, card) =>
+                card.createdAt > latest.createdAt ? card : latest, cards[0]);
+
+            return {
+                id: this.getDeckId(topic),
+                topic: topic,
+                cards: cards,
+                timestamp: latestCard ? latestCard.createdAt : Date.now(),
+                userId: 'system' // Placeholder
+            };
+        });
+    }
+
+    async getDeck(id: string): Promise<any | null> {
+        const topics = this.getAllTopics();
+        const topic = topics.find(t => this.getDeckId(t) === id);
+
+        if (!topic) return null;
+
+        return this.getDeckByTopic(topic);
+    }
+
+    async getDeckByTopic(topic: string): Promise<any | null> {
+        const cards = this.getFlashcardsByTopic(topic);
+        if (cards.length === 0) return null;
+
+        const latestCard = cards.reduce((latest, card) =>
+            card.createdAt > latest.createdAt ? card : latest, cards[0]);
+
+        return {
+            id: this.getDeckId(topic),
+            topic: topic,
+            cards: cards,
+            timestamp: latestCard ? latestCard.createdAt : Date.now(),
+            userId: 'system'
+        };
+    }
+
+    async saveDeck(deckInput: any): Promise<void> {
+        const cards = deckInput.cards.map((card: any, index: number) => ({
+            id: card.id || `${Date.now()}-${index}`,
+            front: card.front,
+            back: card.back,
+            topic: deckInput.topic,
+            createdAt: Date.now()
+        }));
+
+        this.storeFlashcards(cards);
+        logger.info('Deck saved via GraphQL', { topic: deckInput.topic, cardCount: cards.length });
+    }
+
+    async deleteDeck(id: string): Promise<boolean> {
+        const deck = await this.getDeck(id);
+        if (!deck) return false;
+
+        const cardIds = deck.cards.map((c: any) => c.id);
+        let deletedCount = 0;
+
+        for (const cardId of cardIds) {
+            if (this.deleteFlashcard(cardId)) {
+                deletedCount++;
+            }
+        }
+
+        logger.info('Deck deleted via GraphQL', { id, topic: deck.topic, deletedCards: deletedCount });
+        return true;
+    }
 }

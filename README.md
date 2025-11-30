@@ -94,12 +94,47 @@ graph TB
 
 ## 📖 API Documentation
 
+### REST API
+
 Interactive API documentation is available via **Swagger UI**:
 
 - **URL**: `http://localhost:3000/api-docs`
 - **Specification**: `swagger.yaml`
 
 Explore and test all endpoints directly from your browser.
+
+### GraphQL API ✨ NEW
+
+The application now supports a modern GraphQL API alongside REST:
+
+- **Endpoint**: `http://localhost:3000/graphql`
+- **Documentation**: See [docs/graphql-api.md](docs/graphql-api.md)
+- **Playground**: Available in development mode at `/graphql`
+
+**Key Features:**
+- 🔀 **Hybrid Mode**: Automatic fallback to REST API if GraphQL fails
+- 🔐 **Full Authentication**: JWT-based auth for protected operations
+- ⚡ **Efficient Queries**: Request only the data you need
+- 🎯 **Type Safety**: GraphQL schema with strong typing
+- 📦 **Batching Support**: Multiple operations in single request
+
+**Enable GraphQL Mode:**
+```javascript
+localStorage.setItem('USE_GRAPHQL', 'true');
+location.reload();
+```
+
+**Compare APIs:**
+```bash
+# REST: Multiple requests for deck + cards
+curl /api/decks
+curl /api/decks/:id
+
+# GraphQL: Single request
+curl -X POST /graphql -d '{
+  "query": "{ deck(id: \"abc\") { topic cards { front back } } }"
+}'
+```
 
 ## ✨ Key Features
 

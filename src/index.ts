@@ -232,6 +232,6 @@ const server = new ExpressServer(
 );
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
-server.start(PORT);
+await server.start(PORT);
 
 logger.info(`🚀 Server started on port ${PORT}`);

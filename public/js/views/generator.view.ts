@@ -165,8 +165,8 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         const { ConfigurationService } = await import('../services/ConfigurationService.js');
         const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
-        // Single API call - backend handles everything including WebLLM
-        const data = await apiService.post('/generate', {
+        // Use hybrid method - supports both GraphQL and REST
+        const data = await apiService.generateFlashcards({
           topic,
           count,
           runtime: useBrowser ? 'webllm' : 'ollama',
@@ -394,7 +394,7 @@ Generate the JSON array now:`;
       console.warn('Failed to parse LLM response directly, trying regex fallback');
     }
 
-    // 3. Last Resort: Regex fallback for individual objects
+    // 3. Regex fallback: Individual JSON objects
     const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
     let match;
     while ((match = objectRegex.exec(response)) !== null) {
@@ -406,7 +406,108 @@ Generate the JSON array now:`;
       } catch (e) { }
     }
 
-    // 4. Plain text fallback - convert sentences to flashcards
+    // 4. CSV Format: Try to parse as CSV
+    if (cards.length === 0) {
+      console.warn('No JSON found, trying CSV format...');
+
+      // Look for CSV-like patterns: "question","answer" or question,answer
+      const lines = response.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      for (const line of lines) {
+        // Try comma-separated with quotes
+        let csvMatch = line.match(/^"([^"]+)"\s*,\s*"([^"]+)"$/);
+        if (csvMatch) {
+          cards.push({
+            question: csvMatch[1].trim(),
+            answer: csvMatch[2].trim()
+          });
+          continue;
+        }
+
+        // Try comma-separated without quotes (but not if it's a sentence)
+        if (line.includes(',') && !line.endsWith('.')) {
+          const parts = line.split(',');
+          if (parts.length === 2) {
+            const q = parts[0].trim();
+            const a = parts[1].trim();
+            // Only accept if both parts are substantial
+            if (q.length > 5 && a.length > 5 && !q.match(/^\d+$/)) {
+              cards.push({
+                question: q,
+                answer: a
+              });
+            }
+          }
+        }
+
+        // Try pipe-separated: question | answer
+        const pipeMatch = line.match(/^(.+?)\s*\|\s*(.+)$/);
+        if (pipeMatch) {
+          cards.push({
+            question: pipeMatch[1].trim(),
+            answer: pipeMatch[2].trim()
+          });
+          continue;
+        }
+
+        // Try tab-separated
+        if (line.includes('\t')) {
+          const parts = line.split('\t').map(p => p.trim());
+          if (parts.length === 2 && parts[0].length > 5 && parts[1].length > 5) {
+            cards.push({
+              question: parts[0],
+              answer: parts[1]
+            });
+          }
+        }
+      }
+
+      if (cards.length > 0) {
+        console.log(`Parsed ${cards.length} cards from CSV format`);
+        return cards;
+      }
+    }
+
+    // 5. TOML Format: Try to parse as TOML-like structure
+    if (cards.length === 0) {
+      console.warn('No CSV found, trying TOML format...');
+
+      // Look for [[card]] sections or [card.N] patterns
+      const tomlSections = response.split(/\[\[card\]\]|\[card\.\d+\]/i);
+
+      for (const section of tomlSections) {
+        if (!section.trim()) continue;
+
+        const lines = section.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        let question = '';
+        let answer = '';
+
+        for (const line of lines) {
+          // Match key = value or key = "value"
+          const kvMatch = line.match(/^(question|front|q)\s*=\s*["']?([^"']+)["']?$/i);
+          if (kvMatch) {
+            question = kvMatch[2].trim();
+            continue;
+          }
+
+          const ansMatch = line.match(/^(answer|back|a)\s*=\s*["']?([^"']+)["']?$/i);
+          if (ansMatch) {
+            answer = ansMatch[2].trim();
+          }
+        }
+
+        if (question && answer) {
+          cards.push({ question, answer });
+        }
+      }
+
+      if (cards.length > 0) {
+        console.log(`Parsed ${cards.length} cards from TOML format`);
+        return cards;
+      }
+    }
+
+    // 6. Plain text fallback - convert sentences to flashcards
     if (cards.length === 0) {
       console.warn('No JSON found, attempting plain text conversion...');
 

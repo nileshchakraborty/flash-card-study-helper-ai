@@ -63,18 +63,18 @@ export function initializeQuizHandlers(quizView: any) {
         if (selectedFlashcardIds.size === 0) return;
 
         try {
-            const response = await apiService.post('/quiz/create-from-flashcards', {
+            const response = await apiService.createQuiz({
                 flashcardIds: Array.from(selectedFlashcardIds),
                 count: Math.min(selectedFlashcardIds.size, 10)
             });
 
             if (response.success && response.quiz) {
-                const quizData = await apiService.get(`/quiz/${response.quiz.id}`);
+                const quizData = await apiService.getQuiz(response.quiz.id);
                 if (quizData.success) {
                     storageService.storeQuiz(quizData.quiz);
                     refreshAvailableQuizzes(quizView);
                     quizView.hideFlashcardSelectionModal();
-                    alert(`Quiz created with ${response.quiz.questionCount} questions!`);
+                    alert(`Quiz created with ${response.quiz.questionCount || response.quiz.questions?.length || 0} questions!`);
                 }
             }
         } catch (error) {
@@ -83,15 +83,7 @@ export function initializeQuizHandlers(quizView: any) {
         }
     });
 
-    // From Topic button
-    document.getElementById('quiz-from-topic-btn')?.addEventListener('click', () => {
-        quizView.showTopicQuizForm();
-    });
-
-    // Cancel topic quiz
-    document.getElementById('cancel-topic-quiz')?.addEventListener('click', () => {
-        quizView.hideTopicQuizForm();
-    });
+    // ...
 
     // Topic quiz form submit
     document.getElementById('create-quiz-topic-form')?.addEventListener('submit', async (e: Event) => {
@@ -109,18 +101,18 @@ export function initializeQuizHandlers(quizView: any) {
         }
 
         try {
-            const response = await apiService.post('/quiz/create-from-topic', {
+            const response = await apiService.createQuiz({
                 topic,
                 count
             });
 
             if (response.success && response.quiz) {
-                const quizData = await apiService.get(`/quiz/${response.quiz.id}`);
+                const quizData = await apiService.getQuiz(response.quiz.id);
                 if (quizData.success) {
                     storageService.storeQuiz(quizData.quiz);
                     refreshAvailableQuizzes(quizView);
                     quizView.hideTopicQuizForm();
-                    alert(`Quiz created with ${response.quiz.questionCount} questions!`);
+                    alert(`Quiz created with ${response.quiz.questionCount || response.quiz.questions?.length || 0} questions!`);
                 }
             }
         } catch (error) {
@@ -129,60 +121,27 @@ export function initializeQuizHandlers(quizView: any) {
         }
     });
 
-    // Quiz item click to start
-    document.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        const quizItem = target.closest('.quiz-item');
+    // ...
 
-        if (quizItem) {
-            const quizId = quizItem.getAttribute('data-quiz-id');
-            const quiz = quizId ? storageService.getQuiz(quizId) : null;
+    async function refreshAvailableQuizzes(quizView: any) {
+        const quizzes = storageService.getAllQuizzes();
 
-            if (quiz) {
-                quizModel.startQuiz(quiz.questions, 'standard', quiz.topic);
-                // Switch to quiz tab
-                document.querySelector('[data-tab="quiz"]')?.dispatchEvent(new Event('click'));
-            }
-        }
-    });
-
-    // Store flashcards when deck loaded
-    eventBus.on('deck:loaded', (cards: any[]) => {
-        if (cards?.length > 0) {
-            storageService.storeFlashcards(cards);
-            fromFlashcardsBtn?.removeAttribute('disabled');
-        }
-    });
-
-    // Refresh quizzes on tab switch
-    eventBus.on('tab:switched', (tabName: string) => {
-        if (tabName === 'create-quiz') {
-            refreshAvailableQuizzes(quizView);
-        }
-    });
-
-    // Initial load
-    refreshAvailableQuizzes(quizView);
-}
-
-async function refreshAvailableQuizzes(quizView: any) {
-    const quizzes = storageService.getAllQuizzes();
-
-    try {
-        const response = await apiService.get('/quiz/list/all');
-        if (response.success && response.quizzes) {
-            for (const quiz of response.quizzes) {
-                if (!storageService.getQuiz(quiz.id)) {
-                    const fullData = await apiService.get(`/quiz/${quiz.id}`);
-                    if (fullData.success) {
-                        storageService.storeQuiz(fullData.quiz);
+        try {
+            const response = await apiService.getAllQuizzes();
+            if (response.success && response.quizzes) {
+                for (const quiz of response.quizzes) {
+                    if (!storageService.getQuiz(quiz.id)) {
+                        const fullData = await apiService.getQuiz(quiz.id);
+                        if (fullData.success) {
+                            storageService.storeQuiz(fullData.quiz);
+                        }
                     }
                 }
             }
+        } catch (error) {
+            console.warn('Could not load quizzes from API:', error);
         }
-    } catch (error) {
-        console.warn('Could not load quizzes from API:', error);
-    }
 
-    quizView.renderAvailableQuizzes(storageService.getAllQuizzes());
+        quizView.renderAvailableQuizzes(storageService.getAllQuizzes());
+    }
 }

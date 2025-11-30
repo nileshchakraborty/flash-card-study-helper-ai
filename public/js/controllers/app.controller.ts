@@ -112,7 +112,8 @@ export class AppController {
             return;
           }
 
-          const flashcardResponse = await apiService.post('/generate', {
+
+          const flashcardResponse = await apiService.generateFlashcards({
             topic: topic,
             count: count,
             mode: 'standard',
@@ -128,7 +129,7 @@ export class AppController {
 
             while (attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 1000));
-              jobStatus = await apiService.get(`/jobs/${flashcardResponse.jobId}`);
+              jobStatus = await apiService.getJobStatus(flashcardResponse.jobId);
 
               if (jobStatus.status === 'completed') {
                 if (jobStatus.result && jobStatus.result.cards) {
@@ -265,7 +266,7 @@ export class AppController {
 
       try {
         console.log('Generating harder flashcards for:', enhancedTopic);
-        const data = await apiService.post('/generate', {
+        const data = await apiService.generateFlashcards({
           topic: difficulty === 'deep-dive' ? topic : enhancedTopic,
           count: 10,
           mode: difficulty === 'deep-dive' ? 'deep-dive' : 'standard',
