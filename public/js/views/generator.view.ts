@@ -89,45 +89,71 @@ export class GeneratorView extends BaseView {
           await orchestrator.loadModel(config);
         }
 
-        const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.
+        const prompt = `You must generate flashcards in STRICT JSON format.
 
-⚠️ TASK: Create ${count} educational flashcards about: ${topic}
+TASK: Create exactly ${count} flashcards about: "${topic}"
 
-⚠️ CRITICAL RULES:
-1. Ask questions ABOUT the concepts
-2. Provide explanatory answers in plain English
-3. NEVER copy code snippets as questions or answers
-4. Questions must end with "?"
-5. Answers must be 1-3 sentences explaining the concept
+CRITICAL RULES:
+- Output MUST start with <<<JSON_START>>>
+- Output MUST end with <<<JSON_END>>>
+- Between markers: ONLY a valid JSON array
+- Each object needs "question" and "answer" fields
+- NO explanations, NO other text, ONLY JSON
 
-✅ CORRECT EXAMPLE:
-Q: "What is the purpose of the 'with' statement when working with files?"
-A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
+REQUIRED FORMAT:
+<<<JSON_START>>>
+[
+  {"question": "...", "answer": "..."},
+  {"question": "...", "answer": "..."}
+]
+<<<JSON_END>>>
 
-❌ WRONG (DO NOT DO THIS):
-Q: "with open(txt_file_path, 'r') as f:"
-A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
+EXAMPLES:
+Topic: "Python Programming"
+<<<JSON_START>>>
+[
+  {"question": "What is a Python list?", "answer": "An ordered, mutable collection of items"},
+  {"question": "How do you define a function in Python?", "answer": "Using the 'def' keyword followed by function name and parentheses"}
+]
+<<<JSON_END>>>
 
-JSON FORMAT:
-- Return ONLY: [{"question": "...", "answer": "..."}]
-- No code blocks, no markdown, pure JSON array
+Topic: "World History"
+<<<JSON_START>>>
+[
+  {"question": "When did World War II begin?", "answer": "September 1, 1939"},
+  {"question": "Who was the first president of the United States?", "answer": "George Washington"}
+]
+<<<JSON_END>>>
 
-Create ${count} flashcards`;
+NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
 
         console.log('Generating flashcards with client-side LLM...');
         const response = await orchestrator.generate(prompt);
         console.log('Client-side LLM Response:', response);
 
         cards = this.parseLLMResponse(response);
+        console.log('Parsed raw cards:', JSON.stringify(cards, null, 2));
 
         if (cards.length > 0) {
-          // Format cards for consistency with backend-generated ones
-          cards = cards.map((c, i) => ({
-            id: `gen-${Date.now()}-${i}`,
-            front: c.question,
-            back: c.answer,
-            topic: topic
-          }));
+          // Robust mapping to handle various property names
+          cards = cards.map((c, i) => {
+            // Try to find the question and answer in common properties
+            const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
+            const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
+
+            return {
+              id: `gen-${Date.now()}-${i}`,
+              front: question,
+              back: answer,
+              topic: topic
+            };
+          });
+
+          // Filter out cards where both sides are missing or placeholders
+          cards = cards.filter(c =>
+            (c.front !== "Question missing" || c.back !== "Answer missing") &&
+            c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
+          );
         } else {
           throw new Error('Failed to generate valid flashcards from client-side LLM response');
         }
@@ -139,8 +165,8 @@ Create ${count} flashcards`;
         const { ConfigurationService } = await import('../services/ConfigurationService.js');
         const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
-        // Single API call - backend handles everything including WebLLM
-        const data = await apiService.post('/generate', {
+        // Use hybrid method - supports both GraphQL and REST
+        const data = await apiService.generateFlashcards({
           topic,
           count,
           runtime: useBrowser ? 'webllm' : 'ollama',
@@ -206,49 +232,49 @@ Create ${count} flashcards`;
 
       const topic = this.elements.uploadForm.querySelector('#upload-topic')?.value || 'Uploaded Content';
 
-      const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.
-
-⚠️ TASK: Create 10 educational flashcards about: ${topic}
+      const prompt = `You are a strict JSON generator.
+TASK: Create 10 educational flashcards about "${topic}".
 
 Text:
 ${text.substring(0, 15000)}
 
-⚠️ CRITICAL RULES:
-1. Ask questions ABOUT the concepts in the text
-2. Provide explanatory answers in plain English
-3. NEVER copy code snippets as  questions or answers
-4. Questions must end with "?"
-5. Answers must be 1-3 sentences explaining the concept
+OUTPUT RULES:
+1. Output ONLY a raw JSON array of objects.
+2. Start with <<<JSON_START>>> and end with <<<JSON_END>>>.
+3. DO NOT output separate arrays for questions and answers.
 
-✅ CORRECT EXAMPLE:
-Q: "What is the purpose of the 'with' statement when working with files?"
-A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
+EXAMPLE:
+<<<JSON_START>>>
+[
+  { "question": "What is the main idea?", "answer": "The central concept of the text." }
+]
+<<<JSON_END>>>
 
-❌ WRONG (DO NOT DO THIS):
-Q: "with open(txt_file_path, 'r') as f:"
-A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
-
-JSON FORMAT:
-- Return ONLY: [{"question": "...", "answer": "..."}]
-- No code blocks, no markdown, pure JSON array
-
-Create 10 flashcards now:`;
+Generate the JSON array now:`;
 
       console.log('Generating flashcards with LLM...');
       const response = await orchestrator.generate(prompt);
       console.log('LLM Response:', response);
 
       // Parse JSON from response
-      const cards = this.parseLLMResponse(response);
+      let cards = this.parseLLMResponse(response);
+      console.log('Parsed raw cards (upload):', JSON.stringify(cards, null, 2));
 
       if (cards.length > 0) {
-        // Format cards
-        const formattedCards = cards.map((c, i) => ({
-          id: `upload-${Date.now()}-${i}`,
-          front: c.question,
-          back: c.answer,
-          topic: topic
-        }));
+        // Robust mapping
+        const formattedCards = cards.map((c, i) => {
+          const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
+          const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
+          return {
+            id: `upload-${Date.now()}-${i}`,
+            front: question,
+            back: answer,
+            topic: topic
+          };
+        }).filter(c =>
+          (c.front !== "Question missing" || c.back !== "Answer missing") &&
+          c.front !== "Q1" && c.front !== "Q2"
+        );
 
         eventBus.emit('deck:loaded', formattedCards);
 
@@ -315,41 +341,238 @@ Create 10 flashcards now:`;
 
   parseLLMResponse(response) {
     let cards = [];
+
+    // Helper to clean and parse JSON
+    const tryParse = (str) => {
+      try {
+        // Fix double braces
+        let clean = str.replace(/\{\{/g, '{').replace(/\}\}/g, '}');
+        // Fix trailing commas
+        clean = clean.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+        return JSON.parse(clean);
+      } catch (e) {
+        return null;
+      }
+    };
+
     try {
-      // Simple extraction
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      // 1. Try to find content between delimiters
+      const delimiterMatch = response.match(/<<<JSON_START>>>([\s\S]*?)<<<JSON_END>>>/);
+      if (delimiterMatch && delimiterMatch[1]) {
+        const parsed = tryParse(delimiterMatch[1]);
+        if (parsed) {
+          if (Array.isArray(parsed)) return parsed;
+          // Handle separate arrays
+          const keys = Object.keys(parsed);
+          const questionKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
+          const answerKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
+          if (questionKey && answerKey && Array.isArray(parsed[questionKey])) {
+            return parsed[questionKey].map((q, i) => ({ question: q, answer: parsed[answerKey][i] || '' }));
+          }
+        }
+      }
+
+      // 2. Fallback: Try to find ANY valid JSON structure (array or object)
+      // We search for the largest possible JSON block
+      const jsonMatch = response.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
       if (jsonMatch) {
-        cards = JSON.parse(jsonMatch[0]);
-      } else {
-        cards = JSON.parse(response);
+        const parsed = tryParse(jsonMatch[0]);
+        if (parsed) {
+          if (Array.isArray(parsed)) return parsed;
+
+          const keys = Object.keys(parsed);
+          const questionKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
+          const answerKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
+          if (questionKey && answerKey && Array.isArray(parsed[questionKey])) {
+            return parsed[questionKey].map((q, i) => ({ question: q, answer: parsed[answerKey][i] || '' }));
+          }
+          // Handle single object with "questions" array
+          if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
+        }
       }
     } catch (e) {
       console.warn('Failed to parse LLM response directly, trying regex fallback');
-      // Fallback regex
-      const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
-      let match;
-      while ((match = objectRegex.exec(response)) !== null) {
-        try {
+    }
+
+    // 3. Regex fallback: Individual JSON objects
+    const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+    let match;
+    while ((match = objectRegex.exec(response)) !== null) {
+      try {
+        cards.push({
+          question: JSON.parse(`"${match[1]}"`),
+          answer: JSON.parse(`"${match[2]}"`)
+        });
+      } catch (e) { }
+    }
+
+    // 4. CSV Format: Try to parse as CSV
+    if (cards.length === 0) {
+      console.warn('No JSON found, trying CSV format...');
+
+      // Look for CSV-like patterns: "question","answer" or question,answer
+      const lines = response.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      for (const line of lines) {
+        // Try comma-separated with quotes
+        let csvMatch = line.match(/^"([^"]+)"\s*,\s*"([^"]+)"$/);
+        if (csvMatch) {
           cards.push({
-            question: JSON.parse(`"${match[1]}"`),
-            answer: JSON.parse(`"${match[2]}"`)
+            question: csvMatch[1].trim(),
+            answer: csvMatch[2].trim()
           });
-        } catch (e) { }
+          continue;
+        }
+
+        // Try comma-separated without quotes (but not if it's a sentence)
+        if (line.includes(',') && !line.endsWith('.')) {
+          const parts = line.split(',');
+          if (parts.length === 2) {
+            const q = parts[0].trim();
+            const a = parts[1].trim();
+            // Only accept if both parts are substantial
+            if (q.length > 5 && a.length > 5 && !q.match(/^\d+$/)) {
+              cards.push({
+                question: q,
+                answer: a
+              });
+            }
+          }
+        }
+
+        // Try pipe-separated: question | answer
+        const pipeMatch = line.match(/^(.+?)\s*\|\s*(.+)$/);
+        if (pipeMatch) {
+          cards.push({
+            question: pipeMatch[1].trim(),
+            answer: pipeMatch[2].trim()
+          });
+          continue;
+        }
+
+        // Try tab-separated
+        if (line.includes('\t')) {
+          const parts = line.split('\t').map(p => p.trim());
+          if (parts.length === 2 && parts[0].length > 5 && parts[1].length > 5) {
+            cards.push({
+              question: parts[0],
+              answer: parts[1]
+            });
+          }
+        }
+      }
+
+      if (cards.length > 0) {
+        console.log(`Parsed ${cards.length} cards from CSV format`);
+        return cards;
       }
     }
 
-    // Text Format Fallback (Question: ... Answer: ...)
+    // 5. TOML Format: Try to parse as TOML-like structure
     if (cards.length === 0) {
-      const textRegex = /(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?(?:Card|Question)(?:\*\*)?:?\s*(.+?)\s*(?:\*\*)?Answer(?:\*\*)?:?\s*(.+?)(?=(?:\n\s*(?:\d+\.|\[Card|\*\*Card)|$))/gis;
-      let textMatch;
-      while ((textMatch = textRegex.exec(response)) !== null) {
-        const question = textMatch[1].trim();
-        const answer = textMatch[2].trim();
+      console.warn('No CSV found, trying TOML format...');
+
+      // Look for [[card]] sections or [card.N] patterns
+      const tomlSections = response.split(/\[\[card\]\]|\[card\.\d+\]/i);
+
+      for (const section of tomlSections) {
+        if (!section.trim()) continue;
+
+        const lines = section.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        let question = '';
+        let answer = '';
+
+        for (const line of lines) {
+          // Match key = value or key = "value"
+          const kvMatch = line.match(/^(question|front|q)\s*=\s*["']?([^"']+)["']?$/i);
+          if (kvMatch) {
+            question = kvMatch[2].trim();
+            continue;
+          }
+
+          const ansMatch = line.match(/^(answer|back|a)\s*=\s*["']?([^"']+)["']?$/i);
+          if (ansMatch) {
+            answer = ansMatch[2].trim();
+          }
+        }
+
         if (question && answer) {
           cards.push({ question, answer });
         }
       }
+
+      if (cards.length > 0) {
+        console.log(`Parsed ${cards.length} cards from TOML format`);
+        return cards;
+      }
     }
+
+    // 6. Plain text fallback - convert sentences to flashcards
+    if (cards.length === 0) {
+      console.warn('No JSON found, attempting plain text conversion...');
+
+      // Extract unique sentences (remove duplicates)
+      const sentences = response
+        .split(/\n+/)
+        .map(line => line.trim())
+        .filter(line => line.length > 10 && line.length < 200) // Reasonable length
+        .map(line => line.replace(/^["']|["']$/g, '')) // Remove quotes
+        .filter((line, index, arr) => arr.indexOf(line) === index); // Remove duplicates
+
+      // Convert sentences to Q&A pairs
+      for (let i = 0; i < sentences.length && cards.length < 10; i++) {
+        const sentence = sentences[i];
+
+        // Try to extract key information
+        // Pattern: "X is Y" -> Q: "What is X?" A: "Y"
+        const isPattern = sentence.match(/^(.+?)\s+is\s+(.+?)\.?$/i);
+        if (isPattern) {
+          const subject = isPattern[1].trim();
+          const definition = isPattern[2].trim();
+          cards.push({
+            question: `What is ${subject}?`,
+            answer: definition.charAt(0).toUpperCase() + definition.slice(1)
+          });
+          continue;
+        }
+
+        // Pattern: "X refers to Y" -> Q: "What does X refer to?" A: "Y"
+        const refersPattern = sentence.match(/^(.+?)\s+refers to\s+(.+?)\.?$/i);
+        if (refersPattern) {
+          cards.push({
+            question: `What does ${refersPattern[1].trim()} refer to?`,
+            answer: refersPattern[2].trim()
+          });
+          continue;
+        }
+
+        // Pattern: "X means Y" -> Q: "What does X mean?" A: "Y"
+        const meansPattern = sentence.match(/^(.+?)\s+means\s+(.+?)\.?$/i);
+        if (meansPattern) {
+          cards.push({
+            question: `What does ${meansPattern[1].trim()} mean?`,
+            answer: meansPattern[2].trim()
+          });
+          continue;
+        }
+
+        // Default: Use sentence as answer, generate question
+        if (sentence.includes('for')) {
+          const parts = sentence.split('for');
+          cards.push({
+            question: `What is used for ${parts[1].trim()}?`,
+            answer: parts[0].trim()
+          });
+        } else {
+          // Generic conversion: just use the sentence
+          cards.push({
+            question: `Tell me about this topic`,
+            answer: sentence
+          });
+        }
+      }
+    }
+
     return cards;
   }
 

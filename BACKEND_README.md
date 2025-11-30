@@ -1,12 +1,12 @@
 # MindFlip AI - Backend API
 
-**A production-ready, self-contained REST API for AI-powered flashcard generation and study assistance.**
+**A production-ready, self-contained API for AI-powered flashcard generation with REST and GraphQL support.**
 
-This backend service provides a complete, independent API that can be integrated into any frontend application or used as a standalone service. It implements Clean Architecture principles with robust error handling, caching, queuing, and resilience patterns.
+This backend service provides a complete, independent API that can be integrated into any frontend application. It implements Clean Architecture principles with robust error handling, caching, queuing, and resilience patterns.
 
 ## 🎯 Overview
 
-MindFlip AI Backend is a Node.js/TypeScript API service that generates educational flashcards using:
+MindFlip AI Backend supports both **REST** and **GraphQL** APIs, providing:
 - **LLM Integration**: Ollama (server-side) and WebLLM (browser-based via WebSocket)
 - **Web Search**: Serper.dev integration for real-time knowledge retrieval
 - **File Processing**: PDF and image (OCR) support
@@ -88,7 +88,8 @@ npm run serve
 ```
 
 The API will be available at:
-- **API Base**: `http://localhost:3000/api`
+- **REST API Base**: `http://localhost:3000/api`
+- **GraphQL API**: `http://localhost:3000/graphql`
 - **Swagger UI**: `http://localhost:3000/api-docs`
 - **Health Check**: `http://localhost:3000/api/health`
 
@@ -120,11 +121,15 @@ POST /api/upload                   # Upload PDF/Image for processing
 #### Quiz Generation
 
 ```http
-POST /api/quiz                     # Generate quiz from flashcards
+POST /api/quiz                     # Generate quiz (from topic or flashcards)
 POST /api/quiz/generate-advanced    # Generate advanced quiz
 GET  /api/quiz/history             # Get quiz history
 POST /api/quiz/history             # Save quiz result
 ```
+
+**Quiz Generation Options:**
+- **From Topic**: Provide `topic` and optional `numQuestions`.
+- **From Flashcards**: Provide `flashcardIds` array and optional `numQuestions`.
 
 #### WebLLM Management (New)
 
@@ -141,6 +146,71 @@ POST /api/webllm/generate          # Generate via WebLLM (via WebSocket)
 POST /api/decks                    # Save flashcard deck
 GET  /api/decks                    # Get deck history
 ```
+
+#### GraphQL API ✨ NEW
+
+```http
+POST /graphql                      # GraphQL endpoint (queries + mutations)
+```
+
+**Key Features:**
+- 🔀 Hybrid mode with automatic REST fallback
+- 🔐 Full JWT authentication support
+- ⚡ Efficient data fetching (request only what you need)
+- 📦 Batch multiple operations in single request
+
+**Example Queries:**
+
+```graphql
+# Get all decks with cards
+query {
+  decks {
+    id
+    topic
+    cards {
+      front
+      back
+    }
+  }
+}
+
+# Generate flashcards (requires auth)
+mutation {
+  generateFlashcards(input: {
+    topic: "React Hooks"
+    count: 10
+    mode: "standard"
+  }) {
+    cards {
+      front
+      back
+    }
+    jobId
+  }
+}
+
+# Create quiz
+mutation {
+  createQuiz(input: {
+    topic: "JavaScript"
+    source: "topic"
+    count: 5
+  }) {
+    id
+    questions {
+      question
+      options
+    }
+  }
+}
+```
+
+**Enable GraphQL Mode (Frontend):**
+```javascript
+localStorage.setItem('USE_GRAPHQL', 'true');
+```
+
+**Full Documentation**: See [docs/graphql-api.md](docs/graphql-api.md)
 
 #### Admin & Monitoring
 
@@ -246,6 +316,63 @@ if (result.status === 'completed') {
   const flashcards = result.result.cards;
   // Use flashcards in your application
 }
+```
+
+### GraphQL Integration Example
+
+```javascript
+// 1. Authenticate (same as REST)
+// ... get token from OAuth flow
+
+// 2. Generate Flashcards via GraphQL
+const response = await fetch('http://api.example.com/graphql', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    query: `
+      mutation GenerateFlashcards($input: GenerateInput!) {
+        generateFlashcards(input: $input) {
+          cards {
+            front
+            back
+          }
+          jobId
+          recommendedTopics
+        }
+      }
+    `,
+    variables: {
+      input: {
+        topic: 'Neural Networks',
+        count: 10,
+        mode: 'standard',
+        knowledgeSource: 'ai-web'
+      }
+    }
+  })
+});
+
+const { data } = await response.json();
+
+// 3. Handle Response
+if (data.generateFlashcards.jobId) {
+  // Async: Poll for results
+  const jobId = data.generateFlashcards.jobId;
+  // ... poll via GraphQL job query or REST /api/jobs/:id
+} else {
+  // Sync: Use cards immediately
+  const flashcards = data.generateFlashcards.cards;
+}
+```
+
+**Advantages of GraphQL:**
+- Request exactly the fields you need
+- Combine multiple operations in one request
+- Type-safe with schema validation
+- Automatic REST fallback for reliability
 ```
 
 ### WebLLM Integration

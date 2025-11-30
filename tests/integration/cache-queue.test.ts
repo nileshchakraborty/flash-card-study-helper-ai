@@ -14,44 +14,56 @@ describe('Cache-Queue Integration', () => {
     beforeAll(() => {
         // Mock StudyService
         mockStudyService = {
-            generateFlashcards: jest.fn().mockResolvedValue({
+            generateFlashcards: jest.fn<any>().mockResolvedValue({
                 cards: [
                     { id: '1', front: 'Q1', back: 'A1', topic: 'Test' },
                     { id: '2', front: 'Q2', back: 'A2', topic: 'Test' }
                 ],
                 recommendedTopics: ['Related1', 'Related2']
             }),
-            processFile: jest.fn(),
-            getBriefAnswer: jest.fn(),
-            generateAdvancedQuiz: jest.fn(),
-            getQuizHistory: jest.fn(),
-            saveQuizResult: jest.fn(),
-            getDeckHistory: jest.fn(),
-            saveDeck: jest.fn()
+            processFile: jest.fn<any>(),
+            getBriefAnswer: jest.fn<any>(),
+            generateAdvancedQuiz: jest.fn<any>(),
+            getQuizHistory: jest.fn<any>(),
+            saveQuizResult: jest.fn<any>(),
+            getDeckHistory: jest.fn<any>(),
+            saveDeck: jest.fn<any>()
         };
 
         flashcardCache = new FlashcardCacheService(3600);
 
         // Mock QueueService
         mockQueue = {
-            addGenerateJob: jest.fn().mockResolvedValue('job-123'),
-            getJobStatus: jest.fn().mockResolvedValue({
+            addGenerateJob: jest.fn<any>().mockResolvedValue('job-123'),
+            getJobStatus: jest.fn<any>().mockResolvedValue({
                 status: 'completed',
                 result: {
                     cards: [{ id: '1', front: 'Q', back: 'A', topic: 'Test' }],
                     recommendedTopics: []
                 }
             }),
-            getQueueStats: jest.fn().mockResolvedValue({
+            getQueueStats: jest.fn<any>().mockResolvedValue({
                 waiting: 0,
                 active: 1,
                 completed: 5,
                 failed: 0,
                 delayed: 0
             })
-        };
+        } as any;
 
-        server = new ExpressServer(mockStudyService, mockQueue, flashcardCache);
+        // Mock other services
+        const mockWebLLMService = {} as any;
+        const mockQuizStorage = {} as any;
+        const mockFlashcardStorage = {} as any;
+
+        server = new ExpressServer(
+            mockStudyService,
+            mockQueue,
+            flashcardCache,
+            mockWebLLMService,
+            mockQuizStorage,
+            mockFlashcardStorage
+        );
         app = server.getApp();
     });
 

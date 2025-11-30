@@ -13,30 +13,46 @@ describe('API Resilience Tests', () => {
     beforeAll(() => {
         // Mock StudyService
         mockStudyService = {
-            generateFlashcards: jest.fn().mockResolvedValue({
+            generateFlashcards: jest.fn<any>().mockResolvedValue({
                 cards: [
                     { id: '1', front: 'Q1', back: 'A1', topic: 'Test' },
                     { id: '2', front: 'Q2', back: 'A2', topic: 'Test' }
                 ],
                 recommendedTopics: ['Related Topic']
             }),
-            processFile: jest.fn(),
-            getBriefAnswer: jest.fn(),
-            generateAdvancedQuiz: jest.fn(),
-            getQuizHistory: jest.fn(),
-            saveQuizResult: jest.fn(),
-            getDeckHistory: jest.fn(),
-            saveDeck: jest.fn()
+            processFile: jest.fn<any>(),
+            getBriefAnswer: jest.fn<any>(),
+            generateAdvancedQuiz: jest.fn<any>(),
+            getQuizHistory: jest.fn<any>(),
+            saveQuizResult: jest.fn<any>(),
+            getDeckHistory: jest.fn<any>(),
+            saveDeck: jest.fn<any>()
         };
 
-        // Initialize QueueService (requires Redis)
-        try {
-            mockQueueService = new QueueService();
-        } catch (e) {
-            console.warn('Redis not available for tests, queue tests will be skipped');
-        }
+        // Mock QueueService
+        mockQueueService = {
+            addGenerateJob: jest.fn<any>().mockResolvedValue('job-123'),
+            getJobStatus: jest.fn<any>().mockResolvedValue({ status: 'completed' }),
+            getQueueStats: jest.fn<any>().mockResolvedValue({ waiting: 0 })
+        } as any;
 
-        server = new ExpressServer(mockStudyService, mockQueueService);
+        const mockFlashcardCache = {
+            get: jest.fn<any>(),
+            set: jest.fn()
+        } as any;
+
+        const mockWebLLMService = {} as any;
+        const mockQuizStorage = {} as any;
+        const mockFlashcardStorage = {} as any;
+
+        server = new ExpressServer(
+            mockStudyService,
+            mockQueueService,
+            mockFlashcardCache,
+            mockWebLLMService,
+            mockQuizStorage,
+            mockFlashcardStorage
+        );
         app = server.getApp();
     });
 
@@ -57,12 +73,14 @@ describe('API Resilience Tests', () => {
         });
 
         it('should queue job and return 202 with jobId when authenticated', async () => {
-            // Mock token (in real tests, you'd generate a valid JWE token)
-            const mockToken = 'mock-jwt-token';
+            // Generate a valid token using AuthService
+            const { AuthService } = await import('../src/core/services/AuthService.js');
+            const authService = AuthService.getInstance();
+            const validToken = await authService.encryptToken({ id: 'test-user', email: 'test@example.com' });
 
             const response = await request(app)
                 .post('/api/generate')
-                .set('Authorization', `Bearer ${mockToken}`)
+                .set('Authorization', `Bearer ${validToken}`)
                 .send({
                     topic: 'JavaScript Async',
                     count: 5,
@@ -70,14 +88,10 @@ describe('API Resilience Tests', () => {
                     knowledgeSource: 'ai-web'
                 });
 
-            if (mockQueueService) {
-                expect(response.status).toBe(202);
-                expect(response.body.success).toBe(true);
-                expect(response.body.jobId).toBeDefined();
-                expect(response.body.statusUrl).toContain('/api/jobs/');
-            } else {
-                expect(response.status).toBe(401); // Auth will fail with mock token
-            }
+            expect(response.status).toBe(202);
+            expect(response.body.success).toBe(true);
+            expect(response.body.jobId).toBeDefined();
+            expect(response.body.statusUrl).toContain('/api/jobs/');
         });
     });
 

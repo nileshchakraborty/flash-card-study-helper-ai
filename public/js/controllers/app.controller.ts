@@ -6,6 +6,7 @@ import { deckModel } from '../models/deck.model.js';
 import { quizModel } from '../models/quiz.model.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
+import { initializeQuizHandlers } from '../quiz-init.js';
 
 export class AppController {
   private generatorView: any;
@@ -25,6 +26,9 @@ export class AppController {
   init() {
     this.setupTabSwitching();
     this.setupGlobalEvents();
+
+    // Initialize quiz creation and management handlers
+    initializeQuizHandlers(this.quizView);
 
     // Initial load
     this.loadInitialState();
@@ -98,7 +102,18 @@ export class AppController {
         if (topic && topic.trim() && (topic !== deckModel.currentTopic || cards.length === 0)) {
           // Generate quiz from web/topic using StudyService
           // First generate flashcards, then create quiz from them
-          const flashcardResponse = await apiService.post('/generate', {
+          // Check authentication for backend generation
+          if (!apiService.isAuthenticated()) {
+            const login = confirm('Generating quizzes from new topics requires a free account. Would you like to log in?');
+            if (login) {
+              window.location.href = '/api/auth/google';
+            }
+            this.quizView.hideLoading();
+            return;
+          }
+
+
+          const flashcardResponse = await apiService.generateFlashcards({
             topic: topic,
             count: count,
             mode: 'standard',
@@ -114,7 +129,7 @@ export class AppController {
 
             while (attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 1000));
-              jobStatus = await apiService.get(`/jobs/${flashcardResponse.jobId}`);
+              jobStatus = await apiService.getJobStatus(flashcardResponse.jobId);
 
               if (jobStatus.status === 'completed') {
                 if (jobStatus.result && jobStatus.result.cards) {
@@ -237,12 +252,21 @@ export class AppController {
 
       const enhancedTopic = `${topic}${topicSuffix}`;
 
+      // Check authentication for Deep Dive
+      if (!apiService.isAuthenticated()) {
+        const login = confirm('Deep Dive features require a free account to save your progress and access advanced AI models. Would you like to log in with Google?');
+        if (login) {
+          window.location.href = '/api/auth/google';
+        }
+        return;
+      }
+
       // Show loading
       this.generatorView.showLoading();
 
       try {
         console.log('Generating harder flashcards for:', enhancedTopic);
-        const data = await apiService.post('/generate', {
+        const data = await apiService.generateFlashcards({
           topic: difficulty === 'deep-dive' ? topic : enhancedTopic,
           count: 10,
           mode: difficulty === 'deep-dive' ? 'deep-dive' : 'standard',

@@ -1,6 +1,6 @@
 // @ts-nocheck
-import {apiService} from '../services/api.service.js';
-import {eventBus} from '../utils/event-bus.js';
+import { apiService } from '../services/api.service.js';
+import { eventBus } from '../utils/event-bus.js';
 
 export class QuizModel {
   questions: any[] = [];
@@ -9,11 +9,11 @@ export class QuizModel {
   history: any[] = [];
   mode: string = 'standard'; // standard, web, advanced
   currentTopic: string = 'General';
-  
+
   constructor() {
     // Properties are now initialized directly on the class
   }
-  
+
   startQuiz(questions, mode = 'standard', topic = 'General') {
     this.questions = questions;
     this.mode = mode;
@@ -22,15 +22,15 @@ export class QuizModel {
     this.currentTopic = topic;
     eventBus.emit('quiz:started', this.getCurrentQuestion());
   }
-  
+
   getCurrentQuestion() {
     return this.questions[this.currentIndex];
   }
-  
+
   answerQuestion(questionId, back) {
     this.answers[questionId] = back;
   }
-  
+
   nextQuestion() {
     if (this.currentIndex < this.questions.length - 1) {
       this.currentIndex++;
@@ -39,7 +39,7 @@ export class QuizModel {
     }
     return false;
   }
-  
+
   prevQuestion() {
     if (this.currentIndex > 0) {
       this.currentIndex--;
@@ -48,7 +48,7 @@ export class QuizModel {
     }
     return false;
   }
-  
+
   async submitQuiz(topic?: string) {
     const quizTopic = topic || this.currentTopic || 'General';
     let score = 0;
@@ -65,7 +65,7 @@ export class QuizModel {
         expected: q.correctAnswer || q.expected // Ensure expected is passed for UI
       };
     });
-    
+
     const quizResult = {
       score,
       total: this.questions.length,
@@ -73,11 +73,14 @@ export class QuizModel {
       results,
       timestamp: Date.now()
     };
-    
+
     try {
-      const response = await apiService.post('/api/quiz/history', quizResult);
-      if (response && response.id) {
-        quizResult.id = response.id; // Add ID from server
+      // Use hybrid submitQuiz method
+      // We pass the full result object, apiService handles adaptation for GraphQL
+      const response = await apiService.submitQuiz(quizResult.id || this.currentTopic, quizResult);
+
+      if (response && (response.id || response.quizId)) {
+        quizResult.id = response.id || response.quizId; // Add ID from server
       }
       this.history.unshift(quizResult); // Add to local history
       eventBus.emit('quiz:completed', quizResult);
@@ -89,10 +92,10 @@ export class QuizModel {
       eventBus.emit('quiz:completed', quizResult);
       eventBus.emit('quiz:history-updated', this.history);
     }
-    
+
     return quizResult;
   }
-  
+
   async loadHistory() {
     try {
       const data = await apiService.get('/quiz/history');

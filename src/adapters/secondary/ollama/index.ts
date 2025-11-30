@@ -240,7 +240,16 @@ Create ${count} flashcards now:`;
   }
 
   async generateQuizFromFlashcards(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]> {
-    const systemPrompt = "You are a teacher creating a quiz based SPECIFICALLY on the provided flashcards.";
+    // Check cache
+    const flashcardIds = flashcards.map(fc => fc.id).sort().join(',');
+    const cacheKey = `ollama:quiz:flashcards:${CacheServiceClass.hashKey(flashcardIds)}:${count}`;
+
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
+    const systemPrompt = "You are an expert quiz designer creating multiple-choice tests based on flashcard content.";
 
     // Create a text representation of the flashcards
     const cardsText = flashcards.map(c => `Q: ${c.front}\nA: ${c.back}`).join('\n\n');
@@ -251,26 +260,115 @@ Create ${count} flashcards now:`;
         
         Create ${count} multiple-choice questions based ONLY on these flashcards.
         
-        IMPORTANT REQUIREMENTS:
-        1. Mix the difficulty: Include Easy (direct recall), Medium (application), and Hard (synthesis/inference) questions.
-        2. The "correctAnswer" MUST be one of the "options".
-        3. Return ONLY a JSON array.
+        CRITICAL REQUIREMENTS:
+        1. Each question MUST have exactly 4 options: 1 correct answer + 3 plausible wrong answers (distractors)
+        2. For True/False questions, use only 2 options: ["True", "False"]
+        3. The "correctAnswer" MUST be one of the "options" array
+        4. Make distractors plausible but clearly wrong to someone who studied the material
+        5. Mix difficulty: Easy (direct recall), Medium (application), Hard (synthesis)
+        6. Questions should test understanding, not just memorization
         
-        JSON Format:
+        DETECTION RULES:
+        - If a question is inherently binary (yes/no, true/false, exists/doesn't exist), use only 2 options
+        - For all other questions, provide 4 options
+        
+        JSON Format (return ONLY valid JSON, no markdown):
         [
           {
             "id": "q1",
-            "question": "Question text here",
-            "options": ["Option A", "Option B", "Option C", "Option D"],
-            "correctAnswer": "Option A",
-            "explanation": "Why this is correct",
-            "difficulty": "easy" | "medium" | "hard"
+            "question": "What is the capital of France?",
+            "options": ["Paris", "London", "Berlin", "Madrid"],
+            "correctAnswer": "Paris",
+            "explanation": "Paris has been the capital of France since 987 AD",
+            "difficulty": "easy"
+          },
+          {
+            "id": "q2",
+            "question": "Is Python a compiled language?",
+            "options": ["True", "False"],
+            "correctAnswer": "False",
+            "explanation": "Python is an interpreted language, not compiled",
+            "difficulty": "medium"
           }
         ]
+        
+        Create ${count} questions now:
         `;
 
     const response = await this.callOllama(prompt, systemPrompt);
-    return this.extractJSON(response);
+    const result = this.extractJSON(response);
+
+    // Store in cache
+    if (this.cache && result.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate quiz questions directly from a topic (without flashcards)
+   */
+  async generateQuizFromTopic(topic: string, count: number, context?: string): Promise<QuizQuestion[]> {
+    // Check cache
+    const contextHash = context ? CacheServiceClass.hashKey(context.substring(0, 1000)) : '';
+    const cacheKey = `ollama:quiz:topic:${topic}:${count}:${contextHash}`;
+
+    if (this.cache) {
+      const cached = this.cache.get(cacheKey);
+      if (cached !== undefined) return cached;
+    }
+
+    const systemPrompt = "You are an expert quiz designer creating educational multiple-choice tests.";
+
+    const prompt = `
+        Create ${count} multiple-choice quiz questions about: "${topic}"
+        ${context ? `\n\nContext/Background Information:\n${context}\n` : ''}
+        
+        CRITICAL REQUIREMENTS:
+        1. Each question MUST have exactly 4 options: 1 correct answer + 3 plausible wrong answers (distractors)
+        2. For True/False questions, use only 2 options: ["True", "False"]
+        3. The "correctAnswer" MUST be one of the "options" array
+        4. Make distractors challenging but clearly wrong to someone who knows the topic
+        5. Mix difficulty levels: Easy, Medium, Hard
+        6. Questions should test understanding and application, not just definitions
+        
+        DETECTION RULES:
+        - If a question is inherently binary (yes/no, true/false, did X happen, is X true), use only 2 options
+        - For all other questions (what, how, which one, identify, etc.), provide 4 options
+        
+        JSON Format (return ONLY valid JSON, no markdown, no code blocks):
+        [
+          {
+            "id": "q1",
+            "question": "What is the primary purpose of X?",
+            "options": ["Option A (correct)", "Option B (plausible)", "Option C (plausible)", "Option D (plausible)"],
+            "correctAnswer": "Option A (correct)",
+            "explanation": "Brief explanation why this is correct and others are wrong",
+            "difficulty": "medium"
+          },
+          {
+            "id": "q2",
+            "question": "Is statement Y true?",
+            "options": ["True", "False"],
+            "correctAnswer": "False",
+            "explanation": "Explanation of why it's false",
+            "difficulty": "easy"
+          }
+        ]
+        
+        Create ${count} questions now:
+        `;
+
+    const response = await this.callOllama(prompt, systemPrompt);
+    const result = this.extractJSON(response);
+
+    // Store in cache
+    if (this.cache && result.length > 0) {
+      this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   private async callOllama(prompt: string, system: string): Promise<string> {
@@ -382,7 +480,7 @@ Create ${count} flashcards now:`;
       const matches = text.match(/\{[^{}]+\}/g);
       if (matches) {
         const results = matches.map(m => {
-          try { 
+          try {
             const parsed = JSON.parse(m);
             // Check for both question/answer and front/back formats
             if ((parsed.question && parsed.answer) || (parsed.front && parsed.back)) {
