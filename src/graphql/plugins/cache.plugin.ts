@@ -1,3 +1,4 @@
+import { HeaderMap } from '@apollo/server';
 import type { ApolloServerPlugin } from '@apollo/server';
 import type { LRUCache } from 'lru-cache';
 
@@ -24,7 +25,7 @@ export const createResponseCachePlugin = (): ApolloServerPlugin => {
             let isCacheable = false;
 
             return {
-                async didResolveOperation(requestContext) {
+                async responseForOperation(requestContext) {
                     const { request, operation } = requestContext;
 
                     // Only cache queries, not mutations
@@ -32,19 +33,23 @@ export const createResponseCachePlugin = (): ApolloServerPlugin => {
                         const operationName = request.operationName || 'anonymous';
                         cacheKey = `${operationName}:${JSON.stringify(request.variables || {})}`;
 
-                        // Check cache
                         const cached = cache.get(cacheKey);
                         if (cached && cached.expires > Date.now()) {
                             console.log(`[Cache] HIT: ${operationName}`);
-                            // Return cached response
-                            requestContext.response = { body: { kind: 'single', singleResult: cached.data } };
-                            isCacheable = false; // Already served from cache
-                            return;
+                            // Short-circuit the request with the cached response
+                            isCacheable = false;
+                            const headers = new HeaderMap();
+                            return {
+                                http: { headers },
+                                body: { kind: 'single', singleResult: cached.data }
+                            };
                         }
 
                         isCacheable = true;
                         console.log(`[Cache] MISS: ${operationName}`);
                     }
+
+                    return null;
                 },
 
                 async willSendResponse(requestContext) {

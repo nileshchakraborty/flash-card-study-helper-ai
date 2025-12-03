@@ -340,236 +340,133 @@ Generate the JSON array now:`;
   }
 
   parseLLMResponse(response) {
-    let cards = [];
+    const isCodeLike = (text) => /import\s+|class\s+|def\s+|function\s|console\.log|System\.out\.println|flashcards_json|randomly selected/i.test(text);
+    const normalizeCard = (raw) => ({
+      question: (raw?.question || raw?.front || '').trim(),
+      answer: (raw?.answer || raw?.back || '').trim()
+    });
+    const isValidCard = (card) => card.question && card.answer && card.question.length > 6 && card.answer.length > 6 && !isCodeLike(card.question + ' ' + card.answer);
 
-    // Helper to clean and parse JSON
+    const stripNoise = (str) => str
+      .replace(/```[a-z]*\n?/gi, '')
+      .replace(/```/g, '')
+      .replace(/<<<JSON_START>>>/g, '')
+      .replace(/<<<JSON_END>>>/g, '')
+      .replace(/^[\s\S]*?(\[)/, '$1');
+
     const tryParse = (str) => {
       try {
-        // Fix double braces
-        let clean = str.replace(/\{\{/g, '{').replace(/\}\}/g, '}');
-        // Fix trailing commas
-        clean = clean.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+        let clean = stripNoise(str)
+          .replace(/\{\{/g, '{').replace(/\}\}/g, '}')
+          .replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
         return JSON.parse(clean);
       } catch (e) {
         return null;
       }
     };
 
-    try {
-      // 1. Try to find content between delimiters
-      const delimiterMatch = response.match(/<<<JSON_START>>>([\s\S]*?)<<<JSON_END>>>/);
-      if (delimiterMatch && delimiterMatch[1]) {
-        const parsed = tryParse(delimiterMatch[1]);
-        if (parsed) {
-          if (Array.isArray(parsed)) return parsed;
-          // Handle separate arrays
-          const keys = Object.keys(parsed);
-          const questionKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
-          const answerKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
-          if (questionKey && answerKey && Array.isArray(parsed[questionKey])) {
-            return parsed[questionKey].map((q, i) => ({ question: q, answer: parsed[answerKey][i] || '' }));
-          }
-        }
+    // 1) Prefer JSON arrays (with or without delimiters)
+    const arrayMatches = response.match(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>|\[[\s\S]*?\]/g) || [];
+    for (const match of arrayMatches) {
+      const parsed = tryParse(match);
+      if (parsed && Array.isArray(parsed)) {
+        const filtered = parsed.map(normalizeCard).filter(isValidCard);
+        if (filtered.length) return filtered;
       }
-
-      // 2. Fallback: Try to find ANY valid JSON structure (array or object)
-      // We search for the largest possible JSON block
-      const jsonMatch = response.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-      if (jsonMatch) {
-        const parsed = tryParse(jsonMatch[0]);
-        if (parsed) {
-          if (Array.isArray(parsed)) return parsed;
-
-          const keys = Object.keys(parsed);
-          const questionKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
-          const answerKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
-          if (questionKey && answerKey && Array.isArray(parsed[questionKey])) {
-            return parsed[questionKey].map((q, i) => ({ question: q, answer: parsed[answerKey][i] || '' }));
-          }
-          // Handle single object with "questions" array
-          if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse LLM response directly, trying regex fallback');
     }
 
-    // 3. Regex fallback: Individual JSON objects
-    const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+    // 2) Any JSON object containing question/answer arrays
+    const objectMatches = response.match(/\{[\s\S]*?\}/g) || [];
+    for (const match of objectMatches) {
+      const parsed = tryParse(match);
+      if (parsed) {
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.map(normalizeCard).filter(isValidCard);
+          if (filtered.length) return filtered;
+        }
+
+        const keys = Object.keys(parsed);
+        const qKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
+        const aKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
+        if (qKey && aKey && Array.isArray(parsed[qKey])) {
+          const filtered = parsed[qKey]
+            .map((q, i) => normalizeCard({ question: q, answer: parsed[aKey][i] || '' }))
+            .filter(isValidCard);
+          if (filtered.length) return filtered;
+        }
+        if (parsed.questions && Array.isArray(parsed.questions)) {
+          const filtered = parsed.questions.map(normalizeCard).filter(isValidCard);
+          if (filtered.length) return filtered;
+        }
+      }
+    }
+
+    // 3) Regex fallback for inline objects
+    const cards = [];
+    const objectRegex = /\{\s*\"question\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*,\s*\"answer\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*\}/g;
     let match;
     while ((match = objectRegex.exec(response)) !== null) {
       try {
-        cards.push({
-          question: JSON.parse(`"${match[1]}"`),
-          answer: JSON.parse(`"${match[2]}"`)
+        const card = normalizeCard({
+          question: JSON.parse(`\"${match[1]}\"`),
+          answer: JSON.parse(`\"${match[2]}\"`)
         });
+        if (isValidCard(card)) cards.push(card);
       } catch (e) { }
     }
 
-    // 4. CSV Format: Try to parse as CSV
+    // 4) CSV / pipe / tab fallback (skip lines that look like code)
     if (cards.length === 0) {
-      console.warn('No JSON found, trying CSV format...');
-
-      // Look for CSV-like patterns: "question","answer" or question,answer
-      const lines = response.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
+      const lines = response.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !isCodeLike(l));
       for (const line of lines) {
-        // Try comma-separated with quotes
-        let csvMatch = line.match(/^"([^"]+)"\s*,\s*"([^"]+)"$/);
+        let csvMatch = line.match(/^\"([^\"]+)\"\s*,\s*\"([^\"]+)\"$/);
         if (csvMatch) {
-          cards.push({
-            question: csvMatch[1].trim(),
-            answer: csvMatch[2].trim()
-          });
+          const card = normalizeCard({ question: csvMatch[1], answer: csvMatch[2] });
+          if (isValidCard(card)) cards.push(card);
           continue;
         }
 
-        // Try comma-separated without quotes (but not if it's a sentence)
         if (line.includes(',') && !line.endsWith('.')) {
           const parts = line.split(',');
           if (parts.length === 2) {
-            const q = parts[0].trim();
-            const a = parts[1].trim();
-            // Only accept if both parts are substantial
-            if (q.length > 5 && a.length > 5 && !q.match(/^\d+$/)) {
-              cards.push({
-                question: q,
-                answer: a
-              });
-            }
+            const card = normalizeCard({ question: parts[0], answer: parts[1] });
+            if (isValidCard(card)) cards.push(card);
           }
         }
 
-        // Try pipe-separated: question | answer
         const pipeMatch = line.match(/^(.+?)\s*\|\s*(.+)$/);
         if (pipeMatch) {
-          cards.push({
-            question: pipeMatch[1].trim(),
-            answer: pipeMatch[2].trim()
-          });
+          const card = normalizeCard({ question: pipeMatch[1], answer: pipeMatch[2] });
+          if (isValidCard(card)) cards.push(card);
           continue;
         }
 
-        // Try tab-separated
         if (line.includes('\t')) {
           const parts = line.split('\t').map(p => p.trim());
-          if (parts.length === 2 && parts[0].length > 5 && parts[1].length > 5) {
-            cards.push({
-              question: parts[0],
-              answer: parts[1]
-            });
+          if (parts.length === 2) {
+            const card = normalizeCard({ question: parts[0], answer: parts[1] });
+            if (isValidCard(card)) cards.push(card);
           }
         }
       }
-
-      if (cards.length > 0) {
-        console.log(`Parsed ${cards.length} cards from CSV format`);
-        return cards;
-      }
+      if (cards.length) return cards;
     }
 
-    // 5. TOML Format: Try to parse as TOML-like structure
+    // 5) Plain text fallback – conservative
     if (cards.length === 0) {
-      console.warn('No CSV found, trying TOML format...');
-
-      // Look for [[card]] sections or [card.N] patterns
-      const tomlSections = response.split(/\[\[card\]\]|\[card\.\d+\]/i);
-
-      for (const section of tomlSections) {
-        if (!section.trim()) continue;
-
-        const lines = section.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        let question = '';
-        let answer = '';
-
-        for (const line of lines) {
-          // Match key = value or key = "value"
-          const kvMatch = line.match(/^(question|front|q)\s*=\s*["']?([^"']+)["']?$/i);
-          if (kvMatch) {
-            question = kvMatch[2].trim();
-            continue;
-          }
-
-          const ansMatch = line.match(/^(answer|back|a)\s*=\s*["']?([^"']+)["']?$/i);
-          if (ansMatch) {
-            answer = ansMatch[2].trim();
-          }
-        }
-
-        if (question && answer) {
-          cards.push({ question, answer });
-        }
-      }
-
-      if (cards.length > 0) {
-        console.log(`Parsed ${cards.length} cards from TOML format`);
-        return cards;
-      }
-    }
-
-    // 6. Plain text fallback - convert sentences to flashcards
-    if (cards.length === 0) {
-      console.warn('No JSON found, attempting plain text conversion...');
-
-      // Extract unique sentences (remove duplicates)
       const sentences = response
         .split(/\n+/)
         .map(line => line.trim())
-        .filter(line => line.length > 10 && line.length < 200) // Reasonable length
-        .map(line => line.replace(/^["']|["']$/g, '')) // Remove quotes
-        .filter((line, index, arr) => arr.indexOf(line) === index); // Remove duplicates
+        .filter(line => line.length > 10 && line.length < 200 && !isCodeLike(line))
+        .map(line => line.replace(/^[\"']|[\"']$/g, ''))
+        .filter((line, index, arr) => arr.indexOf(line) === index);
 
-      // Convert sentences to Q&A pairs
-      for (let i = 0; i < sentences.length && cards.length < 10; i++) {
-        const sentence = sentences[i];
-
-        // Try to extract key information
-        // Pattern: "X is Y" -> Q: "What is X?" A: "Y"
-        const isPattern = sentence.match(/^(.+?)\s+is\s+(.+?)\.?$/i);
-        if (isPattern) {
-          const subject = isPattern[1].trim();
-          const definition = isPattern[2].trim();
-          cards.push({
-            question: `What is ${subject}?`,
-            answer: definition.charAt(0).toUpperCase() + definition.slice(1)
-          });
-          continue;
-        }
-
-        // Pattern: "X refers to Y" -> Q: "What does X refer to?" A: "Y"
-        const refersPattern = sentence.match(/^(.+?)\s+refers to\s+(.+?)\.?$/i);
-        if (refersPattern) {
-          cards.push({
-            question: `What does ${refersPattern[1].trim()} refer to?`,
-            answer: refersPattern[2].trim()
-          });
-          continue;
-        }
-
-        // Pattern: "X means Y" -> Q: "What does X mean?" A: "Y"
-        const meansPattern = sentence.match(/^(.+?)\s+means\s+(.+?)\.?$/i);
-        if (meansPattern) {
-          cards.push({
-            question: `What does ${meansPattern[1].trim()} mean?`,
-            answer: meansPattern[2].trim()
-          });
-          continue;
-        }
-
-        // Default: Use sentence as answer, generate question
-        if (sentence.includes('for')) {
-          const parts = sentence.split('for');
-          cards.push({
-            question: `What is used for ${parts[1].trim()}?`,
-            answer: parts[0].trim()
-          });
-        } else {
-          // Generic conversion: just use the sentence
-          cards.push({
-            question: `Tell me about this topic`,
-            answer: sentence
-          });
-        }
+      for (let i = 0; i < sentences.length - 1; i += 2) {
+        const card = normalizeCard({
+          question: sentences[i].endsWith('?') ? sentences[i] : `${sentences[i]}?`,
+          answer: sentences[i + 1]
+        });
+        if (isValidCard(card)) cards.push(card);
       }
     }
 

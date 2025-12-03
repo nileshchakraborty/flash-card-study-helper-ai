@@ -95,11 +95,13 @@ A: "Use the 'with open(filename, mode) as f:' statement. This automatically clos
 Q: "_list = []"
 A: "# create our list..."
 
-JSON FORMAT:
-- Return ONLY a valid JSON array
-- Start with [ and end with ]
-- No markdown, no code blocks
-- Format: [{"question": "...", "answer": "..."}]
+JSON FORMAT (STRICT):
+- Wrap your answer between the markers exactly as shown
+- Do NOT include code fences, explanations, or extra text
+- Use this template:
+<<<JSON_START>>>
+[{"question":"...","answer":"..."}]
+<<<JSON_END>>>
 
 Now create ${count} flashcards about: ${topic}`;
 
@@ -133,9 +135,13 @@ A: "The 'with' statement ensures files are properly closed after use, even if er
 Q: "with open(txt_file_path, 'r') as f:"
 A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
 
-JSON FORMAT:
-- Return ONLY: [{"question": "...", "answer": "..."}]
-- No code blocks, no markdown, pure JSON array
+JSON FORMAT (STRICT):
+- Wrap your answer between the markers exactly as shown
+- Do NOT include code fences, explanations, or extra text
+- Use this template:
+<<<JSON_START>>>
+[{"question":"...","answer":"..."}]
+<<<JSON_END>>>
 
 Create ${count} flashcards now:`;
 
@@ -188,36 +194,115 @@ Create ${count} flashcards now:`;
      * Parse LLM response to extract flashcards
      */
     private parseLLMResponse(response: string, topic: string): any[] {
-        let cards = [];
-        try {
-            // Simple extraction
-            const jsonMatch = response.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                cards = JSON.parse(jsonMatch[0]);
-            } else {
-                cards = JSON.parse(response);
+        const isCodeLike = (text: string) => /import\s+|class\s+|def\s+|function\s|console\.log|System\.out\.println|flashcards_json|randomly selected/i.test(text);
+        const normalizeCard = (raw: any) => ({
+            question: (raw?.question || raw?.front || '').trim(),
+            answer: (raw?.answer || raw?.back || '').trim()
+        });
+        const isValidCard = (card: { question: string; answer: string }) =>
+            !!card.question && !!card.answer && card.question.length > 6 && card.answer.length > 6 && !isCodeLike(card.question + ' ' + card.answer);
+
+        const stripNoise = (str: string) => str
+            .replace(/```[a-z]*\n?/gi, '')
+            .replace(/```/g, '')
+            .replace(/<<<JSON_START>>>/g, '')
+            .replace(/<<<JSON_END>>>/g, '')
+            .replace(/^[\s\S]*?(\[)/, '$1');
+
+        const tryParse = (str: string) => {
+            try {
+                let clean = stripNoise(str)
+                    .replace(/\{\{/g, '{').replace(/\}\}/g, '}')
+                    .replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+                return JSON.parse(clean);
+            } catch (e) {
+                return null;
             }
-        } catch (e) {
-            console.warn('Failed to parse LLM response directly, trying regex fallback');
-            // Fallback regex
-            const objectRegex = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\\s*\}/g;
-            let match;
-            while ((match = objectRegex.exec(response)) !== null) {
-                try {
-                    cards.push({
-                        question: JSON.parse(`"${match[1]}"`),
-                        answer: JSON.parse(`"${match[2]}"`)
-                    });
-                } catch (e) { }
+        };
+
+        // 1) Prefer JSON arrays (with or without delimiters)
+        const arrayMatches = response.match(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>|\[[\s\S]*?\]/g) || [];
+        for (const match of arrayMatches) {
+            const parsed = tryParse(match);
+            if (parsed && Array.isArray(parsed)) {
+                const filtered = parsed.map(normalizeCard).filter(isValidCard);
+                if (filtered.length) {
+                    return filtered.map((card, index) => ({
+                        id: `webllm-${Date.now()}-${index}`,
+                        front: card.question,
+                        back: card.answer,
+                        topic
+                    }));
+                }
             }
         }
 
-        // Format cards for frontend
+        // 2) Any JSON object containing question/answer arrays
+        const objectMatches = response.match(/\{[\s\S]*?\}/g) || [];
+        for (const match of objectMatches) {
+            const parsed = tryParse(match);
+            if (parsed) {
+                if (Array.isArray(parsed)) {
+                    const filtered = parsed.map(normalizeCard).filter(isValidCard);
+                    if (filtered.length) {
+                        return filtered.map((card, index) => ({
+                            id: `webllm-${Date.now()}-${index}`,
+                            front: card.question,
+                            back: card.answer,
+                            topic
+                        }));
+                    }
+                }
+
+                const keys = Object.keys(parsed);
+                const qKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
+                const aKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
+                if (qKey && aKey && Array.isArray((parsed as any)[qKey])) {
+                    const filtered = (parsed as any)[qKey]
+                        .map((q: string, i: number) => normalizeCard({ question: q, answer: (parsed as any)[aKey][i] || '' }))
+                        .filter(isValidCard);
+                    if (filtered.length) {
+                        return filtered.map((card, index) => ({
+                            id: `webllm-${Date.now()}-${index}`,
+                            front: card.question,
+                            back: card.answer,
+                            topic
+                        }));
+                    }
+                }
+                if ((parsed as any).questions && Array.isArray((parsed as any).questions)) {
+                    const filtered = (parsed as any).questions.map(normalizeCard).filter(isValidCard);
+                    if (filtered.length) {
+                        return filtered.map((card, index) => ({
+                            id: `webllm-${Date.now()}-${index}`,
+                            front: card.question,
+                            back: card.answer,
+                            topic
+                        }));
+                    }
+                }
+            }
+        }
+
+        // 3) Regex fallback for inline objects
+        const cards: any[] = [];
+        const objectRegex = /\{\s*\"question\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*,\s*\"answer\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*\}/g;
+        let match;
+        while ((match = objectRegex.exec(response)) !== null) {
+            try {
+                const card = normalizeCard({
+                    question: JSON.parse(`\"${match[1]}\"`),
+                    answer: JSON.parse(`\"${match[2]}\"`)
+                });
+                if (isValidCard(card)) cards.push(card);
+            } catch (e) { }
+        }
+
         return cards.map((card: any, index: number) => ({
             id: `webllm-${Date.now()}-${index}`,
-            front: card.question || card.front,
-            back: card.answer || card.back,
-            topic: topic
+            front: card.question,
+            back: card.answer,
+            topic
         }));
     }
 }

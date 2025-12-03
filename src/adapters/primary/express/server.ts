@@ -152,6 +152,9 @@ export class ExpressServer {
       '/graphql',
       cors<cors.CorsRequest>(),
       express.json(),
+      // Cast is needed because @apollo/server bundles its own express types
+      // which differ from the app's @types/express version. The middleware
+      // is runtime-compatible, so a narrow cast avoids the TS overload clash.
       apolloExpressMiddleware(this.apolloServer, {
         context: async ({ req }) => {
           const baseContext = await createContext(req, {
@@ -174,7 +177,7 @@ export class ExpressServer {
             loaders
           };
         },
-      }),
+      }) as unknown as express.RequestHandler,
     );
 
     // Setup WebSocket server for GraphQL subscriptions
