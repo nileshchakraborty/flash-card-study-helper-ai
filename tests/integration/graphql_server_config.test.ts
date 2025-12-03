@@ -4,6 +4,7 @@ import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { StudyService } from '../../src/core/services/StudyService.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
 import { QueueService } from '../../src/core/services/QueueService.js';
+import { createMockServer } from '../utils/mockServer.js';
 
 describe('GraphQL Server Configuration', () => {
     let server: ExpressServer;
@@ -82,7 +83,7 @@ describe('GraphQL Server Configuration', () => {
         await server.setupGraphQL();
         server.setupRoutes();
 
-        app = server.getApp();
+        app = createMockServer(server.getApp());
 
     });
 

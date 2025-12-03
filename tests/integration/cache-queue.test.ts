@@ -3,6 +3,7 @@ import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
 import { QueueService } from '../../src/core/services/QueueService.js';
+import { createMockServer } from '../utils/mockServer.js';
 
 describe('Cache-Queue Integration', () => {
     let app: any;
@@ -65,7 +66,7 @@ describe('Cache-Queue Integration', () => {
             mockFlashcardStorage
         );
         server.setupRoutes();
-        app = server.getApp();
+        app = createMockServer(server.getApp());
     });
 
     afterEach(() => {

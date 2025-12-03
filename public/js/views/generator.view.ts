@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { BaseView } from './base.view.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
+import type { Flashcard } from '../models/deck.model.js';
 
 export class GeneratorView extends BaseView {
   constructor() {
@@ -548,6 +548,11 @@ Generate the JSON array now:`;
       .replace(/```[a-zA-Z]*\n?/g, '')
       .replace(/<stdout>/gi, '')
       .replace(/<\/?span[^>]*>/gi, '')
+      // Normalise slightly malformed markers sometimes emitted by WebLLM/Ollama
+      .replace(/<JSON_START>>>/gi, '<<<JSON_START>>>')
+      .replace(/<JSON_END>>>/gi, '<<<JSON_END>>>')
+      .replace(/JSON_START>>>/gi, '<<<JSON_START>>>')
+      .replace(/JSON_END>>>/gi, '<<<JSON_END>>>')
       .trim();
 
     const blockMatch = cleaned.match(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>/i);
@@ -559,7 +564,7 @@ Generate the JSON array now:`;
         .trim();
     } else {
       // fallback: grab the first JSON array in the text
-      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+      const arrMatch = cleaned.match(/\[[\s\S]*?\]/);
       if (arrMatch) jsonBlock = arrMatch[0];
     }
 

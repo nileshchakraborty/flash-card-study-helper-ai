@@ -1,42 +1,45 @@
+import type { ID, Timestamp, QuizSource } from './types.js';
+
 export interface Flashcard {
-  id: string;
-  front: string;  // Changed from 'question' to match frontend
-  back: string;   // Changed from 'answer' to match frontend
-  topic: string;
-  source?: {
-    filename?: string;
-    page?: number;
-    type?: string;
-    url?: string;
+  readonly id: ID;
+  readonly front: string;  // question
+  readonly back: string;   // answer
+  readonly topic: string;
+  readonly source?: {
+    readonly filename?: string;
+    readonly page?: number;
+    readonly type?: string;
+    readonly url?: string;
   };
 }
 
 export interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  explanation?: string;
+  readonly id: ID;
+  readonly question: string;
+  readonly options: readonly string[];
+  readonly correctAnswer: string;
+  readonly explanation?: string;
 }
 
 export interface QuizResult {
-  id: string;
-  timestamp: number;
-  score: number;
-  total: number;
-  topic: string;
-  results: {
-    cardId: string;
-    question: string;
-    userAnswer: string;
-    correctAnswer: string;
-    correct: boolean;
+  readonly id: ID;
+  readonly timestamp: Timestamp;
+  readonly score: number;
+  readonly total: number;
+  readonly topic: string;
+  readonly results: readonly {
+    readonly cardId: ID;
+    readonly question: string;
+    readonly userAnswer: string;
+    readonly correctAnswer: string;
+    readonly correct: boolean;
   }[];
 }
 
 export interface Deck {
-  id: string;
-  topic: string;
-  timestamp: number;
-  cards: Flashcard[];
+  readonly id: ID;
+  readonly topic: string;
+  readonly timestamp: Timestamp;
+  readonly cards: readonly Flashcard[];
+  readonly source?: QuizSource;
 }

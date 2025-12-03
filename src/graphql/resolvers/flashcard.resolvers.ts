@@ -2,13 +2,13 @@ import type { GraphQLContext } from '../context.js';
 
 export const flashcardResolvers = {
     Query: {
-        decks: async (_: any, __: any, context: GraphQLContext) => {
+        decks: async (_: unknown, __: unknown, context: GraphQLContext) => {
             // Get decks from storage
             const decks = await context.flashcardStorage.getDecks();
             return decks;
         },
 
-        deck: async (_: any, { id }: { id: string }, context: GraphQLContext) => {
+        deck: async (_: unknown, { id }: { id: string }, context: GraphQLContext) => {
             const deck = await context.flashcardStorage.getDeck(id);
             if (!deck) {
                 throw new Error(`Deck with id ${id} not found`);
@@ -16,7 +16,7 @@ export const flashcardResolvers = {
             return deck;
         },
 
-        flashcards: async (_: any, { topic }: { topic?: string }, context: GraphQLContext) => {
+        flashcards: async (_: unknown, { topic }: { topic?: string }, context: GraphQLContext) => {
             if (topic) {
                 const deck = await context.flashcardStorage.getDeckByTopic(topic);
                 return deck?.cards || [];
@@ -29,8 +29,8 @@ export const flashcardResolvers = {
 
     Mutation: {
         generateFlashcards: async (
-            _: any,
-            { input }: { input: any },
+            _: unknown,
+            { input }: { input: { topic: string; count?: number; mode?: 'standard' | 'deep-dive'; knowledgeSource?: 'ai-only' | 'web-only' | 'ai-web'; parentTopic?: string } },
             context: GraphQLContext
         ) => {
             // Require authentication for generation
@@ -75,8 +75,8 @@ export const flashcardResolvers = {
         },
 
         createDeck: async (
-            _: any,
-            { input }: { input: any },
+            _: unknown,
+            { input }: { input: { topic: string; cards: Array<{ front: string; back: string; topic?: string }> } },
             context: GraphQLContext
         ) => {
             const deck = {
@@ -92,7 +92,7 @@ export const flashcardResolvers = {
         },
 
         deleteDeck: async (
-            _: any,
+            _: unknown,
             { id }: { id: string },
             context: GraphQLContext
         ) => {

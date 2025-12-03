@@ -1,3 +1,4 @@
+import type { IncomingHttpHeaders } from 'http';
 import type { AuthService } from '../core/services/AuthService.js';
 import type { StudyUseCase } from '../core/ports/interfaces.js';
 import type { QuizStorageService } from '../core/services/QuizStorageService.js';
@@ -21,7 +22,7 @@ export interface GraphQLContext {
 }
 
 export async function createContext(
-    req: any,
+    req: { headers: IncomingHttpHeaders },
     services: {
         authService: AuthService;
         studyService: StudyUseCase;
@@ -44,9 +45,10 @@ export async function createContext(
                 email: payload.email || '',
                 name: payload.name || ''
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Token is invalid, user remains undefined
-            console.warn('[GraphQL Context] Token decryption failed:', error.message);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.warn('[GraphQL Context] Token decryption failed:', message);
         }
     }
 

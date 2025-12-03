@@ -3,6 +3,7 @@ import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
+import { createMockServer } from '../utils/mockServer.js';
 
 describe('GraphQL API Integration', () => {
     let app: any;
@@ -86,7 +87,7 @@ describe('GraphQL API Integration', () => {
             name: 'Test User'
         });
 
-        app = server.getApp();
+        app = createMockServer(server.getApp());
     });
 
     afterEach(() => {

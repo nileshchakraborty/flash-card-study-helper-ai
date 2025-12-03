@@ -1,13 +1,14 @@
 import { PubSub } from 'graphql-subscriptions';
+import type { GraphQLContext } from '../context.js';
 
 const pubsub = new PubSub();
 
 export const jobResolvers = {
     Query: {
         job: async (
-            _: any,
+            _: unknown,
             { id }: { id: string },
-            context: any
+            context: GraphQLContext
         ) => {
             // Delegate to existing job query resolver
             const { queueService } = context;
@@ -32,7 +33,7 @@ export const jobResolvers = {
 
     Subscription: {
         jobUpdated: {
-            subscribe: (_: any, { jobId }: { jobId: string }) => {
+            subscribe: (_: unknown, { jobId }: { jobId: string }) => {
                 console.log('[GraphQL Subscription] Client subscribed to job:', jobId);
                 return pubsub.asyncIterableIterator(`JOB_UPDATED_${jobId}`);
             }

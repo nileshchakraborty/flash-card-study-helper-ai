@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
+import { createMockServer } from '../utils/mockServer.js';
 import {
     benchmark,
     compareResults,
@@ -10,7 +11,9 @@ import {
     type ComparisonResult
 } from './benchmark_utils.js';
 
-describe('Performance: GraphQL vs REST', () => {
+const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
+
+(SKIP_SANDBOX ? describe.skip : describe)('Performance: GraphQL vs REST', () => {
     let server: ExpressServer;
     let app: any;
     let authService: AuthService;
@@ -68,7 +71,7 @@ describe('Performance: GraphQL vs REST', () => {
 
         await server.setupGraphQL();
         server.setupRoutes();
-        app = server.getApp();
+        app = createMockServer(server.getApp());
 
         console.log('\n🚀 Starting Performance Benchmarks...\n');
     });

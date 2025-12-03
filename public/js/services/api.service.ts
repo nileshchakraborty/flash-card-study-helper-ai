@@ -1,5 +1,23 @@
-// @ts-nocheck
 import { graphqlService } from './graphql.service';
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type RequestOptions = {
+  method?: HttpMethod;
+  headers?: Record<string, string>;
+  body?: string;
+};
+
+type DeckPayload = {
+  topic: string;
+  cards: Array<{ front: string; back: string; id?: string; topic?: string }>;
+};
+
+type CreateQuizParams = {
+  topic?: string;
+  count?: number;
+  flashcardIds?: string[];
+  flashcards?: Array<{ id: string; front: string; back: string; topic?: string }>;
+};
 
 export class ApiService {
   private baseUrl: string;
@@ -36,7 +54,7 @@ export class ApiService {
     return this.useGraphQL;
   }
 
-  async request(endpoint, options = {}) {
+  async request(endpoint: string, options: RequestOptions = {}) {
     // Check for token in URL (from OAuth redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
@@ -51,7 +69,7 @@ export class ApiService {
     const token = localStorage.getItem('authToken');
 
     try {
-      const headers = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...options.headers,
       };
@@ -76,7 +94,7 @@ export class ApiService {
     }
   }
 
-  async get(endpoint) {
+  async get(endpoint: string) {
     return this.request(endpoint, { method: 'GET' });
   }
 
@@ -84,7 +102,7 @@ export class ApiService {
     return !!localStorage.getItem('authToken');
   }
 
-  async post(endpoint, data) {
+  async post(endpoint: string, data: unknown) {
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -111,7 +129,7 @@ export class ApiService {
   /**
    * Create a deck - supports both REST and GraphQL
    */
-  async createDeck(deck) {
+  async createDeck(deck: DeckPayload) {
     if (this.useGraphQL) {
       try {
         return await graphqlService.createDeck(deck);
@@ -157,7 +175,7 @@ export class ApiService {
   /**
    * Get quiz by ID - supports both REST and GraphQL
    */
-  async getQuiz(id) {
+  async getQuiz(id: string) {
     if (this.useGraphQL) {
       try {
         const quiz = await graphqlService.getQuiz(id);
@@ -174,7 +192,7 @@ export class ApiService {
    * Create quiz - supports both REST and GraphQL
    * Unified method for topic or flashcards
    */
-  async createQuiz(params) {
+  async createQuiz(params: CreateQuizParams) {
     if (this.useGraphQL) {
       try {
         const input = {

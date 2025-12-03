@@ -1,9 +1,26 @@
 import type { GraphQLContext } from '../context.js';
 import { requireAuth } from '../context.js';
+import type { QuizQuestion } from '../../core/domain/models.js';
+
+type CreateQuizInput = {
+    topic?: string;
+    count?: number;
+    cards?: Array<{
+        id: string;
+        front: string;
+        back: string;
+        topic?: string;
+    }>;
+};
+
+type SubmitAnswersArgs = {
+    quizId: string;
+    answers: string[];
+};
 
 export const quizResolvers = {
     Query: {
-        quiz: async (_: any, { id }: { id: string }, context: GraphQLContext) => {
+        quiz: async (_: unknown, { id }: { id: string }, context: GraphQLContext) => {
             const quiz = await context.quizStorage.getQuiz(id);
             if (!quiz) {
                 throw new Error(`Quiz with id ${id} not found`);
@@ -11,17 +28,17 @@ export const quizResolvers = {
             return quiz;
         },
 
-        quizHistory: async (_: any, __: any, context: GraphQLContext) => {
+        quizHistory: async (_: unknown, __: unknown, context: GraphQLContext) => {
             const history = await context.quizStorage.getHistory();
             return history || [];
         },
 
-        allQuizzes: async (_: any, __: any, context: GraphQLContext) => {
+        allQuizzes: async (_: unknown, __: unknown, context: GraphQLContext) => {
             const quizzes = await context.quizStorage.getAllQuizzes();
             return quizzes || [];
         },
 
-        queueStats: async (_: any, __: any, context: GraphQLContext) => {
+        queueStats: async (_: unknown, __: unknown, context: GraphQLContext) => {
             // Require auth for queue stats
             requireAuth(context);
 
@@ -29,7 +46,7 @@ export const quizResolvers = {
             return stats;
         },
 
-        job: async (_: any, { id }: { id: string }, context: GraphQLContext) => {
+        job: async (_: unknown, { id }: { id: string }, context: GraphQLContext) => {
             // Require auth for job status
             requireAuth(context);
 
@@ -43,18 +60,19 @@ export const quizResolvers = {
 
     Mutation: {
         createQuiz: async (
-            _: any,
-            { input }: { input: any },
+            _: unknown,
+            { input }: { input: CreateQuizInput },
             context: GraphQLContext
-        ) => {
-            let questions: any[] = [];
+        ): Promise<ReturnType<GraphQLContext['quizStorage']['createQuiz']>> => {
+            let questions: QuizQuestion[] = [];
 
             try {
                 if (input.topic) {
                     questions = await context.studyService.generateQuiz(input.topic, input.count || 5);
                 }
-            } catch (error) {
-                console.warn('Failed to generate quiz questions:', error);
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                console.warn('Failed to generate quiz questions:', message);
                 // Continue with empty questions or handle error
             }
 
@@ -68,10 +86,10 @@ export const quizResolvers = {
         },
 
         submitQuizAnswer: async (
-            _: any,
-            { quizId, answers }: { quizId: string; answers: any[] },
+            _: unknown,
+            { quizId, answers }: SubmitAnswersArgs,
             context: GraphQLContext
-        ) => {
+        ): Promise<ReturnType<GraphQLContext['quizStorage']['submitAnswers']>> => {
             const result = await context.quizStorage.submitAnswers(quizId, answers);
             return result;
         },

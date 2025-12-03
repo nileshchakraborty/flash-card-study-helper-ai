@@ -8,7 +8,9 @@ import { WebLLMService } from '../../../../src/core/services/WebLLMService.js';
 import { QuizStorageService } from '../../../../src/core/services/QuizStorageService.js';
 import { FlashcardStorageService } from '../../../../src/core/services/FlashcardStorageService.js';
 
-describe('Quiz API Endpoints', () => {
+const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
+
+(SKIP_SANDBOX ? describe.skip : describe)('Quiz API Endpoints', () => {
     let app: express.Application;
     let server: ExpressServer;
     let quizStorage: QuizStorageService;

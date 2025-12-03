@@ -194,7 +194,9 @@ describe('QuizStorageService', () => {
             // Verify attempt saved
             const attempts = service.getAttempts(quiz.id);
             expect(attempts).toHaveLength(1);
-            expect(attempts[0]).toEqual(attempt);
+            // completedAt may differ by a few ms; compare fields manually
+            expect({ ...attempts[0], completedAt: undefined }).toEqual({ ...attempt, completedAt: undefined });
+            expect(Math.abs(new Date(attempts[0].completedAt as any).getTime() - new Date(attempt.completedAt as any).getTime())).toBeLessThan(5);
 
             // Verify in all quizzes list
             const allQuizzes = service.getAllQuizzes();

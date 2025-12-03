@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeAll, afterEach } from '@jest/globals'
 import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
+import { createMockServer } from '../utils/mockServer.js';
 
 describe('GraphQL Authentication Context', () => {
     let server: ExpressServer;
@@ -63,7 +64,7 @@ describe('GraphQL Authentication Context', () => {
         await server.setupGraphQL();
         server.setupRoutes();
 
-        app = server.getApp();
+        app = createMockServer(server.getApp());
     });
 
     afterEach(() => {

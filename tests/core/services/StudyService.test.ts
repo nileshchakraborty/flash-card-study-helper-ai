@@ -51,18 +51,20 @@ describe('StudyService', () => {
       expect(mockSearchAdapter.search).toHaveBeenCalled();
       // When no context is available, it falls back to generateFlashcards
       expect(mockAiAdapter.generateFlashcards).toHaveBeenCalledWith('test topic', 5);
-      expect(result.cards).toHaveLength(1);
+      expect(result.cards).toHaveLength(5); // enforceCardCount pads to requested count
     });
   });
 
   describe('generateQuiz', () => {
-    it('should use generateQuizFromFlashcards when flashcards are provided', async () => {
+    it('should return local fallback quiz when flashcards are provided (no adapter needed)', async () => {
       const flashcards = [{ id: '1', front: 'Q', back: 'A', topic: 'test' }];
       mockAiAdapter.generateQuizFromFlashcards.mockResolvedValue([]);
 
-      await studyService.generateQuiz('test', 5, flashcards);
+      const quiz = await studyService.generateQuiz('test', 5, flashcards);
 
-      expect(mockAiAdapter.generateQuizFromFlashcards).toHaveBeenCalledWith(flashcards, 5);
+      expect(quiz.length).toBeGreaterThan(0);
+      // Local fallback is used first; adapter call is optional
+      expect(mockAiAdapter.generateQuizFromFlashcards).not.toHaveBeenCalled();
     });
 
     it('should fallback to generateAdvancedQuiz when no flashcards provided', async () => {

@@ -1,4 +1,4 @@
-import type { SearchServicePort } from '../../../core/ports/interfaces.js';
+import type { SearchResult, SearchServicePort } from '../../../core/ports/interfaces.js';
 import { SerperAdapter } from '../serper/index.js';
 import { MCPClientWrapper } from '../mcp/MCPClientWrapper.js';
 import type { SearchResponse } from '../mcp/types.js';
@@ -18,7 +18,7 @@ export class HybridSerperAdapter implements SearchServicePort {
         private useMCP: boolean
     ) { }
 
-    async search(query: string, limit: number = 5): Promise<any[]> {
+    async search(query: string, limit: number = 5): Promise<SearchResult[]> {
         if (!this.useMCP || !this.mcpClient) {
             return this.directAdapter.search(query);
         }
@@ -32,11 +32,16 @@ export class HybridSerperAdapter implements SearchServicePort {
             );
 
             logger.info('MCP web search succeeded', { query, limit });
-            return result.results;
-        } catch (error: any) {
+            return (result.results || []).map(item => ({
+                title: item.title ?? '',
+                link: item.link ?? '',
+                snippet: item.snippet ?? item.description ?? ''
+            }));
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
             logger.warn('MCP search failed, falling back to direct Serper', {
                 query,
-                error: error.message
+                error: message
             });
             return this.directAdapter.search(query);
         }

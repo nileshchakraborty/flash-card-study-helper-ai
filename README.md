@@ -4,6 +4,13 @@
 
 This project implements a **Clean Architecture**-based API that leverages LLMs (Ollama, WebLLM) and web search (Serper) to generate high-quality educational content. The frontend is provided as a reference implementation to demonstrate the API's capabilities.
 
+## Type Safety & Code Quality
+- TypeScript strict mode is enabled (noImplicitAny, strictNullChecks, noUnusedLocals/Params, noFallthroughCasesInSwitch).
+- Prefer `unknown` over `any`; add type guards at API/LLM boundaries. See `src/adapters/primary/express/validators.ts` for request guards.
+- Core models are readonly and use literal unions for runtimes (`ollama` | `webllm`) and knowledge sources.
+- ESLint config (`.eslintrc.cjs`) enforces: no explicit `any`, prefer-readonly, no non-null assertions, explicit return types for exported APIs.
+- When adding routes, include a small runtime validator before using request bodies; keep assertions to a minimum.
+
 ## 🏗 Architecture
 
 The system follows **Clean Architecture** principles to ensure separation of concerns, maintainability, and testability:

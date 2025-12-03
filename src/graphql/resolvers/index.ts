@@ -7,10 +7,10 @@ import { GraphQLScalarType, Kind } from 'graphql';
 const JSONScalar = new GraphQLScalarType({
     name: 'JSON',
     description: 'The `JSON` scalar type represents JSON values as specified by ECMA-404',
-    serialize(value: any) {
+    serialize(value: unknown) {
         return value;
     },
-    parseValue(value: any) {
+    parseValue(value: unknown) {
         return value;
     },
     parseLiteral(ast) {
@@ -25,14 +25,14 @@ const JSONScalar = new GraphQLScalarType({
 const DateTimeScalar = new GraphQLScalarType({
     name: 'DateTime',
     description: 'The `DateTime` scalar type represents date and time as ISO 8601 string',
-    serialize(value: any) {
+    serialize(value: unknown) {
         if (value instanceof Date) {
             return value.toISOString();
         }
         return new Date(value).toISOString();
     },
-    parseValue(value: any) {
-        return new Date(value);
+    parseValue(value: unknown) {
+        return new Date(value as string);
     },
     parseLiteral(ast) {
         if (ast.kind === Kind.STRING) {

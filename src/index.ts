@@ -70,8 +70,9 @@ async function initializeMCP(): Promise<MCPClientWrapper | null> {
 
         console.log('✅ MCP client connected and healthy');
         return mcpClient;
-    } catch (error: any) {
-        console.error('❌ MCP initialization failed, using direct adapters:', error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('❌ MCP initialization failed, using direct adapters:', message);
         return null;
     }
 }
@@ -152,7 +153,7 @@ queueService.initWorker(async (job) => {
                     runtime: job.data.runtime,
                     parentTopic: job.data.topic
                 });
-            } catch (err) {
+            } catch (err: unknown) {
                 logger.warn('Failed to queue recommended topic', { topic: recommendedTopic });
             }
         }
@@ -181,8 +182,9 @@ if (isVercelDeployment) {
         try {
             redisService = new RedisService();
             await redisService.connect(process.env.REDIS_URL);
-        } catch (error: any) {
-            logger.warn('Redis initialization failed, using in-memory cache:', error.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            logger.warn('Redis initialization failed, using in-memory cache:', message);
         }
     } else {
         logger.info('REDIS_URL not set, using in-memory cache only');

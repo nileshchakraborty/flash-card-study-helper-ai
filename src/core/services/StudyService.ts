@@ -1,5 +1,6 @@
 import type { StudyUseCase, AIServicePort, SearchServicePort, StoragePort } from '../ports/interfaces.js';
 import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models.js';
+import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
@@ -23,12 +24,16 @@ export class StudyService implements StudyUseCase {
     private metricsService?: MetricsService
   ) { }
 
+  /**
+   * Generate flashcards for a topic using the configured AI/runtime pipeline.
+   * Returns the requested count (or padded fallbacks) and optional recommendations.
+   */
   async generateFlashcards(
     topic: string,
     count: number,
-    mode: 'standard' | 'deep-dive' = 'standard',
-    knowledgeSource: 'ai-only' | 'web-only' | 'ai-web' = 'ai-web',
-    runtime: 'ollama' | 'webllm' = 'ollama',
+    mode: QuizMode = 'standard',
+    knowledgeSource: KnowledgeSource = 'ai-web',
+    runtime: Runtime = 'ollama',
     parentTopic?: string
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     const desiredCount = Math.max(1, count || 1);
@@ -78,8 +83,8 @@ export class StudyService implements StudyUseCase {
   private async doGenerateFlashcards(
     topic: string,
     count: number,
-    mode: 'standard' | 'deep-dive',
-    knowledgeSource: 'ai-only' | 'web-only' | 'ai-web',
+    mode: QuizMode,
+    knowledgeSource: KnowledgeSource,
     aiAdapter: AIServicePort,
     parentTopic?: string
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
@@ -301,6 +306,10 @@ export class StudyService implements StudyUseCase {
     return this.getAdapter('ollama').generateBriefAnswer(question, context);
   }
 
+  /**
+   * Build a quiz either from existing flashcards or directly from a topic.
+   * Respects a preferred runtime order and falls back to local generation when needed.
+   */
   async generateQuiz(
     topic: string,
     count: number,

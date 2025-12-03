@@ -15,6 +15,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
+import { isValidGenerateBody, isValidQuizBody } from './validators.js';
 import { typeDefs } from '../../../graphql/schema.js';
 import { resolvers } from '../../../graphql/resolvers/index.js';
 import { createContext } from '../../../graphql/context.js';
@@ -31,7 +32,7 @@ import type { BlobStorageService } from '../../../core/services/BlobStorageServi
 
 export class ExpressServer {
   private app: express.Application;
-  private httpServer: any;
+  private httpServer: http.Server;
   private wss: WebSocketServer | null = null;
   private upload: multer.Multer;
   private authService: AuthService;
@@ -196,8 +197,11 @@ export class ExpressServer {
       schema,
       context: async (ctx) => {
         // Extract token from connection params if provided
-        const connectionParams: any = ctx.connectionParams || {};
-        const token = connectionParams.authorization?.replace('Bearer ', '');
+        const connectionParams = (ctx.connectionParams || {}) as Record<string, unknown>;
+        const rawAuth = typeof connectionParams.authorization === 'string'
+          ? connectionParams.authorization
+          : undefined;
+        const token = rawAuth?.replace('Bearer ', '');
 
         // Create context similar to HTTP context
         let user;
@@ -304,10 +308,10 @@ export class ExpressServer {
             // Client sending back results
             this.webllmService!.handleClientResponse(sessionId, message);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           ws.send(JSON.stringify({
             type: 'error',
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
           }));
         }
       });
@@ -325,7 +329,7 @@ export class ExpressServer {
     this.app.get('/api/auth/google/callback',
       passport.authenticate('google', { session: false, failureRedirect: '/' }),
       async (req, res) => {
-        const user = req.user as any;
+        const user = req.user as { id: string; emails?: { value: string }[]; displayName?: string };
         const token = await this.authService.encryptToken({
           id: user.id,
           email: user.emails?.[0]?.value,
@@ -340,6 +344,10 @@ export class ExpressServer {
     this.app.post('/api/generate', apiRateLimiter, authMiddleware, async (req, res) => {
       try {
         const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
+        if (!isValidGenerateBody(req.body)) {
+          res.status(400).json({ error: 'topic is required' });
+          return;
+        }
         const desiredCount = Math.max(1, parseInt(count || '10', 10));
 
         // Check cache first
@@ -370,7 +378,7 @@ export class ExpressServer {
             knowledgeSource: knowledgeSource || 'ai-web',
             runtime: runtime || 'ollama',
             parentTopic,
-            userId: (req as any).user?.id
+            userId: (req as { user?: { id?: string } }).user?.id
           });
 
           res.status(202).json({
@@ -400,8 +408,8 @@ export class ExpressServer {
             }
           });
         }
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -415,8 +423,8 @@ export class ExpressServer {
 
         const status = await this.queueService.getJobStatus(req.params.id);
         res.json(status);
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -430,21 +438,9 @@ export class ExpressServer {
 
         const stats = await this.queueService.getQueueStats();
         res.json(stats);
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
-    });
-
-    // Get all decks (returns empty - client uses in-memory storage)
-    this.app.get('/api/decks', async (req, res) => {
-      // In-memory storage on client side, server returns empty
-      res.json({ decks: [], warning: 'Using client-side storage' });
-    });
-
-    // Save a deck (accepts but doesn't persist - client handles storage)
-    this.app.post('/api/decks', apiRateLimiter, async (req, res) => {
-      // Client-side storage, just acknowledge
-      res.json({ success: true, warning: 'Using client-side storage' });
     });
 
     // Search endpoint for WebLLM (client-side)
@@ -453,8 +449,8 @@ export class ExpressServer {
         const { query } = req.body;
         const results = await this.studyService['searchAdapter'].search(query);
         res.json({ success: true, results });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -464,8 +460,8 @@ export class ExpressServer {
         const { urls } = req.body;
         const content = await this.studyService['scrapeMultipleSources'](urls);
         res.json({ success: true, content });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -482,8 +478,8 @@ export class ExpressServer {
           topic
         );
         res.json({ success: true, cards });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -492,8 +488,8 @@ export class ExpressServer {
         const { question, context } = req.body;
         const answer = await this.studyService.getBriefAnswer(question, context);
         res.json({ success: true, briefAnswer: answer });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -513,6 +509,10 @@ export class ExpressServer {
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
       try {
         const { topic, numQuestions, count, flashcardIds, cards } = req.body;
+        if (!isValidQuizBody(req.body)) {
+          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
+          return;
+        }
         const desiredCount = numQuestions ?? count;
 
         // Route to appropriate quiz creation method
@@ -768,8 +768,8 @@ export class ExpressServer {
         }
 
         res.json({ success: true, quiz });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -841,8 +841,8 @@ export class ExpressServer {
         }));
 
         res.json({ success: true, quizzes: summaries });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
