@@ -22,6 +22,7 @@ export class AuthService {
                 throw new Error(`JWE_SECRET_KEY must be either a 64-character hex string or exactly 32 characters. Got ${this.secretKey.length} bytes.`);
             }
         }
+
         console.log('[AuthService] Initialized with', process.env.JWE_SECRET_KEY ? 'env secret' : 'generated secret');
     }
 

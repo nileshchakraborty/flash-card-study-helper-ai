@@ -1,0 +1,1575 @@
+
+> mindflip-ai@1.0.0 test
+> NODE_OPTIONS='--experimental-vm-modules' jest --config jest.config.cjs
+
+(node:21469) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/unit/AuthService.test.ts
+  ● Console
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      [AuthService] Initialized with env secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+(node:21464) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21465) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/core/services/StudyService.test.ts
+  ● Console
+
+    console.log
+      
+      === Starting Knowledge Retrieval for: "test topic" (Mode: ai-web) ===
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:87:13)
+
+    console.log
+      1. Checking AI internal knowledge...
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:92:15)
+
+    console.warn
+         Failed to get AI summary: Not implemented
+
+       95 |         console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
+       96 |       } catch (e) {
+    >  97 |         console.warn('   Failed to get AI summary:', e.message);
+          |                 ^
+       98 |       }
+       99 |     }
+      100 |
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:97:17)
+      at StudyService.generateFlashcards (src/core/services/StudyService.ts:41:22)
+      at Object.<anonymous> (tests/core/services/StudyService.test.ts:49:22)
+
+    console.log
+      2. Generating refined search query...
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:114:13)
+
+    console.warn
+         Failed to refine query, using original topic.
+
+      118 |       console.log(`   Refined Query: "${searchQuery}"`);
+      119 |     } catch (e) {
+    > 120 |       console.warn('   Failed to refine query, using original topic.');
+          |               ^
+      121 |     }
+      122 |
+      123 |     console.log('3. Searching web for top sources...');
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:120:15)
+      at StudyService.generateFlashcards (src/core/services/StudyService.ts:41:22)
+      at Object.<anonymous> (tests/core/services/StudyService.test.ts:49:22)
+
+    console.log
+      3. Searching web for top sources...
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:123:13)
+
+    console.log
+         Found 0 results.
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:125:13)
+
+    console.log
+         Selected top 0 unique sources for scraping.
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:144:13)
+
+    console.log
+         No sources to scrape.
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:154:15)
+
+    console.log
+      5. Synthesizing context and generating flashcards...
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:158:13)
+
+    console.log
+         No context available, falling back to basic generation.
+
+      at StudyService.doGenerateFlashcards (src/core/services/StudyService.ts:173:15)
+
+    console.log
+      Generating quiz from 1 flashcards
+
+      at StudyService.generateQuiz (src/core/services/StudyService.ts:299:15)
+
+(node:21466) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21471) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/public/js/services/ApiService.test.ts
+  ● Console
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      API Request Failed: Error: API Error: Not Found
+          at ApiService.request (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/public/js/services/api.service.js:17:23)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+      20 |         }
+      21 |         catch (error) {
+    > 22 |             console.error('API Request Failed:', error);
+         |                     ^
+      23 |             throw error;
+      24 |         }
+      25 |     }
+
+      at ApiService.request (public/js/services/api.service.js:22:21)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      API Request Failed: Error: API Error: Internal Server Error
+          at ApiService.request (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/public/js/services/api.service.js:17:23)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+      20 |         }
+      21 |         catch (error) {
+    > 22 |             console.error('API Request Failed:', error);
+         |                     ^
+      23 |             throw error;
+      24 |         }
+      25 |     }
+
+      at ApiService.request (public/js/services/api.service.js:22:21)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      API Request Failed: Error: Network failure
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:158:28)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1007:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:947:3)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12)
+
+      20 |         }
+      21 |         catch (error) {
+    > 22 |             console.error('API Request Failed:', error);
+         |                     ^
+      23 |             throw error;
+      24 |         }
+      25 |     }
+
+      at ApiService.request (public/js/services/api.service.js:22:21)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+    console.error
+      Error: Not implemented: navigation (except hash changes)
+          at module.exports (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+          at navigateFetch (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+          at exports.navigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+          at LocationImpl._locationObjectNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+          at LocationImpl._locationObjectSetterNavigate (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+          at LocationImpl.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+          at Location.set href [as href] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+          at Window.set location [as location] (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+          at Object.<anonymous> (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/tests/public/js/services/ApiService.test.ts:28:31)
+          at Promise.finally.completed (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1557:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1497:10)
+          at _callCircusHook (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:976:40)
+          at processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at _runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:941:5)
+          at /Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:849:7
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:862:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at _runTestsForDescribeBlock (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:857:11)
+          at run (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:761:3)
+          at runAndTransformResultsToJestFormat (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/jestAdapterInit.js:1918:21)
+          at jestAdapter (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-circus/build/runner.js:101:19)
+          at runTestInternal (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:275:16)
+          at runTest (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:343:7)
+          at Object.worker (/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/node_modules/jest-runner/build/testWorker.js:497:12) {
+        type: 'not implemented'
+      }
+
+      26 |       // Mock location.search getter
+      27 |       delete (window as any).location;
+    > 28 |       (window as any).location = {
+         |                               ^
+      29 |         search: '',
+      30 |         pathname: '/',
+      31 |       };
+
+      at VirtualConsole.<anonymous> (node_modules/@jest/environment-jsdom-abstract/build/index.js:87:23)
+      at module.exports (node_modules/jsdom/lib/jsdom/browser/not-implemented.js:12:26)
+      at navigateFetch (node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+      at exports.navigate (node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+      at LocationImpl._locationObjectNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:30:5)
+      at LocationImpl._locationObjectSetterNavigate (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:24:17)
+      at LocationImpl.set href [as href] (node_modules/jsdom/lib/jsdom/living/window/Location-impl.js:46:10)
+      at Location.set href [as href] (node_modules/jsdom/lib/jsdom/living/generated/Location.js:125:37)
+          at Reflect.set (<anonymous>)
+      at Window.set location [as location] (node_modules/jsdom/lib/jsdom/browser/Window.js:424:15)
+      at Object.<anonymous> (tests/public/js/services/ApiService.test.ts:28:31)
+
+(node:21467) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/adapters/secondary/ollama/OllamaAdapter.test.ts
+  ● Console
+
+    console.log
+      Raw AI response: [{"front":"Q1","back":"A1"},{"front":"Q2","back":"A2"}]
+
+      at OllamaAdapter.generateFlashcards (src/adapters/secondary/ollama/index.ts:60:13)
+
+    console.log
+      Parsed JSON: [ { front: 'Q1', back: 'A1' }, { front: 'Q2', back: 'A2' } ]
+
+      at OllamaAdapter.generateFlashcards (src/adapters/secondary/ollama/index.ts:62:13)
+
+    console.log
+      Raw AI response: Here is the JSON: "front": "Q1", "back": "A1" ... "front": "Q2", "back": "A2"
+
+      at OllamaAdapter.generateFlashcards (src/adapters/secondary/ollama/index.ts:60:13)
+
+    console.log
+      Parsed JSON: [ { question: 'Q1', answer: 'A1' }, { question: 'Q2', answer: 'A2' } ]
+
+      at OllamaAdapter.generateFlashcards (src/adapters/secondary/ollama/index.ts:62:13)
+
+PASS tests/core/services/SupabaseService.test.ts
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : ⚠️  Supabase credentials not found, skipping initialization
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+(node:21470) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21472) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/frontend/webllm_integration.test.ts
+  ● Console
+
+    console.log
+      Generating flashcards for: Test Topic count: 5 runtime: ollama (server-side)
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:136:17)
+
+    console.log
+      📋 Using default config: { runtime: 'auto', knowledgeSource: 'ai-web' }
+
+      at ConfigurationServiceClass.loadConfig (public/js/services/ConfigurationService.ts:48:17)
+
+    console.log
+      Received response from backend: { cards: [ { id: '1', front: 'Q', back: 'A' } ] }
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:150:17)
+
+    console.log
+      Emitting deck:loaded with 1 cards
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:154:17)
+
+    console.log
+      Generating flashcards for: Test Topic count: 5 runtime: webllm (client-side)
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:79:17)
+
+    console.log
+      Generating flashcards with client-side LLM...
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:117:17)
+
+    console.log
+      Client-side LLM Response: [{"question": "Q1", "answer": "A1"}]
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:119:17)
+
+    console.log
+      Emitting deck:loaded with 1 cards
+
+      at GeneratorView.handleGenerate (public/js/views/generator.view.ts:154:17)
+
+PASS tests/WebLLMRuntime.test.ts
+(node:21468) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/core/services/UpstashVectorService.test.ts
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : ⚠️  Upstash Vector initialization failed:
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+(node:21463) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL tests/core/services/QuizStorageService.test.ts
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QuizStorageService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+  ● QuizStorageService › createQuiz › should create a quiz from topic
+
+    TypeError: service.createQuiz is not a function
+
+      10 |     describe('createQuiz', () => {
+      11 |         it('should create a quiz from topic', () => {
+    > 12 |             const quiz = service.createQuiz({
+         |                                  ^
+      13 |                 topic: 'JavaScript',
+      14 |                 source: 'topic',
+      15 |                 questions: [
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:12:34)
+
+  ● QuizStorageService › createQuiz › should create a quiz from flashcards
+
+    TypeError: service.createQuiz is not a function
+
+      32 |         it('should create a quiz from flashcards', () => {
+      33 |             const flashcardIds = ['fc-1', 'fc-2'];
+    > 34 |             const quiz = service.createQuiz({
+         |                                  ^
+      35 |                 topic: 'Python',
+      36 |                 source: 'flashcards',
+      37 |                 questions: [
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:34:34)
+
+  ● QuizStorageService › createQuiz › should assign unique IDs to each quiz
+
+    TypeError: service.createQuiz is not a function
+
+      50 |
+      51 |         it('should assign unique IDs to each quiz', () => {
+    > 52 |             const quiz1 = service.createQuiz({
+         |                                   ^
+      53 |                 topic: 'Test1',
+      54 |                 source: 'topic',
+      55 |                 questions: []
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:52:35)
+
+  ● QuizStorageService › getQuiz › should return a quiz by ID
+
+    TypeError: service.createQuiz is not a function
+
+      68 |     describe('getQuiz', () => {
+      69 |         it('should return a quiz by ID', () => {
+    > 70 |             const created = service.createQuiz({
+         |                                     ^
+      71 |                 topic: 'TypeScript',
+      72 |                 source: 'topic',
+      73 |                 questions: []
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:70:37)
+
+  ● QuizStorageService › getQuiz › should return undefined for non-existent quiz
+
+    expect(received).toBeUndefined()
+
+    Received: null
+
+      80 |         it('should return undefined for non-existent quiz', () => {
+      81 |             const found = service.getQuiz('non-existent-id');
+    > 82 |             expect(found).toBeUndefined();
+         |                           ^
+      83 |         });
+      84 |     });
+      85 |
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:82:27)
+
+  ● QuizStorageService › getAllQuizzes › should return all quizzes
+
+    TypeError: service.createQuiz is not a function
+
+      86 |     describe('getAllQuizzes', () => {
+      87 |         it('should return all quizzes', () => {
+    > 88 |             service.createQuiz({ topic: 'Quiz1', source: 'topic', questions: [] });
+         |                     ^
+      89 |             service.createQuiz({ topic: 'Quiz2', source: 'flashcards', questions: [] });
+      90 |
+      91 |             const all = service.getAllQuizzes();
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:88:21)
+
+  ● QuizStorageService › saveAttempt › should save a quiz attempt
+
+    TypeError: service.createQuiz is not a function
+
+      101 |     describe('saveAttempt', () => {
+      102 |         it('should save a quiz attempt', () => {
+    > 103 |             const quiz = service.createQuiz({
+          |                                  ^
+      104 |                 topic: 'Test Quiz',
+      105 |                 source: 'topic',
+      106 |                 questions: [
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:103:34)
+
+  ● QuizStorageService › saveAttempt › should throw error for non-existent quiz
+
+    expect(received).toThrow(expected)
+
+    Expected substring: "Quiz not found"
+    Received message:   "service.saveAttempt is not a function"
+
+          127 |         it('should throw error for non-existent quiz', () => {
+          128 |             expect(() => {
+        > 129 |                 service.saveAttempt('non-existent', {
+              |                         ^
+          130 |                     answers: [],
+          131 |                     score: 0,
+          132 |                     totalQuestions: 0
+
+      at tests/core/services/QuizStorageService.test.ts:129:25
+      at Object.<anonymous> (node_modules/expect/build/index.js:1824:9)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:2235:93)
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:134:16)
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:134:16)
+
+  ● QuizStorageService › getAttempts › should return all attempts for a quiz
+
+    TypeError: service.createQuiz is not a function
+
+      138 |     describe('getAttempts', () => {
+      139 |         it('should return all attempts for a quiz', () => {
+    > 140 |             const quiz = service.createQuiz({
+          |                                  ^
+      141 |                 topic: 'Test',
+      142 |                 source: 'topic',
+      143 |                 questions: []
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:140:34)
+
+  ● QuizStorageService › getAttempts › should return empty array for quiz with no attempts
+
+    TypeError: service.createQuiz is not a function
+
+      154 |
+      155 |         it('should return empty array for quiz with no attempts', () => {
+    > 156 |             const quiz = service.createQuiz({
+          |                                  ^
+      157 |                 topic: 'Test',
+      158 |                 source: 'topic',
+      159 |                 questions: []
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:156:34)
+
+  ● QuizStorageService › quiz lifecycle › should handle complete quiz creation and attempt workflow
+
+    TypeError: service.createQuiz is not a function
+
+      173 |         it('should handle complete quiz creation and attempt workflow', () => {
+      174 |             // Create quiz
+    > 175 |             const quiz = service.createQuiz({
+          |                                  ^
+      176 |                 topic: 'Complete Test',
+      177 |                 source: 'topic',
+      178 |                 questions: [
+
+      at Object.<anonymous> (tests/core/services/QuizStorageService.test.ts:175:34)
+
+PASS tests/public/js/models/QuizModel.test.ts
+PASS tests/public/js/models/DeckModel.test.ts
+
+ReferenceError: You are trying to `import` a file after the Jest environment has been torn down. From tests/adapters/secondary/parsers/quiz-routes.test.ts.
+FAIL tests/adapters/secondary/parsers/quiz-routes.test.ts
+  ● Test suite failed to run
+
+    Configuration error:
+
+    Could not locate module ../../../src/adapters/primary/express/server.js mapped as:
+    $1.
+
+    Please check your configuration for these entries:
+    {
+      "moduleNameMapper": {
+        "/^(\.{1,2}\/.*)\.js$/": "$1"
+      },
+      "resolver": undefined
+    }
+
+      at createNoMappedModuleFoundError (node_modules/jest-resolve/build/index.js:1117:17)
+
+PASS tests/unit/ResilienceService.test.ts
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-fail' OPENED
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-fail' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' OPENED
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-breaker-open' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-timeout' OPENED
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'test-timeout' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'breaker2' OPENED
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'breaker2' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[33mwarn[39m] : Circuit breaker 'breaker2' fallback triggered
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+(node:21460) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS tests/public/js/utils/EventBus.test.ts
+(node:21462) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL tests/integration/cache-queue.test.ts
+  ● Console
+
+    console.log
+      [AuthService] Initialized with generated secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"3600s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+  ● Cache-Queue Integration › POST /api/generate with cache › should return cached result on cache hit
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● Cache-Queue Integration › POST /api/generate with cache › should queue job on cache miss
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● Cache-Queue Integration › GET /api/queue/stats › should return queue statistics
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● Cache-Queue Integration › Cache TTL › should not return expired cached entries
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+(node:21461) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL tests/api.resilience.test.ts
+  ● Console
+
+    console.log
+      [AuthService] Initialized with generated secret
+
+      at new AuthService (src/core/services/AuthService.ts:25:17)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : QueueService initialized
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+  ● API Resilience Tests › POST /api/generate › should return 401 without auth token
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● API Resilience Tests › POST /api/generate › should queue job and return 202 with jobId when authenticated
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● API Resilience Tests › Rate Limiting › should rate limit after too many requests
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● API Resilience Tests › GET /api/health › should return health status
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+  ● API Resilience Tests › GET /api/queue/stats › should return queue statistics when authenticated
+
+    NetworkError: AggregateError [ECONNREFUSED]:
+
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "AggregateError: 
+        at internalConnectMultiple (node:net:1134:18)
+        at afterConnectMultiple (node:net:1715:7)
+        at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+      code: 'ECONNREFUSED',
+      [errors]: [
+        Error: connect ECONNREFUSED ::1:6379
+            at createConnectionError (node:net:1678:14)
+            at afterConnectMultiple (node:net:1708:16)
+            at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+          errno: -61,
+          code: 'ECONNREFUSED',
+          syscall: 'connect',
+          address: '::1',
+          port: 6379
+        },
+        Error: connect ECONNREFUSED 127.0.0.1:6379
+            at createConnectionError (node:net:1678:14)
+            at afterConnectMultiple (node:net:1708:16)
+            at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+          errno: -61,
+          code: 'ECONNREFUSED',
+          syscall: 'connect',
+          address: '127.0.0.1',
+          port: 6379
+        }
+      ]
+    }".
+
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+        code: 'ECONNREFUSED',
+        [errors]: [
+          Error: connect ECONNREFUSED ::1:6379
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+            errno: -61,
+            code: 'ECONNREFUSED',
+            syscall: 'connect',
+            address: '::1',
+            port: 6379
+          },
+          Error: connect ECONNREFUSED 127.0.0.1:6379
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+            errno: -61,
+            code: 'ECONNREFUSED',
+            syscall: 'connect',
+            address: '127.0.0.1',
+            port: 6379
+          }
+        ]
+      }".
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at Queue.emit (node_modules/bullmq/src/classes/queue-base.ts:129:17)
+      at Queue.emit (node_modules/bullmq/src/classes/queue.ts:192:18)
+      at RedisConnection.<anonymous> (node_modules/bullmq/src/classes/queue-base.ts:75:56)
+      at EventEmitter.RedisConnection.handleClientError (node_modules/bullmq/src/classes/redis-connection.ts:121:12)
+      at EventEmitter.silentEmit (node_modules/ioredis/built/Redis.js:484:30)
+      at Socket.<anonymous> (node_modules/ioredis/built/redis/event_handler.js:221:14)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "AggregateError: 
+        at internalConnectMultiple (node:net:1134:18)
+        at afterConnectMultiple (node:net:1715:7)
+        at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+      code: 'ECONNREFUSED',
+      [errors]: [
+        Error: connect ECONNREFUSED ::1:6379
+            at createConnectionError (node:net:1678:14)
+            at afterConnectMultiple (node:net:1708:16)
+            at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+          errno: -61,
+          code: 'ECONNREFUSED',
+          syscall: 'connect',
+          address: '::1',
+          port: 6379
+        },
+        Error: connect ECONNREFUSED 127.0.0.1:6379
+            at createConnectionError (node:net:1678:14)
+            at afterConnectMultiple (node:net:1708:16)
+            at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+          errno: -61,
+          code: 'ECONNREFUSED',
+          syscall: 'connect',
+          address: '127.0.0.1',
+          port: 6379
+        }
+      ]
+    }".
+
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+        code: 'ECONNREFUSED',
+        [errors]: [
+          Error: connect ECONNREFUSED ::1:6379
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+            errno: -61,
+            code: 'ECONNREFUSED',
+            syscall: 'connect',
+            address: '::1',
+            port: 6379
+          },
+          Error: connect ECONNREFUSED 127.0.0.1:6379
+      at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17) {
+            errno: -61,
+            code: 'ECONNREFUSED',
+            syscall: 'connect',
+            address: '127.0.0.1',
+            port: 6379
+          }
+        ]
+      }".
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at Queue.emit (node_modules/bullmq/src/classes/queue-base.ts:129:17)
+      at Queue.emit (node_modules/bullmq/src/classes/queue.ts:192:18)
+      at RedisConnection.<anonymous> (node_modules/bullmq/src/classes/queue-base.ts:75:56)
+      at EventEmitter.RedisConnection.handleClientError (node_modules/bullmq/src/classes/redis-connection.ts:121:12)
+      at EventEmitter.silentEmit (node_modules/ioredis/built/Redis.js:484:30)
+      at Socket.<anonymous> (node_modules/ioredis/built/redis/event_handler.js:221:14)
+
+PASS tests/unit/FlashcardCacheService.test.ts
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache set {"key":"react|5|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache hit {"key":"react|5|standard|ai-web"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache set {"key":"react|5|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache hit {"key":"react|5|standard|ai-web"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache set {"key":"vue|10|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[32minfo[39m] : Cache set {"key":"expiretest|5|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache set {"key":"topic1|5|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache set {"key":"topic2|10|standard|ai-web","size":2}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : FlashcardCacheService initialized {"ttl":"1s"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache set {"key":"topic1|5|standard|ai-web","size":1}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache set {"key":"topic2|10|standard|ai-web","size":2}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[32minfo[39m] : Cache cleared
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+FAIL tests/core/services/RedisService.test.ts (5.313 s)
+  ● Console
+
+    console.log
+      2025-11-26 13:51:30 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:30 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:31 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:32 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+    console.log
+      2025-11-26 13:51:34 [[31merror[39m] : Redis Client Error: {"code":"ECONNREFUSED","stack":"AggregateError: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)\n    at TCPConnectWrap.callbackTrampoline (node:internal/async_hooks:130:17)"}
+
+      at Console.log (node_modules/winston/lib/winston/transports/console.js:87:23)
+
+  ● RedisService › connection › should handle connection failure gracefully
+
+    thrown: "Exceeded timeout of 5000 ms for a test.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+       9 |
+      10 |     describe('connection', () => {
+    > 11 |         it('should handle connection failure gracefully', async () => {
+         |         ^
+      12 |             // Try to connect to non-existent Redis
+      13 |             await service.connect('redis://localhost:9999');
+      14 |
+
+      at tests/core/services/RedisService.test.ts:11:9
+      at tests/core/services/RedisService.test.ts:10:5
+      at tests/core/services/RedisService.test.ts:3:1
+
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 5 failed, 13 passed, 18 total
+Tests:       21 failed, 74 passed, 95 total
+Snapshots:   0 total
+Time:        6.472 s
+Ran all test suites.

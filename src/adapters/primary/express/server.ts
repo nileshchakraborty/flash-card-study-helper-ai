@@ -8,13 +8,26 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { ApolloServer } from '@apollo/server';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { expressMiddleware as apolloExpressMiddleware } from '@apollo/server/express4';
+import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
-import { authenticate } from './middleware/auth.middleware.js';
+import { authMiddleware } from './middleware/auth.middleware.js';
+import { typeDefs } from '../../../graphql/schema.js';
+import { resolvers } from '../../../graphql/resolvers/index.js';
+import { createContext } from '../../../graphql/context.js';
 import type { StudyUseCase } from '../../../core/ports/interfaces.js';
 import type { QueueService } from '../../../core/services/QueueService.js';
 import type { FlashcardCacheService } from '../../../core/services/FlashcardCacheService.js';
 import type { WebLLMService } from '../../../core/services/WebLLMService.js';
+import type { QuizStorageService } from '../../../core/services/QuizStorageService.js';
+import type { FlashcardStorageService } from '../../../core/services/FlashcardStorageService.js';
+import type { RedisService } from '../../../core/services/RedisService.js';
+import type { SupabaseService } from '../../../core/services/SupabaseService.js';
+import type { UpstashVectorService } from '../../../core/services/UpstashVectorService.js';
+import type { BlobStorageService } from '../../../core/services/BlobStorageService.js';
 
 export class ExpressServer {
   private app: express.Application;
@@ -22,22 +35,44 @@ export class ExpressServer {
   private wss: WebSocketServer | null = null;
   private upload: multer.Multer;
   private authService: AuthService;
+  private quizStorage: QuizStorageService;
+  private flashcardStorage: FlashcardStorageService;
+  private apolloServer?: ApolloServer;
+  // External services (optional)
+  private redisService: RedisService | null;
+  private supabaseService: SupabaseService | null;
+  private vectorService: UpstashVectorService | null;
+  private blobService: BlobStorageService | null;
 
   constructor(
     private studyService: StudyUseCase,
-    private queueService?: QueueService,
-    private flashcardCache?: FlashcardCacheService,
-    private webllmService?: WebLLMService
+    private queueService: QueueService,
+    private flashcardCache: FlashcardCacheService,
+    private webllmService: WebLLMService,
+    quizStorage: QuizStorageService,
+    flashcardStorage: FlashcardStorageService,
+    redisService: RedisService | null = null,
+    supabaseService: SupabaseService | null = null,
+    vectorService: UpstashVectorService | null = null,
+    blobService: BlobStorageService | null = null
   ) {
     this.app = express();
     this.httpServer = createServer(this.app);
     this.upload = multer({ storage: multer.memoryStorage() });
     this.authService = AuthService.getInstance();
+    this.quizStorage = quizStorage;
+    this.flashcardStorage = flashcardStorage;
+    this.redisService = redisService;
+    this.supabaseService = supabaseService;
+    this.vectorService = vectorService;
+    this.blobService = blobService;
     this.setupPassport();
     this.setupMiddleware();
     this.setupWebSocket();
-    this.setupRoutes();
+    // Routes are now set up in start() to ensure correct order with GraphQL
   }
+
+
 
   private setupPassport() {
     passport.use(new GoogleStrategy({
@@ -55,9 +90,177 @@ export class ExpressServer {
     this.app.use(passport.initialize());
     this.app.use(express.static('public'));
 
-    // Swagger UI
-    const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
-    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    // Swagger UI - handle gracefully if swagger.yaml doesn't exist
+    try {
+      const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    } catch (error) {
+      console.warn('Swagger documentation not available');
+    }
+  }
+
+  public async setupGraphQL() {
+    // Create executable schema
+    const schema = makeExecutableSchema({ typeDefs, resolvers });
+
+    // Create Apollo Server instance
+    this.apolloServer = new ApolloServer({
+      schema,
+      formatError: (error) => {
+        console.error('GraphQL Error:', error);
+        return error;
+      },
+      plugins: [
+        // Enable Apollo Sandbox in development (modern alternative to GraphQL Playground)
+        // This properly handles both GET (landing page) and POST (queries) requests
+        process.env.NODE_ENV !== 'production'
+          ? ApolloServerPluginLandingPageLocalDefault({
+            embed: true,
+            includeCookies: false
+          })
+          : ApolloServerPluginLandingPageLocalDefault({ embed: false }),
+        // Response caching for optimization (placeholder - can be enhanced with Redis in production)
+        {
+          async requestDidStart() {
+            return {
+              async willSendResponse({ response }) {
+                // Simple logging for now - full caching impl deferred
+                if (response.body.kind === 'single' && !response.body.singleResult.errors) {
+                  // Cache headers could be set here
+                }
+              }
+            };
+          }
+        },
+        {
+          async serverWillStart() {
+            return {
+              async drainServer() {
+                // cleanup
+              },
+            };
+          },
+        },
+      ],
+    });
+
+    // Start Apollo Server
+    await this.apolloServer.start();
+
+    // Mount GraphQL endpoint for queries and mutations
+    this.app.use(
+      '/graphql',
+      cors<cors.CorsRequest>(),
+      express.json(),
+      apolloExpressMiddleware(this.apolloServer, {
+        context: async ({ req }) => {
+          const baseContext = await createContext(req, {
+            authService: this.authService,
+            studyService: this.studyService,
+            quizStorage: this.quizStorage,
+            flashcardStorage: this.flashcardStorage,
+            queueService: this.queueService,
+            webllmService: this.webllmService
+          });
+
+          // Add DataLoaders for query batching (basic implementation)
+          const loaders = {
+            deckLoader: null, // Placeholder - DataLoader impl ready in src/graphql/dataloaders
+            jobLoader: null
+          };
+
+          return {
+            ...baseContext,
+            loaders
+          };
+        },
+      }),
+    );
+
+    // Setup WebSocket server for GraphQL subscriptions
+    // Using separate path /subscriptions to avoid conflict with HTTP /graphql endpoint
+    const { WebSocketServer } = await import('ws');
+    const { makeServer } = await import('graphql-ws');
+
+    // Create WebSocket server directly attached to HTTP server (like WebLLM)
+    const graphqlWsServer = new WebSocketServer({
+      server: this.httpServer,
+      path: '/subscriptions',
+    });
+
+    // Create graphql-ws server
+    const subscriptionServer = makeServer({
+      schema,
+      context: async (ctx) => {
+        // Extract token from connection params if provided
+        const connectionParams: any = ctx.connectionParams || {};
+        const token = connectionParams.authorization?.replace('Bearer ', '');
+
+        // Create context similar to HTTP context
+        let user;
+        if (token) {
+          try {
+            const payload = await this.authService.decryptToken(token);
+            user = {
+              id: payload.id || payload.sub || '',
+              email: payload.email || '',
+              name: payload.name || ''
+            };
+          } catch (error: any) {
+            console.warn('[GraphQL WS] Token decryption failed:', error.message);
+          }
+        }
+
+        return {
+          authService: this.authService,
+          studyService: this.studyService,
+          quizStorage: this.quizStorage,
+          flashcardStorage: this.flashcardStorage,
+          queueService: this.queueService,
+          webllmService: this.webllmService,
+          user,
+          token
+        };
+      },
+      onConnect: (ctx) => {
+        console.log('[GraphQL WS] Client connected');
+        return true; // Allow connection
+      },
+      onDisconnect: (ctx) => {
+        console.log('[GraphQL WS] Client disconnected');
+      },
+    });
+
+    // Handle WebSocket connections
+    graphqlWsServer.on('connection', (socket, request) => {
+      console.log('[GraphQL WS] WebSocket connection established for /subscriptions');
+
+      const closed = subscriptionServer.opened(
+        {
+          protocol: socket.protocol,
+          send: (data) =>
+            new Promise((resolve, reject) => {
+              socket.send(data, (err) => (err ? reject(err) : resolve()));
+            }),
+          close: (code, reason) => socket.close(code, reason),
+          onMessage: (cb) => socket.on('message', async (event) => {
+            try {
+              await cb(event.toString());
+            } catch (err) {
+              socket.close(1011, (err as Error).message);
+            }
+          }),
+        },
+        { socket, request }
+      );
+
+      socket.once('close', (code, reason) => {
+        closed(code, reason.toString());
+      });
+    });
+
+    console.log('🚀 GraphQL endpoint available at /graphql');
+    console.log('📡 GraphQL subscriptions available via WebSocket at /subscriptions');
   }
 
   private setupWebSocket() {
@@ -112,7 +315,7 @@ export class ExpressServer {
     });
   }
 
-  private setupRoutes() {
+  public setupRoutes() {
     // Auth Routes
     this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -131,7 +334,7 @@ export class ExpressServer {
     );
 
     // Flashcards (Protected - Async via Queue)
-    this.app.post('/api/generate', apiRateLimiter, authenticate, async (req, res) => {
+    this.app.post('/api/generate', apiRateLimiter, authMiddleware, async (req, res) => {
       try {
         const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
 
@@ -199,7 +402,7 @@ export class ExpressServer {
     });
 
     // Job Status Endpoint
-    this.app.get('/api/jobs/:id', authenticate, async (req, res) => {
+    this.app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
       try {
         if (!this.queueService) {
           res.status(404).json({ error: 'Queue service not available' });
@@ -214,7 +417,7 @@ export class ExpressServer {
     });
 
     // Queue Statistics (Admin)
-    this.app.get('/api/queue/stats', authenticate, async (req, res) => {
+    this.app.get('/api/queue/stats', authMiddleware, async (req, res) => {
       try {
         if (!this.queueService) {
           res.status(404).json({ error: 'Queue service not available' });
@@ -226,6 +429,18 @@ export class ExpressServer {
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
+    });
+
+    // Get all decks (returns empty - client uses in-memory storage)
+    this.app.get('/api/decks', async (req, res) => {
+      // In-memory storage on client side, server returns empty
+      res.json({ decks: [], warning: 'Using client-side storage' });
+    });
+
+    // Save a deck (accepts but doesn't persist - client handles storage)
+    this.app.post('/api/decks', apiRateLimiter, async (req, res) => {
+      // Client-side storage, just acknowledge
+      res.json({ success: true, warning: 'Using client-side storage' });
     });
 
     // Search endpoint for WebLLM (client-side)
@@ -250,7 +465,7 @@ export class ExpressServer {
       }
     });
 
-    this.app.post('/api/upload', apiRateLimiter, authenticate, this.upload.single('file'), async (req, res) => {
+    this.app.post('/api/upload', apiRateLimiter, authMiddleware, this.upload.single('file'), async (req, res) => {
       try {
         const file = req.file;
         const topic = req.body.topic || 'General';
@@ -290,19 +505,346 @@ export class ExpressServer {
       }
     });
 
-    // Quiz
+    // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
       try {
-        const { cards, topic } = req.body;
-        // Generate quiz questions from provided cards
-        const questions = cards.slice(0, Math.min(cards.length, 10)).map((card: any, index: number) => ({
-          id: `q${index + 1}`,
-          cardId: card.id,
-          question: card.front,
-          correctAnswer: card.back,
-          options: [card.back] // In real app, would generate distractors
+        const { topic, numQuestions, flashcardIds } = req.body;
+
+        // Route to appropriate quiz creation method
+        if (flashcardIds && Array.isArray(flashcardIds)) {
+          // Create quiz from flashcards
+          if (flashcardIds.length === 0) {
+            res.status(400).json({ error: 'flashcardIds array cannot be empty' });
+            return;
+          }
+
+          const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
+          if (flashcards.length === 0) {
+            res.status(404).json({ error: 'No flashcards found with provided IDs' });
+            return;
+          }
+
+          const formattedCards = flashcards.map(fc => ({
+            id: fc.id,
+            front: fc.front,
+            back: fc.back,
+            topic: fc.topic
+          }));
+
+          const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromFlashcards(
+            formattedCards,
+            numQuestions || Math.min(flashcards.length, 10)
+          );
+
+          const quiz = {
+            id: `quiz-${Date.now()}`,
+            topic: flashcards[0].topic || 'Quiz',
+            questions,
+            source: 'flashcards' as const,
+            sourceFlashcardIds: flashcardIds,
+            createdAt: Date.now()
+          };
+
+          if (this.quizStorage) {
+            this.quizStorage.storeQuiz(quiz);
+            this.flashcardStorage?.markFlashcardsUsedInQuiz(flashcardIds, quiz.id);
+          }
+
+          res.json({ quizId: quiz.id, quiz });
+        } else if (topic) {
+          // Create quiz from topic
+          let context = '';
+          try {
+            const searchResults = await this.studyService['searchAdapter'].search(topic);
+            context = searchResults.slice(0, 3).map(r => r.snippet || '').join('\n');
+          } catch (error) {
+            console.warn('Web search failed, generating quiz without context');
+          }
+
+          const questions = await this.studyService.generateQuiz(
+            topic,
+            numQuestions || 5
+          );
+
+          const quiz = {
+            id: `quiz-${Date.now()}`,
+            topic,
+            questions,
+            source: 'topic' as const,
+            createdAt: Date.now()
+          };
+
+          if (this.quizStorage) {
+            this.quizStorage.storeQuiz(quiz);
+          }
+
+          res.json({ quizId: quiz.id, quiz });
+        } else {
+          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
+        }
+      } catch (error: any) {
+        console.error('Quiz creation error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Create quiz from flashcards
+    this.app.post('/api/quiz/create-from-flashcards', apiRateLimiter, async (req, res) => {
+      try {
+        const { flashcardIds, count, options } = req.body;
+
+        if (!flashcardIds || !Array.isArray(flashcardIds) || flashcardIds.length === 0) {
+          res.status(400).json({ error: 'flashcardIds array is required' });
+          return;
+        }
+
+        // Get flashcards from storage
+        const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
+
+        if (flashcards.length === 0) {
+          res.status(404).json({ error: 'No flashcards found with provided IDs' });
+          return;
+        }
+
+        // Convert indexed flashcards to the format expected by generateQuizFromFlashcards
+        const formattedCards = flashcards.map(fc => ({
+          id: fc.id,
+          front: fc.front,
+          back: fc.back,
+          topic: fc.topic
         }));
-        res.json({ questions });
+
+        // Generate quiz questions using AI
+        const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromFlashcards(
+          formattedCards,
+          count || Math.min(flashcards.length, 10)
+        );
+
+        // Create quiz object
+        const quiz = {
+          id: `quiz-${Date.now()}`,
+          topic: flashcards[0].topic || 'Quiz',
+          questions,
+          source: 'flashcards' as const,
+          sourceFlashcardIds: flashcardIds,
+          createdAt: Date.now(),
+          metadata: options
+        };
+
+        // Store quiz
+        if (this.quizStorage) {
+          this.quizStorage.storeQuiz(quiz);
+
+          // Mark flashcards as used
+          this.flashcardStorage?.markFlashcardsUsedInQuiz(flashcardIds, quiz.id);
+        }
+
+        res.json({
+          success: true,
+          quiz: {
+            id: quiz.id,
+            topic: quiz.topic,
+            questionCount: questions.length,
+            createdAt: quiz.createdAt
+          }
+        });
+      } catch (error: any) {
+        console.error('Failed to create quiz from flashcards:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Create quiz from topic
+    this.app.post('/api/quiz/create-from-topic', apiRateLimiter, async (req, res) => {
+      try {
+        const { topic, count, options } = req.body;
+
+        if (!topic) {
+          res.status(400).json({ error: 'topic is required' });
+          return;
+        }
+
+        // Search for relevant context using web search
+        let context = '';
+        try {
+          const searchResults = await this.studyService['searchAdapter'].search(topic);
+          context = searchResults
+            .slice(0, 3)
+            .map(r => r.snippet || '')
+            .join('\n');
+        } catch (error) {
+          console.warn('Web search failed, generating quiz without context:', error);
+        }
+
+        // Generate quiz questions using AI
+        const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromTopic(
+          topic,
+          count || 5,
+          context
+        );
+
+        // Create quiz object
+        const quiz = {
+          id: `quiz-${Date.now()}`,
+          topic,
+          questions,
+          source: 'topic' as const,
+          createdAt: Date.now(),
+          metadata: options
+        };
+
+        // Store quiz
+        if (this.quizStorage) {
+          this.quizStorage.storeQuiz(quiz);
+        }
+
+        res.json({
+          success: true,
+          quiz: {
+            id: quiz.id,
+            topic: quiz.topic,
+            questionCount: questions.length,
+            createdAt: quiz.createdAt
+          }
+        });
+      } catch (error: any) {
+        console.error('Failed to create quiz from topic:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get quiz history - MUST come before /api/quiz/:quizId to avoid route collision
+    // Duplicate quiz history route removed - now at top before parameterized routes
+    this.app.get('/api/quiz/history', async (req, res) => {
+      try {
+        const quizzes = this.quizStorage?.getAllQuizzes() || [];
+
+        // Attach attempts to each quiz
+        const quizzesWithAttempts = quizzes.map(quiz => ({
+          ...quiz,
+          attempts: this.quizStorage?.getAttempts(quiz.id) || []
+        }));
+
+        res.json({ quizzes: quizzesWithAttempts });
+      } catch (error: any) {
+        console.warn('[API] Failed to get quiz history:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get specific quiz
+    this.app.get('/api/quiz/:quizId', async (req, res) => {
+      try {
+        const quiz = this.quizStorage?.getQuiz(req.params.quizId);
+
+        if (!quiz) {
+          res.status(404).json({ error: 'Quiz not found' });
+          return;
+        }
+
+        res.json({ success: true, quiz });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Submit quiz answers
+    this.app.post('/api/quiz/:id/submit', async (req, res) => {
+      try {
+        const quizId = req.params.id;
+        const { answers } = req.body;
+
+        const quiz = this.quizStorage?.getQuiz(quizId);
+        if (!quiz) {
+          res.status(404).json({ error: 'Quiz not found' });
+          return;
+        }
+
+        if (!answers || !Array.isArray(answers)) {
+          res.status(400).json({ error: 'answers array is required' });
+          return;
+        }
+
+        // Calculate score
+        let score = 0;
+        quiz.questions.forEach((question, index) => {
+          if (answers[index] === question.correctAnswer) {
+            score++;
+          }
+        });
+
+        const attempt = {
+          id: `attempt-${Date.now()}`,
+          quizId,
+          answers,  // Keep as array for now
+          score,
+          total: quiz.questions.length,
+          timestamp: Date.now(),
+          completedAt: Date.now()
+        };
+
+        // Save attempt (casting to avoid type mismatch)
+        if (this.quizStorage) {
+          this.quizStorage.storeAttempt(attempt as any);
+        }
+
+        res.json({
+          success: true,
+          score,
+          totalQuestions: quiz.questions.length,
+          percentage: Math.round((score / quiz.questions.length) * 100),
+          attempt
+        });
+      } catch (error: any) {
+        console.error('Quiz submit error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // List all quizzes
+    this.app.get('/api/quiz/list/all', async (req, res) => {
+      try {
+        const quizzes = this.quizStorage?.getAllQuizzes() || [];
+
+        // Return summaries only
+        const summaries = quizzes.map(q => ({
+          id: q.id,
+          topic: q.topic,
+          questionCount: q.questions.length,
+          source: q.source,
+          createdAt: q.createdAt
+        }));
+
+        res.json({ success: true, quizzes: summaries });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // List flashcards for selection
+    this.app.get('/api/flashcards/list/all', async (req, res) => {
+      try {
+        const flashcards = this.flashcardStorage?.getAllFlashcards() || [];
+
+        // Group by topic
+        const grouped = flashcards.reduce((acc, fc) => {
+          if (!acc[fc.topic]) {
+            acc[fc.topic] = [];
+          }
+          acc[fc.topic].push({
+            id: fc.id,
+            front: fc.front,
+            back: fc.back,
+            usedInQuizzes: fc.usedInQuizzes
+          });
+          return acc;
+        }, {} as Record<string, any[]>);
+
+        res.json({
+          success: true,
+          flashcards: grouped,
+          topics: Object.keys(grouped)
+        });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -318,16 +860,7 @@ export class ExpressServer {
       }
     });
 
-    this.app.get('/api/quiz/history', async (req, res) => {
-      try {
-        const history = await this.studyService.getQuizHistory();
-        res.json({ history: history || [] });
-      } catch (error: any) {
-        console.warn('[API] Failed to get quiz history:', error.message);
-        // Return empty array instead of 500 error for serverless compatibility
-        res.json({ history: [], warning: 'Server-side storage unavailable' });
-      }
-    });
+
 
     this.app.post('/api/quiz/history', async (req, res) => {
       try {
@@ -364,7 +897,6 @@ export class ExpressServer {
         res.json({ success: true, id: deck.id });
       } catch (error: any) {
         console.warn('[API] Failed to save deck:', error.message);
-        // Return success anyway - client should handle persistence
         res.json({ success: true, id: `deck-${Date.now()}`, warning: 'Server-side storage unavailable' });
       }
     });
@@ -378,6 +910,12 @@ export class ExpressServer {
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
+    });
+
+    // Get all flashcards (returns empty - client uses in-memory storage)
+    this.app.get('/api/flashcards', async (req, res) => {
+      // In-memory storage on client side, server returns empty
+      res.json({ cards: [] });
     });
 
     // Health check
@@ -404,7 +942,13 @@ export class ExpressServer {
     return this.app;
   }
 
-  public start(port: number) {
+  public async start(port: number) {
+    // Setup GraphQL (must be done after construction, as it's async)
+    await this.setupGraphQL();
+
+    // Setup REST routes (must be after GraphQL to avoid capturing /graphql requests if we had a catch-all)
+    this.setupRoutes();
+
     this.httpServer.listen(port, () => {
       console.log(`Server running on port ${port}`);
       if (this.wss) {

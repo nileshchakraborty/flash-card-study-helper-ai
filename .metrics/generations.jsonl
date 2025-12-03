@@ -13,3 +13,7 @@
 {"runtime":"webllm","knowledgeSource":"ai-web","mode":"standard","topic":"calculus","cardCount":2,"duration":6503,"success":true,"timestamp":1763943878213}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"calculus","cardCount":10,"duration":12889,"success":true,"timestamp":1763943898319}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Euler's Method, Multivariable Calculus, Differential Equations, Variational Calculus, Integral Equations (Fundamentals)","cardCount":10,"duration":19271,"success":true,"timestamp":1763943942384}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Test Flashcards","cardCount":1,"duration":4746,"success":true,"timestamp":1764285811214}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Testing","cardCount":0,"duration":2238,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764463959656}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Test Auth","cardCount":0,"duration":4884,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464346205}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Auth Success Test","cardCount":0,"duration":1543,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464819742}

@@ -47,7 +47,13 @@
 - ✅ All business logic in backend
 - ✅ Frontend only provides WebGPU runtime
 - ✅ WebLLM orchestration handled by backend
-
+### 8. GraphQL API Integration
+- ✅ Implemented Apollo Server alongside Express
+- ✅ Created dual-mode API (REST + GraphQL)
+- ✅ Implemented hybrid adapters with automatic fallback
+- ✅ Added Subscription support (backend ready)
+- ✅ Integrated Authentication (JWE) into GraphQL context
+- ✅ Created `docs/graphql-api.md` documentation
 ## 📁 File Structure
 
 ```

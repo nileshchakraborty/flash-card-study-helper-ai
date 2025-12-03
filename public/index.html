@@ -79,6 +79,11 @@
                     Create Cards
                 </button>
                 <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 transition-colors text-center"
+                    data-tab="create-quiz">
+                    <span class="material-icons align-middle mr-2">add</span>
+                    Create Quiz
+                </button>
+                <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 transition-colors text-center"
                     data-tab="quiz">
                     <span class="material-icons align-middle mr-2">quiz</span>
                     Quiz
@@ -266,79 +271,91 @@
             </div>
         </section>
 
-        <!-- Quiz Tab -->
-        <section class="tab-content hidden" id="quiz-tab">
+        <!-- Create Quiz Tab (renamed from Quiz) -->
+        <section class="tab-content hidden" id="create-quiz-tab">
             <div class="max-w-4xl mx-auto">
-                <!-- Quiz Setup -->
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 hover:shadow-2xl transition-all duration-300"
-                    id="quiz-setup">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-6">Start a Quiz</h2>
+                <!-- Create New Quiz Section -->
+                <div
+                    class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 hover:shadow-2xl transition-all duration-300 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-6">Create New Quiz</h2>
 
-                    <!-- Pick A Quiz Section -->
-                    <div class="mb-8">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Pick A Quiz</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button
-                                class="p-6 border-2 border-gray-200 rounded-2xl hover:border-purple-300 hover:bg-gradient-to-br hover:from-purple-50 hover:to-indigo-50 transition-all text-left group shadow-md hover:shadow-xl hover:scale-105"
-                                id="quiz-from-cards">
-                                <span
-                                    class="material-icons text-4xl text-purple-400 group-hover:text-purple-600 mb-3 transition-colors">style</span>
-                                <div class="font-semibold text-gray-900 text-lg mb-1">From Flashcards</div>
-                                <div class="text-sm text-gray-600">Test yourself on your current deck</div>
-                            </button>
-                            <button
-                                class="p-6 border-2 border-gray-200 rounded-2xl hover:border-indigo-300 hover:bg-gradient-to-br hover:from-indigo-50 hover:to-blue-50 transition-all text-left group shadow-md hover:shadow-xl hover:scale-105"
-                                id="quiz-from-web">
-                                <span
-                                    class="material-icons text-4xl text-indigo-400 group-hover:text-indigo-600 mb-3 transition-colors">public</span>
-                                <div class="font-semibold text-gray-900 text-lg mb-1">Generate from Web</div>
-                                <div class="text-sm text-gray-600">Create a new quiz from any topic</div>
-                            </button>
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- From Flashcards -->
+                        <button id="quiz-from-flashcards-btn"
+                            class="p-6 border-2 border-gray-200 rounded-2xl hover:border-purple-300 hover:bg-gradient-to-br hover:from-purple-50 hover:to-indigo-50 transition-all text-left group shadow-md hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            title="">
+                            <span
+                                class="material-icons text-4xl text-purple-400 group-hover:text-purple-600 mb-3 transition-colors block">style</span>
+                            <div class="font-semibold text-gray-900 text-lg mb-1">From Flashcards</div>
+                            <div class="text-sm text-gray-600">Create quiz from your existing flashcards</div>
+                        </button>
+
+                        <!-- From Topic -->
+                        <button id="quiz-from-topic-btn"
+                            class="p-6 border-2 border-gray-200 rounded-2xl hover:border-indigo-300 hover:bg-gradient-to-br hover:from-indigo-50 hover:to-blue-50 transition-all text-left group shadow-md hover:shadow-xl hover:scale-105">
+                            <span
+                                class="material-icons text-4xl text-indigo-400 group-hover:text-indigo-600 mb-3 transition-colors block">public</span>
+                            <div class="font-semibold text-gray-900 text-lg mb-1">From Topic</div>
+                            <div class="text-sm text-gray-600">Generate quiz from any topic using AI</div>
+                        </button>
                     </div>
 
-                    <!-- Quiz Options -->
-                    <form class="space-y-6" id="quiz-form">
-                        <div class="hidden space-y-4" id="web-quiz-options">
+                    <!-- From Topic Form (initially hidden) -->
+                    <div id="topic-quiz-form"
+                        class="hidden mt-6 p-6 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Generate Quiz from Topic</h3>
+                        <form id="create-quiz-topic-form" class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Topic</label>
-                                <input
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition-all"
-                                    id="quiz-topic-input" placeholder="e.g. Quantum Physics" type="text">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Topic</label>
+                                <input type="text" id="quiz-topic-input-new"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    placeholder="e.g., Quantum Physics, World History" required>
                             </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Number of Questions</label>
-                                <input
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition-all"
-                                    id="quiz-size" max="20" min="1" type="number" value="5"
-                                    oninput="if(this.value > 20) { this.value = 20; } if(this.value < 1 && this.value !== '') { this.value = 1; }" />
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Number of
+                                        Questions</label>
+                                    <input type="number" id="quiz-topic-count"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        min="1" max="20" value="5">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Time Limit</label>
+                                    <select id="quiz-topic-timer"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                                        <option value="0">Untimed</option>
+                                        <option value="30">30 sec/question</option>
+                                        <option value="60">1 min/question</option>
+                                        <option value="120">2 min/question</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Time Limit</label>
-                                <select
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition-all"
-                                    id="quiz-timer">
-                                    <option value="0">Untimed</option>
-                                    <option value="30">30 Seconds per question</option>
-                                    <option value="60">1 Minute per question</option>
-                                    <option value="120">2 Minutes per question</option>
-                                </select>
+                            <div class="flex gap-3">
+                                <button type="submit"
+                                    class="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105">
+                                    <span class="material-icons align-middle mr-2">auto_awesome</span>
+                                    Generate Quiz
+                                </button>
+                                <button type="button" id="cancel-topic-quiz"
+                                    class="px-6 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-all">
+                                    Cancel
+                                </button>
                             </div>
-                        </div>
-
-                        <button
-                            class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xl hover:shadow-2xl hover:scale-105 text-lg"
-                            type="submit">
-                            <span class="material-icons text-xl">play_arrow</span>
-                            Start Quiz
-                        </button>
-                    </form>
+                        </form>
+                    </div>
                 </div>
 
-                <!-- Quiz Questions -->
+                <!-- Available Quizzes -->
+                <div
+                    class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 hover:shadow-2xl transition-all duration-300 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Available Quizzes</h2>
+                    <div id="available-quizzes-list" class="space-y-3">
+                        <div class="text-gray-500 text-sm italic">No quizzes created yet. Create your first quiz above!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quiz Questions (moved from old design) -->
                 <div class="hidden mt-6 bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 relative hover:shadow-2xl transition-all duration-300"
                     id="quiz-questions">
                     <div class="flex items-center justify-between mb-6">
@@ -390,7 +407,55 @@
                 </div>
             </div>
         </section>
+
+        <!-- Quiz Tab (NEW - for taking quizzes) -->
+        <section class="tab-content hidden" id="quiz-tab">
+            <div class="max-w-4xl mx-auto">
+                <!-- Quiz content will be populated by JavaScript -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8">
+                    <p class="text-gray-600 text-center">Select a quiz from "Create Quiz" tab to start</p>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <!-- Flashcard Selection Modal -->
+    <div id="flashcard-selection-modal"
+        class="fixed inset-0 bg-gray-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center">
+        <div
+            class="bg-white/95 backdrop-blur-lg rounded-3xl p-8 max-w-4xl w-full mx-4 shadow-2xl transform transition-all border border-white/20 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-900">Select Flashcards for Quiz</h3>
+                <button id="close-flashcard-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <span class="material-icons text-3xl">close</span>
+                </button>
+            </div>
+
+            <div class="mb-4 flex items-center justify-between">
+                <p class="text-gray-600">Choose flashcards to include in your quiz</p>
+                <span id="selected-flashcard-count" class="text-sm font-semibold text-primary">0 selected</span>
+            </div>
+
+            <div id="flashcard-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto flex-1 mb-6 pr-2">
+                <!-- Flashcards will be populated by JavaScript -->
+                <div class="col-span-2 text-center text-gray-500 py-8">
+                    Loading flashcards...
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t border-gray-200">
+                <button id="cancel-flashcard-selection"
+                    class="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium">
+                    Cancel
+                </button>
+                <button id="confirm-flashcard-selection"
+                    class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    disabled>
+                    Create Quiz
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Quiz Completion Popup -->
     <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center"
