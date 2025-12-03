@@ -14,10 +14,15 @@ export class GeneratorView extends BaseView {
       loadingOverlay: this.getElement('#loading-overlay'),
       deckHistoryList: this.getElement('#deck-history-list'),
       uploadForm: this.getElement('#upload-form'),
-      fileInput: this.getElement('#file-upload'),
+      fileInput: this.getElement('#file-input'),
+      uploadArea: this.getElement('#upload-area'),
+      selectedFilesContainer: this.getElement('#selected-files'),
+      fileList: this.getElement('#file-list'),
       uploadBtn: this.getElement('#upload-form button[type="submit"]'),
-      useBrowserLLM: this.getElement('#use-browser-llm')
+      useBrowserLLM: this.getElement('#use-browser-llm'),
+      uploadTopic: this.getElement('#upload-topic')
     };
+    this.selectedFiles = [];
 
     this.init();
   }
@@ -54,9 +59,28 @@ export class GeneratorView extends BaseView {
     }
 
     if (this.elements.fileInput) {
-      this.bind(this.elements.fileInput, 'change', () => {
-        if (this.elements.uploadBtn) {
-          this.elements.uploadBtn.disabled = !this.elements.fileInput.files.length;
+      this.bind(this.elements.fileInput, 'change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length) {
+          this.selectedFiles.push(...files);
+          this.refreshFileList();
+        }
+      });
+    }
+
+    if (this.elements.uploadArea) {
+      this.bind(this.elements.uploadArea, 'click', () => this.elements.fileInput?.click());
+      ['dragover', 'dragenter'].forEach(evt => {
+        this.bind(this.elements.uploadArea, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea.classList.add('border-purple-400'); });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        this.bind(this.elements.uploadArea, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea.classList.remove('border-purple-400'); });
+      });
+      this.bind(this.elements.uploadArea, 'drop', (ev) => {
+        const files = Array.from(ev.dataTransfer?.files || []);
+        if (files.length) {
+          this.selectedFiles.push(...files);
+          this.refreshFileList();
         }
       });
     }
@@ -64,7 +88,8 @@ export class GeneratorView extends BaseView {
 
   async handleGenerate() {
     const topic = this.elements.topicInput.value;
-    const count = this.elements.cardCount.value;
+    const countRaw = this.elements.cardCount.value;
+    const count = Math.max(1, parseInt(countRaw || '1', 10));
     // Determine runtime based on presence of LLM Orchestrator (WebLLM)
     const orchestrator = (window as any).llmOrchestrator;
     const useBrowser = !!orchestrator; // if orchestrator exists, we will use client‑side generation
@@ -99,6 +124,7 @@ CRITICAL RULES:
 - Between markers: ONLY a valid JSON array
 - Each object needs "question" and "answer" fields
 - NO explanations, NO other text, ONLY JSON
+- DO NOT write code, examples, markdown, or instructions outside the JSON array.
 
 REQUIRED FORMAT:
 <<<JSON_START>>>
@@ -131,8 +157,20 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         const response = await orchestrator.generate(prompt);
         console.log('Client-side LLM Response:', response);
 
-        cards = this.parseLLMResponse(response);
-        console.log('Parsed raw cards:', JSON.stringify(cards, null, 2));
+        cards = this.parseLLMResponseStrict(response, count);
+        console.log('Parsed raw cards (strict):', JSON.stringify(cards, null, 2));
+
+        // If client-side parsing failed to produce the requested count, fallback to backend generation
+        if (cards.length < count) {
+          console.warn(`Client-side generation returned ${cards.length}/${count}. Falling back to backend.`);
+          const fallback = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' });
+          cards = (fallback.cards || []).slice(0, count);
+        }
+
+        // Enforce requested count client-side
+        if (cards.length > count) {
+          cards = cards.slice(0, count);
+        }
 
         if (cards.length > 0) {
           // Robust mapping to handle various property names
@@ -174,6 +212,11 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         });
         cards = data.cards || [];
         console.log('Received response from backend:', data);
+
+        // Enforce requested count in case backend over-returns
+        if (cards.length > count) {
+          cards = cards.slice(0, count);
+        }
       }
 
       if (cards.length > 0) {
@@ -260,33 +303,36 @@ Generate the JSON array now:`;
       let cards = this.parseLLMResponse(response);
       console.log('Parsed raw cards (upload):', JSON.stringify(cards, null, 2));
 
-      if (cards.length > 0) {
-        // Robust mapping
-        const formattedCards = cards.map((c, i) => {
-          const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
-          const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
-          return {
-            id: `upload-${Date.now()}-${i}`,
-            front: question,
-            back: answer,
-            topic: topic
-          };
-        }).filter(c =>
-          (c.front !== "Question missing" || c.back !== "Answer missing") &&
-          c.front !== "Q1" && c.front !== "Q2"
-        );
-
-        eventBus.emit('deck:loaded', formattedCards);
-
-        // Save to history
-        await apiService.post('/decks', {
-          topic: topic,
-          cards: formattedCards
-        });
-        this.loadDeckHistory();
-      } else {
+      if (cards.length === 0) {
         throw new Error('Failed to generate valid flashcards from response');
       }
+
+      const formattedCards = cards.map((c, i) => {
+        const question = c.question || c.questions || c.front || c.term || c.concept || `Card ${i + 1}`;
+        const answer = c.answer || c.answers || c.back || c.definition || c.description || 'Answer not provided';
+        return {
+          id: `upload-${Date.now()}-${i}`,
+          front: question,
+          back: answer,
+          topic: topic
+        };
+      }).filter(c => (c.front && c.back));
+
+      eventBus.emit('deck:loaded', formattedCards);
+
+      // Save to history
+      await apiService.post('/decks', {
+        topic: topic,
+        cards: formattedCards
+      });
+      this.loadDeckHistory();
+
+      if (confirm('Flashcards created from PDF/images. Create a quiz from them now?')) {
+        eventBus.emit('quiz:request-start', { count: formattedCards.length, topic });
+      }
+
+      this.selectedFiles = [];
+      this.refreshFileList();
 
     } catch (error) {
       alert('Failed to process files: ' + error.message);
@@ -294,6 +340,26 @@ Generate the JSON array now:`;
     } finally {
       this.hideLoading();
     }
+  }
+
+  refreshFileList() {
+    const hasFiles = this.selectedFiles.length > 0;
+    if (this.elements.uploadBtn) this.elements.uploadBtn.disabled = !hasFiles;
+    if (this.elements.selectedFilesContainer) this.elements.selectedFilesContainer.classList.toggle('hidden', !hasFiles);
+    if (!this.elements.fileList) return;
+    this.elements.fileList.innerHTML = this.selectedFiles.map((f, idx) => `
+      <li class="flex items-center justify-between bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg">
+        <span class="text-sm text-gray-700 truncate">${f.name}</span>
+        <button class="text-sm text-red-500 hover:text-red-700 remove-file" data-idx="${idx}">Remove</button>
+      </li>
+    `).join('');
+    this.elements.fileList.querySelectorAll('.remove-file').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.currentTarget.getAttribute('data-idx')) || 0;
+        this.selectedFiles.splice(idx, 1);
+        this.refreshFileList();
+      });
+    });
   }
 
   async loadDeckHistory() {
@@ -468,6 +534,54 @@ Generate the JSON array now:`;
         });
         if (isValidCard(card)) cards.push(card);
       }
+    }
+
+    return cards;
+  }
+
+  // Stricter parser for client-side generation: requires explicit markers and clean JSON
+  parseLLMResponseStrict(response, expectedCount = null) {
+    if (!response) return [];
+
+    // Strip common wrappers (e.g., <stdout>, markdown fences)
+    let cleaned = response
+      .replace(/```[a-zA-Z]*\n?/g, '')
+      .replace(/<stdout>/gi, '')
+      .replace(/<\/?span[^>]*>/gi, '')
+      .trim();
+
+    const blockMatch = cleaned.match(/<<<JSON_START>>>[\s\S]*?<<<JSON_END>>>/i);
+    let jsonBlock = '';
+    if (blockMatch) {
+      jsonBlock = blockMatch[0]
+        .replace(/<<<JSON_START>>>/i, '')
+        .replace(/<<<JSON_END>>>/i, '')
+        .trim();
+    } else {
+      // fallback: grab the first JSON array in the text
+      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+      if (arrMatch) jsonBlock = arrMatch[0];
+    }
+
+    if (!jsonBlock) return [];
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonBlock);
+    } catch (e) {
+      return [];
+    }
+
+    if (!Array.isArray(parsed)) return [];
+
+    let cards = parsed.map((c, i) => {
+      const question = (c.question || c.front || '').trim();
+      const answer = (c.answer || c.back || '').trim();
+      return { question, answer };
+    }).filter(c => c.question && c.answer && !/json.dumps|JSON_START|function|def\s|#/.test(c.question + c.answer));
+
+    if (expectedCount && cards.length > expectedCount) {
+      cards = cards.slice(0, expectedCount);
     }
 
     return cards;

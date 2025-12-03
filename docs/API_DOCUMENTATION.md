@@ -84,7 +84,7 @@ OAuth callback endpoint.
 
 #### `POST /api/generate`
 
-Generate flashcards for a topic. Returns immediately with a job ID for async processing.
+Generate flashcards for a topic. Returns immediately with a job ID for async processing. Server validates and, if needed, self-repairs malformed model output before returning results.
 
 **Authentication**: Required  
 **Rate Limit**: 100 requests/15 minutes
@@ -107,6 +107,7 @@ Generate flashcards for a topic. Returns immediately with a job ID for async pro
 - `mode` (string, optional): `"standard"` or `"deep-dive"` (default: "standard")
 - `knowledgeSource` (string, optional): `"ai-only"`, `"web-only"`, or `"ai-web"` (default: "ai-web")
 - `runtime` (string, optional): `"ollama"` or `"webllm"` (default: "ollama")
+- `preferredRuntime` (string, optional): user-preferred runtime; server will try preferred → alternate → local fallback
 - `parentTopic` (string, optional): Parent topic for context
 
 **Response** (200 OK):

@@ -31,6 +31,7 @@ export class StudyService implements StudyUseCase {
     runtime: 'ollama' | 'webllm' = 'ollama',
     parentTopic?: string
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
+    const desiredCount = Math.max(1, count || 1);
     const startTime = Date.now();
     const adapter = this.getAdapter(runtime);
     if (!adapter) {
@@ -38,7 +39,9 @@ export class StudyService implements StudyUseCase {
     }
 
     try {
-      const result = await this.doGenerateFlashcards(topic, count, mode, knowledgeSource, adapter, parentTopic);
+      const result = await this.doGenerateFlashcards(topic, desiredCount, mode, knowledgeSource, adapter, parentTopic);
+      const validated = await this.validateAndRepairFlashcards(result.cards, desiredCount, topic, adapter);
+      const adjustedCards = this.enforceCardCount(validated, desiredCount, topic);
 
       // Record success metrics
       if (this.metricsService) {
@@ -47,13 +50,13 @@ export class StudyService implements StudyUseCase {
           knowledgeSource,
           mode,
           topic,
-          cardCount: result.cards.length,
+          cardCount: Math.min(desiredCount, adjustedCards.length),
           duration: Date.now() - startTime,
           success: true
         });
       }
 
-      return result;
+      return { ...result, cards: adjustedCards };
     } catch (error: any) {
       // Record failure metrics
       if (this.metricsService) {
@@ -102,7 +105,9 @@ export class StudyService implements StudyUseCase {
     if (knowledgeSource === 'ai-only') {
       console.log('2. Generating flashcards from AI knowledge (ai-only mode)...');
       try {
-        const cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
+        let cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
+        cards = await this.validateAndRepairFlashcards(cards, count, topic, this.getAdapter('ollama'));
+        cards = this.enforceCardCount(cards, count, topic);
         return { cards };
       } catch (e) {
         console.error('   Failed to generate from AI knowledge:', e.message);
@@ -174,6 +179,8 @@ export class StudyService implements StudyUseCase {
       cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
     }
 
+    cards = await this.validateAndRepairFlashcards(cards, count, topic, this.getAdapter('ollama'));
+    cards = this.enforceCardCount(cards, count, topic);
     return { cards };
   }
 
@@ -294,14 +301,51 @@ export class StudyService implements StudyUseCase {
     return this.getAdapter('ollama').generateBriefAnswer(question, context);
   }
 
-  async generateQuiz(topic: string, count: number, flashcards?: Flashcard[]): Promise<QuizQuestion[]> {
+  async generateQuiz(
+    topic: string,
+    count: number,
+    flashcards?: Flashcard[],
+    preferredRuntime: 'ollama' | 'webllm' = 'ollama'
+  ): Promise<QuizQuestion[]> {
+    const order = preferredRuntime === 'webllm'
+      ? ['webllm', 'ollama']
+      : ['ollama', 'webllm'];
+
+    const tryAdapters = async (fn: (adapter: any) => Promise<QuizQuestion[]>) => {
+      for (const runtime of order) {
+        try {
+          const adapter = this.getAdapter(runtime);
+          if (adapter && typeof adapter === 'object') {
+            return await fn(adapter);
+          }
+        } catch (err: any) {
+          console.warn(`[StudyService] ${runtime} quiz generation failed:`, err?.message);
+        }
+      }
+      return null;
+    };
+
+    // 1) Flashcard-based quiz
     if (flashcards && flashcards.length > 0) {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
-      return this.getAdapter('ollama').generateQuizFromFlashcards(flashcards, count);
+
+      // fast local quiz first
+      const localQuiz = this.generateQuizFallbackFromFlashcards(flashcards, count);
+      if (localQuiz.length > 0) return localQuiz;
+
+      const result = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count));
+      if (result) return result;
+
+      console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
+      return this.generateQuizFallbackFromFlashcards(flashcards, count);
     }
 
-    // Fallback to topic-based generation if no flashcards provided
-    return this.getAdapter('ollama').generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder');
+    // 2) Topic-based quiz
+    const result = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder'));
+    if (result) return result;
+
+    console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
+    return this.generateQuizFallbackFromTopic(topic, count);
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
@@ -324,4 +368,112 @@ export class StudyService implements StudyUseCase {
   async getDeckHistory(): Promise<Deck[]> {
     return this.storageAdapter.getDeckHistory();
   }
+  /**
+   * Local fallback: build simple MCQs from flashcards without LLM.
+   */
+  private generateQuizFallbackFromFlashcards(flashcards: Flashcard[], count: number): QuizQuestion[] {
+    const pool = flashcards.slice();
+    const questions: QuizQuestion[] = [];
+    const take = Math.min(count || 5, pool.length);
+
+    const shuffle = <T>(arr: T[]) => arr.sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < take; i++) {
+      const card = pool[i % pool.length];
+      const distractors = shuffle(pool.filter((c) => c.id !== card.id)).slice(0, 3).map((c) => c.back);
+      const options = shuffle([card.back, ...distractors]);
+
+      questions.push({
+        id: `fallback-${card.id || i}`,
+        question: card.front?.endsWith('?') ? card.front : `${card.front}?`,
+        options,
+        correctAnswer: card.back,
+        explanation: 'Based on your existing flashcard content.'
+      });
+    }
+
+    return questions;
+  }
+
+  /**
+   * Local fallback: generic topic questions when LLM is unavailable.
+   */
+  private generateQuizFallbackFromTopic(topic: string, count: number): QuizQuestion[] {
+    const questions: QuizQuestion[] = [];
+    const take = Math.max(count || 5, 3);
+    for (let i = 0; i < take; i++) {
+      questions.push({
+        id: `fallback-topic-${i}`,
+        question: `What is a key fact about ${topic}?`,
+        options: [
+          `${topic} is an important concept in its field.`,
+          `${topic} is a random string.`,
+          `${topic} refers to a historical place.`,
+          `${topic} is unrelated to learning.`
+        ],
+        correctAnswer: `${topic} is an important concept in its field.`,
+        explanation: 'Fallback question generated without AI service.'
+      });
+    }
+    return questions;
+  }
+
+  private isCardValid(card: Flashcard): boolean {
+    if (!card) return false;
+    const q = (card.front || (card as any).question || '').trim();
+    const a = (card.back || (card as any).answer || '').trim();
+    if (!q || !a) return false;
+    const noise = /json.dumps|JSON_START|function|def\s|#|```|class\s|import\s/;
+    return !noise.test(q + a) && q.length >= 4 && a.length >= 3;
+  }
+
+  private normalizeCards(raw: any[]): Flashcard[] {
+    return (raw || []).map((c, i) => ({
+      id: c.id || `card-${Date.now()}-${i}`,
+      front: (c.front || c.question || '').trim(),
+      back: (c.back || c.answer || '').trim(),
+      topic: (c as any).topic
+    }));
+  }
+
+  private async validateAndRepairFlashcards(cards: Flashcard[], count: number, topic: string, adapter: any): Promise<Flashcard[]> {
+    const desired = Math.max(1, count || 1);
+    let normalized = this.normalizeCards(cards).filter(c => this.isCardValid(c));
+    if (normalized.length >= desired) return normalized;
+
+    if (adapter?.generateFlashcardsFromText) {
+      try {
+        const prompt = `Fix and return EXACTLY ${desired} flashcards in JSON. Each object must have 'question' and 'answer'. Topic: ${topic}. Here is possibly malformed data:\n${JSON.stringify(cards, null, 2)}`;
+        const repaired = await adapter.generateFlashcardsFromText(prompt, topic, desired);
+        normalized = this.normalizeCards(repaired).filter(c => this.isCardValid(c));
+        if (normalized.length >= desired) return normalized;
+      } catch (e) {
+        console.warn('[StudyService] Repair via adapter failed:', (e as any)?.message);
+      }
+    }
+
+    return normalized;
+  }
+
+  /** Ensure flashcard count matches user request, padding simple Q/A when too few are returned. */
+  private enforceCardCount(cards: Flashcard[], count: number, topic: string): Flashcard[] {
+    const desired = Math.max(1, count || 1);
+    let trimmed = cards.slice(0, desired);
+
+    if (trimmed.length < desired) {
+      const needed = desired - trimmed.length;
+      for (let i = 0; i < needed; i++) {
+        trimmed.push({
+          id: `fallback-${Date.now()}-${i}`,
+          front: `What is a key fact about ${topic}?`,
+          back: `${topic} is an important concept to understand.`,
+          topic
+        } as Flashcard);
+      }
+    }
+
+    return trimmed;
+  }
+
+
 }

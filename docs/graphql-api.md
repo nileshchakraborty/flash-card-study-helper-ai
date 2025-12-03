@@ -438,3 +438,6 @@ query {
 See `implementation_plan.md` for the full migration strategy.
 
 For issues or questions, check `auth_debugging_findings.md` for common authentication problems and solutions.
+
+
+Note: Backend now validates/repairs generated flashcards and will honor preferredRuntime (Ollama/WebLLM) with fallback.

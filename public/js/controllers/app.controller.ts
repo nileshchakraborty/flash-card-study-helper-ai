@@ -7,6 +7,7 @@ import { quizModel } from '../models/quiz.model.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import { initializeQuizHandlers } from '../quiz-init.js';
+import { settingsService } from '../services/settings.service.js';
 
 export class AppController {
   private generatorView: any;
@@ -137,7 +138,8 @@ export class AppController {
                   const quizResponse = await apiService.post('/quiz', {
                     cards: jobStatus.result.cards,
                     count: count,
-                    topic: topic
+                    topic: topic,
+                    preferredRuntime: settingsService.getPreferredRuntime()
                   });
 
                   if (quizResponse.questions) {
@@ -159,7 +161,8 @@ export class AppController {
             const quizResponse = await apiService.post('/quiz', {
               cards: flashcardResponse.cards,
               count: count,
-              topic: topic
+              topic: topic,
+              preferredRuntime: settingsService.getPreferredRuntime()
             });
 
             if (quizResponse.questions) {
@@ -176,7 +179,8 @@ export class AppController {
           response = await apiService.post('/quiz', {
             cards: cards,
             count: count,
-            topic: quizTopic
+            topic: quizTopic,
+            preferredRuntime: settingsService.getPreferredRuntime()
           });
 
           if (response.questions) {

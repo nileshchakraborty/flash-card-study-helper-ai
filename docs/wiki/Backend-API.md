@@ -348,3 +348,8 @@ For complete API exploration and testing:
 ---
 
 *For more details, see the [Getting Started](Getting-Started.md) guide.*
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+
+**Latest:** Runtime preference (Ollama/WebLLM) with automatic fallback; flashcard validation/repair ensures correct JSON and requested counts; client-side generation will fall back to backend if underfilled.

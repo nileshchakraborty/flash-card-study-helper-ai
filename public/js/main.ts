@@ -4,6 +4,7 @@ import { ModelManagerUI } from './controllers/ModelManagerUI';
 import { injectSpeedInsights } from '@vercel/speed-insights';
 import { apiService } from './services/api.service.js';
 import { graphqlService } from './services/graphql.service.js';
+import { settingsService } from './services/settings.service.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Speed Insights
@@ -33,6 +34,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup login/logout button state
   const authBtn = document.getElementById('auth-btn');
   const labelEl = document.getElementById('auth-btn-label');
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsClose = document.getElementById('settings-close');
+  const settingsCancel = document.getElementById('settings-cancel');
+  const settingsSave = document.getElementById('settings-save');
+  const runtimeRadios = Array.from(document.querySelectorAll('.runtime-radio')) as HTMLInputElement[];
+  const navToggle = document.getElementById('nav-toggle');
+  const navLinks = document.getElementById('nav-links');
 
   const renderAuthState = () => {
     if (!authBtn || !labelEl) return;
@@ -51,4 +60,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   renderAuthState();
+
+  const openSettings = () => {
+    const pref = settingsService.getPreferredRuntime();
+    runtimeRadios.forEach(r => r.checked = r.value === pref);
+    settingsModal?.classList.remove('hidden');
+    settingsModal?.classList.add('flex');
+  };
+  const closeSettings = () => {
+    settingsModal?.classList.add('hidden');
+    settingsModal?.classList.remove('flex');
+  };
+
+  settingsBtn?.addEventListener('click', openSettings);
+  settingsClose?.addEventListener('click', closeSettings);
+  settingsCancel?.addEventListener('click', closeSettings);
+  settingsSave?.addEventListener('click', () => {
+    const selected = runtimeRadios.find(r => r.checked);
+    if (selected) settingsService.setPreferredRuntime(selected.value as any);
+    closeSettings();
+  });
+
+  // Hamburger toggle
+  navToggle?.addEventListener('click', () => {
+    navLinks?.classList.toggle('hidden');
+    navLinks?.classList.toggle('flex');
+    navLinks?.classList.toggle('flex-col');
+  });
 });

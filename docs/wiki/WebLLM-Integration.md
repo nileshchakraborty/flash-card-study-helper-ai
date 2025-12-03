@@ -322,3 +322,15 @@ const cards = await client.generateFlashcards('Neural Networks', 10);
 - Create a new session if expired
 - Check session status before use
 
+
+
+## Runtime Preference & Fallback
+- Users can pick a preferred runtime (Ollama or WebLLM) in the frontend Settings modal.
+- Server tries the preferred runtime first, then the alternate runtime, then a local quiz fallback. This keeps quiz creation working even if one runtime is unavailable.
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+
+**Latest:** Runtime preference (Ollama/WebLLM) with automatic fallback; flashcard validation/repair ensures correct JSON and requested counts; client-side generation will fall back to backend if underfilled.
+
+Note: GraphQL/REST accept preferredRuntime (ollama|webllm); server falls back and validates/repairs flashcard outputs before returning.

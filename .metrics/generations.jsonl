@@ -17,3 +17,5 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Testing","cardCount":0,"duration":2238,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764463959656}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Test Auth","cardCount":0,"duration":4884,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464346205}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Auth Success Test","cardCount":0,"duration":1543,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464819742}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"go lang","cardCount":3,"duration":12289,"success":true,"timestamp":1764732843143}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":10696,"success":true,"timestamp":1764732951397}

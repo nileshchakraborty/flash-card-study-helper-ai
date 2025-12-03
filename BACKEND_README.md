@@ -11,6 +11,8 @@ MindFlip AI Backend supports both **REST** and **GraphQL** APIs, providing:
 - **Web Search**: Serper.dev integration for real-time knowledge retrieval
 - **File Processing**: PDF and image (OCR) support
 - **Quiz Generation**: AI-powered quiz creation from flashcards
+- **Runtime Preference & Fallback**: User can choose preferred runtime (Ollama or WebLLM); backend automatically falls back to the alternate runtime, then to a local generator.
+- **Validation & Repair**: Flashcard outputs are validated for correct JSON/question-answer shape; invalid/insufficient results trigger an automatic repair prompt before returning to clients.
 
 ## 🚀 Quick Start
 
@@ -555,4 +557,3 @@ For API integration support, see:
 - **API Documentation**: `/api-docs` (Swagger UI)
 - **GitHub Wiki**: [Wiki Documentation](./docs/wiki/)
 - **Examples**: [Integration Examples](./docs/examples/)
-

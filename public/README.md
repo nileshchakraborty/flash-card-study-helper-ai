@@ -75,3 +75,10 @@ The frontend integrates **WebLLM** for browser-based AI generation.
 - **CSS**: Pure CSS with CSS Variables for theming.
 - **Theme**: Dark mode optimized.
 - **Responsive**: Mobile-first design.
+
+
+## Runtime Preference
+- Use the new Settings button in the header to choose Ollama or WebLLM as default. The app falls back automatically if your choice is unavailable.
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.

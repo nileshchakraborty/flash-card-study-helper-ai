@@ -244,3 +244,11 @@ The backend can be:
 - Used by mobile apps
 - Consumed by third-party services
 
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+
+### 9. Runtime Preference & Validation (Latest)
+✅ User-selectable preferred runtime (Ollama or WebLLM) with automatic fallback to alternate then local
+✅ Flashcard generation validated for strict Q/A JSON; malformed/insufficient outputs are auto-repaired before returning
+✅ Client-side generation falls back to backend if underfilled

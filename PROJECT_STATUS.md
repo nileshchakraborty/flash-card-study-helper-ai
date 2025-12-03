@@ -93,6 +93,7 @@
 4. **Quiz Model**: Fixed answers property and topic handling
 5. **Quiz Results**: Improved results UI with proper styling
 6. **Quiz Navigation**: Fixed tab switching to quiz tab
+7. **Runtime Preference & Fallback**: Quiz generation now honors user-selected runtime (Ollama or WebLLM) from Settings; falls back to the alternate runtime, then a local quiz builder to avoid 500s when an LLM is down.
 
 ## ⚠️ Areas That May Need Attention
 
@@ -207,3 +208,6 @@
 **Deferred**:
 - WebSocket client integration (backend ready, polling works reliably)
 
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+- Added validation/repair layer for flashcards with runtime preference fallback.

@@ -340,12 +340,13 @@ export class ExpressServer {
     this.app.post('/api/generate', apiRateLimiter, authMiddleware, async (req, res) => {
       try {
         const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
+        const desiredCount = Math.max(1, parseInt(count || '10', 10));
 
         // Check cache first
         if (this.flashcardCache) {
           const cachedResult = this.flashcardCache.get(
             topic,
-            count || 10,
+            desiredCount,
             mode,
             knowledgeSource
           );
@@ -364,7 +365,7 @@ export class ExpressServer {
         if (this.queueService) {
           const jobId = await this.queueService.addGenerateJob({
             topic,
-            count: count || 10,
+            count: desiredCount,
             mode,
             knowledgeSource: knowledgeSource || 'ai-web',
             runtime: runtime || 'ollama',
@@ -382,7 +383,7 @@ export class ExpressServer {
           // Fallback to synchronous processing if queue not available
           const result = await this.studyService.generateFlashcards(
             topic,
-            count || 10,
+            desiredCount,
             mode,
             knowledgeSource || 'ai-web',
             runtime || 'ollama',
@@ -511,10 +512,29 @@ export class ExpressServer {
     // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
       try {
-        const { topic, numQuestions, flashcardIds } = req.body;
+        const { topic, numQuestions, count, flashcardIds, cards } = req.body;
+        const desiredCount = numQuestions ?? count;
 
         // Route to appropriate quiz creation method
-        if (flashcardIds && Array.isArray(flashcardIds)) {
+        if (cards && Array.isArray(cards) && cards.length > 0) {
+          const questions = await this.studyService.generateQuiz(
+            topic || cards[0].topic || 'Quiz',
+            desiredCount || Math.min(cards.length, 10),
+            cards
+          );
+
+          const quiz = {
+            id: `quiz-${Date.now()}`,
+            topic: topic || cards[0].topic || 'Quiz',
+            questions,
+            source: 'flashcards' as const,
+            createdAt: Date.now()
+          };
+
+          if (this.quizStorage) this.quizStorage.storeQuiz(quiz);
+
+          res.json({ quizId: quiz.id, quiz });
+        } else if (flashcardIds && Array.isArray(flashcardIds)) {
           // Create quiz from flashcards
           if (flashcardIds.length === 0) {
             res.status(400).json({ error: 'flashcardIds array cannot be empty' });
@@ -534,9 +554,10 @@ export class ExpressServer {
             topic: fc.topic
           }));
 
-          const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromFlashcards(
-            formattedCards,
-            numQuestions || Math.min(flashcards.length, 10)
+          const questions = await this.studyService.generateQuiz(
+            flashcards[0].topic || topic || 'Quiz',
+            desiredCount || Math.min(flashcards.length, 10),
+            formattedCards
           );
 
           const quiz = {
@@ -594,7 +615,8 @@ export class ExpressServer {
     // Create quiz from flashcards
     this.app.post('/api/quiz/create-from-flashcards', apiRateLimiter, async (req, res) => {
       try {
-        const { flashcardIds, count, options } = req.body;
+        const { flashcardIds, count, numQuestions, options } = req.body;
+        const desiredCount = numQuestions ?? count;
 
         if (!flashcardIds || !Array.isArray(flashcardIds) || flashcardIds.length === 0) {
           res.status(400).json({ error: 'flashcardIds array is required' });
@@ -618,9 +640,10 @@ export class ExpressServer {
         }));
 
         // Generate quiz questions using AI
-        const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromFlashcards(
-          formattedCards,
-          count || Math.min(flashcards.length, 10)
+        const questions = await this.studyService.generateQuiz(
+          flashcards[0].topic || 'Quiz',
+          desiredCount || Math.min(flashcards.length, 10),
+          formattedCards
         );
 
         // Create quiz object
@@ -680,10 +703,9 @@ export class ExpressServer {
         }
 
         // Generate quiz questions using AI
-        const questions = await this.studyService['aiAdapters'].ollama.generateQuizFromTopic(
+        const questions = await this.studyService.generateQuiz(
           topic,
-          count || 5,
-          context
+          count || 5
         );
 
         // Create quiz object

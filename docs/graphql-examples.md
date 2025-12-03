@@ -457,3 +457,6 @@ mutation {
 - [GraphQL API Documentation](graphql-api.md)
 - [Backend README](../BACKEND_README.md)
 - [API Documentation](API_DOCUMENTATION.md)
+
+
+Note: Backend now validates/repairs generated flashcards and will honor preferredRuntime (Ollama/WebLLM) with fallback.

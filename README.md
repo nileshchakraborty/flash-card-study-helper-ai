@@ -24,6 +24,7 @@ The system follows **Clean Architecture** principles to ensure separation of con
     - `HybridSerperAdapter`: Connects to Serper.dev via MCP or direct (with fallback).
     - `FileSystemAdapter`: Handles file I/O.
     - `SubscriptionService`: Handles real-time updates via PubSub (WebSocket ready).
+    - **Runtime Preference + Fallback**: User-selectable runtime (Ollama or WebLLM). Server tries preferred runtime → alternate runtime → local fallback.
 - **MCP Layer** (Optional, Feature Flag):
   - `MCPClientWrapper`: Connects to MCP server with circuit breaker.
   - `MCP Server`: Standalone process with tools for Ollama, Serper, etc.
@@ -127,6 +128,10 @@ localStorage.setItem('USE_GRAPHQL', 'true');
 location.reload();
 ```
 
+**LLM Runtime Preference (NEW):**
+- Choose preferred runtime (Ollama or WebLLM) in the in-app **Settings** modal (header → Settings).
+- The app will try your preference first, then automatically fall back to the other runtime, then to a local quiz fallback.
+
 **Compare APIs:**
 ```bash
 # REST: Multiple requests for deck + cards
@@ -165,6 +170,9 @@ curl -X POST /graphql -d '{
 - 🔍 Web search integration (Serper)
 - 📄 PDF/Image processing for flashcard generation
 - 🎓 Quiz generation from flashcards
+- ✅ Validation & Self-Repair: Generated flashcards are validated for strict JSON/question-answer shape; if invalid/insufficient, the system re-prompts the runtime to repair before returning.
+- 📏 Count Enforcement: Returned flashcards are trimmed/padded to match the requested count; client-side generation auto-falls back to backend if underfilled.
+- 🛡️ Runtime fallback ladder: Preferred runtime (configurable) → alternate runtime → local quiz fallback to prevent failures when an LLM is unavailable
 
 ## 🚀 Getting Started
 
@@ -254,7 +262,7 @@ npm run dev
 
 - **API Root**: `http://localhost:3000/api`
 - **Swagger UI**: `http://localhost:3000/api-docs`
-- **Demo Client**: `http://localhost:3000`
+- **Demo Client**: `http://localhost:3000` (Quiz now lives inside the SPA; `Take Quiz` no longer redirects to `quiz.html`)
 - **Health Check**: `http://localhost:3000/api/health`
 
 ## 📡 Key API Endpoints

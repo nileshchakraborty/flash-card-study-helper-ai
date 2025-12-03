@@ -452,6 +452,10 @@ components:
           type: string
           enum: [ollama, webllm]
           description: Which AI runtime to use
+        preferredRuntime:
+          type: string
+          enum: [ollama, webllm]
+          description: User-preferred runtime; server falls back to alternate then local validation
         knowledgeSource:
           type: string
           enum: [ai-only, web-only, ai-web]
