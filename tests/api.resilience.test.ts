@@ -53,6 +53,7 @@ describe('API Resilience Tests', () => {
             mockQuizStorage,
             mockFlashcardStorage
         );
+        server.setupRoutes();
         app = server.getApp();
     });
 

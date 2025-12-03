@@ -1,5 +1,6 @@
 import { flashcardResolvers } from './flashcard.resolvers.js';
 import { quizResolvers } from './quiz.resolvers.js';
+import { jobResolvers } from './job.resolvers.js';
 import { GraphQLScalarType, Kind } from 'graphql';
 
 // Custom scalar for JSON
@@ -49,6 +50,7 @@ export const resolvers = {
     Query: {
         ...flashcardResolvers.Query,
         ...quizResolvers.Query,
+        ...jobResolvers.Query,
 
         // Health check
         health: () => ({
@@ -63,6 +65,7 @@ export const resolvers = {
         ...quizResolvers.Mutation,
     },
 
-    // Subscriptions will be added in Phase 4
-    Subscription: {},
+    Subscription: {
+        ...jobResolvers.Subscription,
+    },
 };

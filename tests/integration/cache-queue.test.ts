@@ -64,6 +64,7 @@ describe('Cache-Queue Integration', () => {
             mockQuizStorage,
             mockFlashcardStorage
         );
+        server.setupRoutes();
         app = server.getApp();
     });
 

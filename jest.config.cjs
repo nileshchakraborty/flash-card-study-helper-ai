@@ -9,6 +9,7 @@ module.exports = {
         '^@mlc-ai/web-llm$': '<rootDir>/tests/mocks/web-llm.js',
         '^msgpackr$': '<rootDir>/node_modules/msgpackr/dist/node.cjs',
         '^ws$': '<rootDir>/tests/mocks/ws.js',
+        '^uuid$': require.resolve('uuid'),
     },
     transform: {
         '^.+\\.[tj]sx?$': [
@@ -19,4 +20,7 @@ module.exports = {
             },
         ],
     },
+    transformIgnorePatterns: [
+        'node_modules/(?!(uuid|@apollo)/)'
+    ],
 };

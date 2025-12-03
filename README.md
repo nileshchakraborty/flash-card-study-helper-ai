@@ -15,12 +15,15 @@ The system follows **Clean Architecture** principles to ensure separation of con
   - `StudyUseCase`: Primary port for the application.
   - `LLMPort`, `SearchPort`: Secondary ports for AI and Search services.
 - **Adapters**: Implements the ports.
-  - **Primary**: Express Server (REST API).
+  - **Primary**: 
+    - `Express Server` (REST API).
+    - `Apollo Server` (GraphQL API).
   - **Secondary**: 
     - `HybridOllamaAdapter`: Connects to Ollama via MCP or direct (with fallback).
     - `WebLLMAdapter`: Connects to browser-based LLM (via client bridge).
     - `HybridSerperAdapter`: Connects to Serper.dev via MCP or direct (with fallback).
     - `FileSystemAdapter`: Handles file I/O.
+    - `SubscriptionService`: Handles real-time updates via PubSub (WebSocket ready).
 - **MCP Layer** (Optional, Feature Flag):
   - `MCPClientWrapper`: Connects to MCP server with circuit breaker.
   - `MCP Server`: Standalone process with tools for Ollama, Serper, etc.
@@ -108,8 +111,8 @@ Explore and test all endpoints directly from your browser.
 The application now supports a modern GraphQL API alongside REST:
 
 - **Endpoint**: `http://localhost:3000/graphql`
-- **Documentation**: See [docs/graphql-api.md](docs/graphql-api.md)
-- **Playground**: Available in development mode at `/graphql`
+- **Documentation**: See [docs/graphql-api.md](docs/graphql-api.md) | [Examples](docs/graphql-examples.md)
+- **Playground**: Apollo Sandbox available in development at `/graphql`
 
 **Key Features:**
 - 🔀 **Hybrid Mode**: Automatic fallback to REST API if GraphQL fails
@@ -338,6 +341,10 @@ flash-card-study-helper-ai/
 │   │   ├── domain/      # Business Models
 │   │   ├── ports/       # Interface Definitions
 │   │   └── services/    # Core Business Logic
+│   ├── graphql/         # GraphQL API (New)
+│   │   ├── resolvers/   # Query/Mutation resolvers
+│   │   ├── schema/      # Type definitions
+│   │   └── plugins/     # Apollo plugins
 │   └── index.ts         # Composition Root
 ├── public/              # Frontend Demo
 ├── tests/               # Unit & Integration Tests

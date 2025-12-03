@@ -4,6 +4,8 @@
 
 The flashcard study helper now supports both REST and GraphQL APIs. The GraphQL API provides a modern, flexible alternative with features like batching, type safety, and efficient data fetching.
 
+**📚 [View Query Examples](graphql-examples.md)** - Practical examples for all operations
+
 ## Quick Start
 
 ### Enable GraphQL Mode
@@ -297,6 +299,45 @@ query CheckJob {
 
 ---
 
+## Subscriptions (Real-time Updates)
+
+The API supports real-time updates for long-running operations like flashcard generation.
+
+### Backend Support
+
+The backend is fully configured for WebSocket subscriptions:
+
+```graphql
+type Subscription {
+  jobUpdated(jobId: ID!): Job!
+}
+```
+
+### Usage (Current Strategy)
+
+While the backend supports WebSockets, the frontend currently uses **polling** for simplicity and reliability across all environments.
+
+**Polling Pattern:**
+1. Mutation returns `jobId`
+2. Client polls `job(id: "...")` query every 2 seconds
+3. Stop polling when `status` is `COMPLETED` or `FAILED`
+
+**Future WebSocket Usage:**
+Once WebSocket integration is enabled on the client:
+
+```graphql
+subscription OnJobUpdate($jobId: ID!) {
+  jobUpdated(jobId: $jobId) {
+    id
+    status
+    progress
+    result
+  }
+}
+```
+
+---
+
 ## Error Handling
 
 GraphQL returns errors in a standard format:
@@ -347,15 +388,22 @@ async generateFlashcards(params) {
 
 ---
 
-## GraphQL Playground
+## Interactive GraphQL Interface
 
-In development mode, access the GraphQL Playground at:
+In development mode, access the **Apollo Sandbox** (interactive GraphQL client) at:
 
 ```
 http://localhost:3000/graphql
 ```
 
-*Note: Playground is disabled in production for security.*
+Apollo Sandbox is the modern replacement for GraphQL Playground, offering:
+- Schema exploration
+- Query and mutation testing
+- Real-time syntax validation
+- Auto-completion
+- Documentation browser
+
+*Note: The interactive interface is available in both development and production, but production uses a less embedded version for security.*
 
 ---
 

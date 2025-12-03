@@ -224,27 +224,36 @@ GET  /api-docs                     # Swagger UI
 
 ### Clean Architecture Layers
 
+### Clean Architecture Layers
+
 ```
-┌─────────────────────────────────────┐
-│   Primary Adapters (Express API)   │
-├─────────────────────────────────────┤
-│   Core Services (Business Logic)   │
-│   - StudyService                    │
-│   - AuthService                     │
-│   - QueueService                    │
-│   - ResilienceService               │
-├─────────────────────────────────────┤
-│   Secondary Adapters                │
-│   - OllamaAdapter                   │
-│   - WebLLMService (New)             │
-│   - SerperAdapter                   │
-│   - FileSystemAdapter               │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│              Primary Adapters                           │
+│   - Express API (REST)                                  │
+│   - Apollo Server (GraphQL)                             │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│              Core Services (Business Logic)             │
+│   - StudyService                                        │
+│   - AuthService                                         │
+│   - QueueService                                        │
+│   - ResilienceService                                   │
+│   - SubscriptionService (New)                           │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│              Secondary Adapters                         │
+│   - OllamaAdapter                                       │
+│   - WebLLMService                                       │
+│   - SerperAdapter                                       │
+│   - FileSystemAdapter                                   │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### Request Flow
 
-1. **Client** → Express API endpoint
+1. **Client** → Express/GraphQL Endpoint
 2. **Authentication** → JWE token validation
 3. **Rate Limiting** → Request throttling
 4. **Cache Check** → Return cached result if available
@@ -252,8 +261,9 @@ GET  /api-docs                     # Swagger UI
 6. **Worker** → Process job with circuit breaker
 7. **Adapter** → Call external service (Ollama/Serper)
 8. **Response** → Return result to client
+9. **Subscription** → Notify client of job completion (via PubSub/Polling)
 
-### WebLLM Architecture (New)
+### WebLLM Architecture
 
 Since WebLLM requires browser WebGPU, we use a hybrid approach:
 
@@ -373,7 +383,6 @@ if (data.generateFlashcards.jobId) {
 - Combine multiple operations in one request
 - Type-safe with schema validation
 - Automatic REST fallback for reliability
-```
 
 ### WebLLM Integration
 
@@ -522,6 +531,10 @@ src/
 │   ├── domain/               # Domain models
 │   ├── ports/                # Interface definitions
 │   └── services/             # Core business logic
+├── graphql/                  # GraphQL API (New)
+│   ├── resolvers/            # Query/Mutation resolvers
+│   ├── schema/               # Type definitions
+│   └── plugins/              # Apollo plugins
 └── index.ts                  # Application entry point
 ```
 

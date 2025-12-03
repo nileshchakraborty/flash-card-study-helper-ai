@@ -39,6 +39,14 @@ describe('Quiz API Endpoints', () => {
             },
             searchAdapter: {
                 search: async () => []
+            },
+            generateQuiz: async (topic: string, numQuestions: number) => {
+                return Array.from({ length: numQuestions }, (_, i) => ({
+                    id: `q${i + 1}`,
+                    question: `Question ${i + 1} about ${topic}?`,
+                    options: ['Option A', 'Option B', 'Option C', 'Option D'],
+                    correctAnswer: 0
+                }));
             }
         } as any;
 
@@ -61,6 +69,7 @@ describe('Quiz API Endpoints', () => {
             null, // Vector
             null  // Blob
         );
+        server.setupRoutes();
 
         // Get the Express app from server
         app = server.getApp();

@@ -75,27 +75,70 @@ export class QueueService {
     initWorker(processor: (job: Job<GenerateJobData>) => Promise<any>) {
         const worker = new Worker('flashcard-generation', processor, { connection: this.connection });
 
-        worker.on('completed', (job) => {
+        worker.on('completed', async (job) => {
             logger.info('Job completed', { jobId: job.id, topic: job.data.topic });
+
+            // Publish job update for GraphQL subscriptions
+            try {
+                const { pubsub } = await import('../../graphql/resolvers/job.resolvers.js');
+                const jobStatus = {
+                    id: job.id,
+                    status: 'COMPLETED',
+                    result: job.returnvalue,
+                    progress: 100
+                };
+                pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+            } catch (error) {
+                logger.error('Failed to publish job completion', { error });
+            }
         });
 
         worker.on('failed', async (job, err) => {
             logger.error('Job failed', { jobId: job?.id, error: err.message });
 
-            // If job has exhausted all retries, move to DLQ
-            if (job && job.attemptsMade >= (job.opts.attempts || 1)) {
-                await this.deadLetterQueue.add('failed-job', {
-                    originalJobId: job.id,
-                    data: job.data,
-                    error: err.message,
-                    timestamp: Date.now()
-                });
-                logger.warn('Job moved to Dead Letter Queue', { jobId: job.id });
+            if (job) {
+                // Publish job update for GraphQL subscriptions
+                try {
+                    const { pubsub } = await import('../../graphql/resolvers/job.resolvers.js');
+                    const jobStatus = {
+                        id: job.id,
+                        status: 'FAILED',
+                        error: err.message,
+                        progress: job.progress || 0
+                    };
+                    pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+                } catch (error) {
+                    logger.error('Failed to publish job failure', { error });
+                }
+
+                // If job has exhausted all retries, move to DLQ
+                if (job.attemptsMade >= (job.opts.attempts || 1)) {
+                    await this.deadLetterQueue.add('failed-job', {
+                        originalJobId: job.id,
+                        data: job.data,
+                        error: err.message,
+                        timestamp: Date.now()
+                    });
+                    logger.warn('Job moved to Dead Letter Queue', { jobId: job.id });
+                }
             }
         });
 
-        worker.on('progress', (job, progress) => {
+        worker.on('progress', async (job, progress) => {
             logger.debug('Job progress', { jobId: job.id, progress });
+
+            // Publish progress update for GraphQL subscriptions
+            try {
+                const { pubsub } = await import('../../graphql/resolvers/job.resolvers.js');
+                const jobStatus = {
+                    id: job.id,
+                    status: 'PROCESSING',
+                    progress: typeof progress === 'number' ? progress : 0
+                };
+                pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+            } catch (error) {
+                logger.error('Failed to publish job progress', { error });
+            }
         });
 
         logger.info('Worker initialized for flashcard-generation queue');

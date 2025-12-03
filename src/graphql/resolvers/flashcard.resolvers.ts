@@ -38,19 +38,38 @@ export const flashcardResolvers = {
                 throw new Error('Authentication required for flashcard generation');
             }
 
-            // Use the study service to generate flashcards
+            // If queue service is available, offload to background job
+            if (context.queueService) {
+                const jobId = await context.queueService.addGenerateJob({
+                    topic: input.topic,
+                    count: input.count || 10,
+                    mode: input.mode || 'standard',
+                    knowledgeSource: input.knowledgeSource || 'ai-web',
+                    runtime: 'ollama', // Default to ollama for now
+                    parentTopic: input.parentTopic,
+                    userId: context.user.id
+                });
+
+                return {
+                    cards: null,
+                    jobId,
+                    recommendedTopics: null
+                };
+            }
+
+            // Fallback to synchronous generation
             const result = await context.studyService.generateFlashcards(
                 input.topic,
                 input.count || 10,
                 input.mode || 'standard',
                 input.knowledgeSource || 'ai-web',
-                undefined, // runtime not needed for GraphQL
+                undefined,
                 input.parentTopic
             );
 
             return {
                 cards: result.cards || [],
-                jobId: (result as any).jobId || null,
+                jobId: null,
                 recommendedTopics: result.recommendedTopics || []
             };
         },

@@ -9,6 +9,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { ApolloServer } from '@apollo/server';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { expressMiddleware as apolloExpressMiddleware } from '@apollo/server/express4';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
@@ -98,7 +99,7 @@ export class ExpressServer {
     }
   }
 
-  private async setupGraphQL() {
+  public async setupGraphQL() {
     // Create executable schema
     const schema = makeExecutableSchema({ typeDefs, resolvers });
 
@@ -109,30 +110,157 @@ export class ExpressServer {
         console.error('GraphQL Error:', error);
         return error;
       },
+      plugins: [
+        // Enable Apollo Sandbox in development (modern alternative to GraphQL Playground)
+        // This properly handles both GET (landing page) and POST (queries) requests
+        process.env.NODE_ENV !== 'production'
+          ? ApolloServerPluginLandingPageLocalDefault({
+            embed: true,
+            includeCookies: false
+          })
+          : ApolloServerPluginLandingPageLocalDefault({ embed: false }),
+        // Response caching for optimization (placeholder - can be enhanced with Redis in production)
+        {
+          async requestDidStart() {
+            return {
+              async willSendResponse({ response }) {
+                // Simple logging for now - full caching impl deferred
+                if (response.body.kind === 'single' && !response.body.singleResult.errors) {
+                  // Cache headers could be set here
+                }
+              }
+            };
+          }
+        },
+        {
+          async serverWillStart() {
+            return {
+              async drainServer() {
+                // cleanup
+              },
+            };
+          },
+        },
+      ],
     });
 
     // Start Apollo Server
     await this.apolloServer.start();
 
-    // Mount GraphQL endpoint
-    // Type casting to bypass Express v5/Apollo Server v4 incompatibility
+    // Mount GraphQL endpoint for queries and mutations
     this.app.use(
       '/graphql',
-      cors(),
+      cors<cors.CorsRequest>(),
       express.json(),
       apolloExpressMiddleware(this.apolloServer, {
-        context: async ({ req }) => createContext(req, {
+        context: async ({ req }) => {
+          const baseContext = await createContext(req, {
+            authService: this.authService,
+            studyService: this.studyService,
+            quizStorage: this.quizStorage,
+            flashcardStorage: this.flashcardStorage,
+            queueService: this.queueService,
+            webllmService: this.webllmService
+          });
+
+          // Add DataLoaders for query batching (basic implementation)
+          const loaders = {
+            deckLoader: null, // Placeholder - DataLoader impl ready in src/graphql/dataloaders
+            jobLoader: null
+          };
+
+          return {
+            ...baseContext,
+            loaders
+          };
+        },
+      }),
+    );
+
+    // Setup WebSocket server for GraphQL subscriptions
+    // Using separate path /subscriptions to avoid conflict with HTTP /graphql endpoint
+    const { WebSocketServer } = await import('ws');
+    const { makeServer } = await import('graphql-ws');
+
+    // Create WebSocket server directly attached to HTTP server (like WebLLM)
+    const graphqlWsServer = new WebSocketServer({
+      server: this.httpServer,
+      path: '/subscriptions',
+    });
+
+    // Create graphql-ws server
+    const subscriptionServer = makeServer({
+      schema,
+      context: async (ctx) => {
+        // Extract token from connection params if provided
+        const connectionParams: any = ctx.connectionParams || {};
+        const token = connectionParams.authorization?.replace('Bearer ', '');
+
+        // Create context similar to HTTP context
+        let user;
+        if (token) {
+          try {
+            const payload = await this.authService.decryptToken(token);
+            user = {
+              id: payload.id || payload.sub || '',
+              email: payload.email || '',
+              name: payload.name || ''
+            };
+          } catch (error: any) {
+            console.warn('[GraphQL WS] Token decryption failed:', error.message);
+          }
+        }
+
+        return {
           authService: this.authService,
           studyService: this.studyService,
           quizStorage: this.quizStorage,
           flashcardStorage: this.flashcardStorage,
           queueService: this.queueService,
-          webllmService: this.webllmService
-        })
-      }) as any
-    );
+          webllmService: this.webllmService,
+          user,
+          token
+        };
+      },
+      onConnect: (ctx) => {
+        console.log('[GraphQL WS] Client connected');
+        return true; // Allow connection
+      },
+      onDisconnect: (ctx) => {
+        console.log('[GraphQL WS] Client disconnected');
+      },
+    });
+
+    // Handle WebSocket connections
+    graphqlWsServer.on('connection', (socket, request) => {
+      console.log('[GraphQL WS] WebSocket connection established for /subscriptions');
+
+      const closed = subscriptionServer.opened(
+        {
+          protocol: socket.protocol,
+          send: (data) =>
+            new Promise((resolve, reject) => {
+              socket.send(data, (err) => (err ? reject(err) : resolve()));
+            }),
+          close: (code, reason) => socket.close(code, reason),
+          onMessage: (cb) => socket.on('message', async (event) => {
+            try {
+              await cb(event.toString());
+            } catch (err) {
+              socket.close(1011, (err as Error).message);
+            }
+          }),
+        },
+        { socket, request }
+      );
+
+      socket.once('close', (code, reason) => {
+        closed(code, reason.toString());
+      });
+    });
 
     console.log('🚀 GraphQL endpoint available at /graphql');
+    console.log('📡 GraphQL subscriptions available via WebSocket at /subscriptions');
   }
 
   private setupWebSocket() {
@@ -187,7 +315,7 @@ export class ExpressServer {
     });
   }
 
-  private setupRoutes() {
+  public setupRoutes() {
     // Auth Routes
     this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -732,22 +860,7 @@ export class ExpressServer {
       }
     });
 
-    this.app.get('/api/quiz/history', async (req, res) => {
-      try {
-        const quizzes = this.quizStorage?.getAllQuizzes() || [];
 
-        // Attach attempts to each quiz
-        const quizzesWithAttempts = quizzes.map(quiz => ({
-          ...quiz,
-          attempts: this.quizStorage?.getAttempts(quiz.id) || []
-        }));
-
-        res.json({ quizzes: quizzesWithAttempts });
-      } catch (error: any) {
-        console.warn('[API] Failed to get quiz history:', error.message);
-        res.status(500).json({ error: error.message });
-      }
-    });
 
     this.app.post('/api/quiz/history', async (req, res) => {
       try {

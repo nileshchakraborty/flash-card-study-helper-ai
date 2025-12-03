@@ -133,7 +133,7 @@ export const typeDefs = `#graphql
 
   # Subscriptions for real-time updates
   type Subscription {
-    jobProgress(jobId: ID!): Job!
-    flashcardGenerated(topic: String!): Flashcard!
+    """Subscribe to job status updates for async operations"""
+    jobUpdated(jobId: ID!): Job!
   }
 `;
