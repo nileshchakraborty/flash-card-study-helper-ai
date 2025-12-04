@@ -12,6 +12,8 @@ import { FlashcardCacheService } from '../src/core/services/FlashcardCacheServic
 import { WebLLMService } from '../src/core/services/WebLLMService.js';
 import { QuizStorageService } from '../src/core/services/QuizStorageService.js';
 import { FlashcardStorageService } from '../src/core/services/FlashcardStorageService.js';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'path';
@@ -21,7 +23,13 @@ dotenv.config();
 // Initialize Cache Services (lightweight for serverless)
 const serperCache = new CacheService({ ttlSeconds: 3600, maxEntries: 50 });
 const llmCache = new CacheService({ ttlSeconds: 86400, maxEntries: 100 });
-const swaggerSpec = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+let swaggerSpec: unknown = {};
+try {
+    swaggerSpec = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+} catch (err) {
+    console.warn('Swagger spec not available in serverless env:', (err as Error).message);
+    swaggerSpec = { openapi: '3.0.0', info: { title: 'API', version: '1.0.0' } };
+}
 
 // Initialize Metrics Service
 const metricsService = new MetricsService('/tmp/.metrics'); // Use /tmp for serverless
@@ -61,6 +69,23 @@ await expressServer.setupGraphQL({ skipWebSocket: true });
 expressServer.setupRoutes();
 
 const app = expressServer.getApp().use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Reconfigure Google OAuth callback to be host-relative in serverless
+const deriveCallbackUrl = (req: any) => {
+    const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host || process.env.VERCEL_URL || 'localhost:3000';
+    const proto = req?.headers?.['x-forwarded-proto'] || 'https';
+    return `${proto}://${host}/api/auth/google/callback`;
+};
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
+    callbackURL: '/api/auth/google/callback',
+    passReqToCallback: true
+}, (req, _accessToken, _refreshToken, profile, done) => {
+    (req as any)._callbackURL = deriveCallbackUrl(req);
+    return done(null, profile);
+}));
 
 // Export the Express app for Vercel
 export default app;

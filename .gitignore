@@ -9,3 +9,6 @@ build/
 .env
 .idea/
 .metrics/
+.vercel
+.env*.local
+.env.backup

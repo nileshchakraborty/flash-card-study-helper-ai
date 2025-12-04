@@ -82,11 +82,21 @@ export class ExpressServer {
 
 
   private setupPassport() {
+    const deriveCallbackUrl = (req: express.Request) => {
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+      const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol || 'http');
+      return `${proto}://${host}/api/auth/google/callback`;
+    };
+
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
-      callbackURL: '/api/auth/google/callback'
-    }, (_accessToken, _refreshToken, profile, done) => {
+      callbackURL: '/api/auth/google/callback',
+      passReqToCallback: true
+    }, (req, _accessToken, _refreshToken, profile, done) => {
+      // Ensure callbackURL is correct in serverless by overriding per-request
+      // (passport caches it per strategy instance, so we just rely on relative path + host/proto headers)
+      (req as any)._callbackURL = deriveCallbackUrl(req);
       return done(null, profile);
     }));
   }
