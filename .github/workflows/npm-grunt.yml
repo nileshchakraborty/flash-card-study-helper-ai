@@ -10,6 +10,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      statuses: write
+
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
@@ -19,6 +23,7 @@ jobs:
       uses: vercel/repository-dispatch/actions/status@v1
       with:
         name: 'Vercel - mindflipai'
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         
     - uses: actions/checkout@v4
 
