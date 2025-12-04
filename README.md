@@ -8,21 +8,21 @@ This project implements a **Clean Architecture** API that leverages LLMs (WebLLM
 
 ```mermaid
 flowchart TD
-  UI[SPA (public assets)] -->|events| AppController
+  UI["SPA"] -->|events| AppController
   AppController --> QuizHandlers
   AppController --> GeneratorView
   AppController --> StudyView
   AppController --> QuizView
 
-  AppController -->|REST/GraphQL| API[/Express Server/]
+  AppController -->|REST or GraphQL| API["Express Server"]
   API --> StudyService
-  StudyService -->|AI adapters (quality gate)| WebLLM[(WebLLM runtime)]
-  StudyService -->|fallback/validation| Ollama[(Ollama API)]
-  StudyService --> Serper[(Serper/Web search)]
-  StudyService --> FlashcardStorage[(FlashcardStorageService)]
-  StudyService --> QuizStorage[(QuizStorageService)]
-  StudyService --> Queue[(BullMQ Queue)]
-  API --> Upload[/File Upload -> processFile/]
+  StudyService -->|AI adapters (quality gate)| WebLLM["WebLLM runtime"]
+  StudyService -->|fallback/validation| Ollama["Ollama API"]
+  StudyService --> Serper["Serper / Web search"]
+  StudyService --> FlashcardStorage["FlashcardStorageService"]
+  StudyService --> QuizStorage["QuizStorageService"]
+  StudyService --> Queue["BullMQ Queue"]
+  API --> Upload["File Upload -> processFile"]
   Upload --> FlashcardStorage
   GeneratorView -->|llmOrchestrator| WebLLM
 ```
