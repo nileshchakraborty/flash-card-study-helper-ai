@@ -521,7 +521,7 @@ export class ExpressServer {
       } catch (error: any) {
         console.warn('[API] Failed to get flashcards:', error.message);
         // Return empty array instead of error
-        res.json({ cards: [] });
+        res.json({ cards: [], warning: 'Flashcards unavailable' });
       }
     });
 
@@ -782,8 +782,8 @@ export class ExpressServer {
 
         res.json({ quizzes: quizzesWithAttempts });
       } catch (error: any) {
-        console.warn('[API] Failed to get quiz history:', error.message);
-        res.status(500).json({ error: error.message });
+        console.warn('[API] Failed to get quiz history, returning empty array:', error.message);
+        res.json({ quizzes: [], warning: 'history unavailable' });
       }
     });
 
