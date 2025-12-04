@@ -18,6 +18,14 @@ type SubmitAnswersArgs = {
     answers: string[];
 };
 
+const withMode = (quiz: any) => {
+    if (!quiz) return quiz;
+    return {
+        ...quiz,
+        mode: quiz.mode ?? 'standard'
+    };
+};
+
 export const quizResolvers = {
     Query: {
         quiz: async (_: unknown, { id }: { id: string }, context: GraphQLContext) => {
@@ -25,7 +33,7 @@ export const quizResolvers = {
             if (!quiz) {
                 throw new Error(`Quiz with id ${id} not found`);
             }
-            return quiz;
+            return withMode(quiz);
         },
 
         quizHistory: async (_: unknown, __: unknown, context: GraphQLContext) => {
@@ -35,7 +43,7 @@ export const quizResolvers = {
 
         allQuizzes: async (_: unknown, __: unknown, context: GraphQLContext) => {
             const quizzes = await context.quizStorage.getAllQuizzes();
-            return quizzes || [];
+            return (quizzes || []).map(withMode);
         },
 
         queueStats: async (_: unknown, __: unknown, context: GraphQLContext) => {
@@ -67,8 +75,15 @@ export const quizResolvers = {
             let questions: QuizQuestion[] = [];
 
             try {
-                if (input.topic) {
-                    questions = await context.studyService.generateQuiz(input.topic, input.count || 5);
+                const cards = input.cards;
+                const hasCards = Array.isArray(cards) && cards.length > 0;
+                const topic = input.topic ?? (hasCards ? cards[0]?.topic : undefined) ?? 'General Quiz';
+                const desiredCount = input.count ?? (hasCards ? Math.min(cards.length, 10) : 5);
+
+                if (hasCards) {
+                    questions = await context.studyService.generateQuiz(topic, desiredCount, cards as any);
+                } else {
+                    questions = await context.studyService.generateQuiz(topic, desiredCount);
                 }
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : 'Unknown error';
@@ -77,12 +92,12 @@ export const quizResolvers = {
             }
 
             const quiz = await context.quizStorage.createQuiz({
-                topic: input.topic || 'General Quiz',
+                topic: input.topic ?? input.cards?.[0]?.topic ?? 'General Quiz',
                 source: input.cards ? 'flashcards' : 'topic',
                 questions: questions as any
             });
 
-            return quiz;
+            return withMode(quiz);
         },
 
         submitQuizAnswer: async (
