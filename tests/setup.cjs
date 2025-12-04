@@ -44,3 +44,15 @@ if (typeof global.crypto === 'undefined' || typeof global.crypto.subtle === 'und
     configurable: true
   });
 }
+
+// Polyfill File for undici/fetch when running in node test env
+if (typeof global.File === 'undefined') {
+  class FilePolyfill extends global.Blob {
+    constructor(parts, filename, options = {}) {
+      super(parts, options);
+      this.name = filename;
+      this.lastModified = options.lastModified || Date.now();
+    }
+  }
+  global.File = FilePolyfill;
+}
