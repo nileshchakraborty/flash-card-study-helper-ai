@@ -35,7 +35,7 @@ export class HybridSerperAdapter implements SearchServicePort {
             return (result.results || []).map(item => ({
                 title: item.title ?? '',
                 link: item.link ?? '',
-                snippet: item.snippet ?? item.description ?? ''
+                snippet: item.snippet ?? (item as any).description ?? ''
             }));
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error';

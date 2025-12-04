@@ -68,30 +68,50 @@ export class ApiService {
 
     const token = localStorage.getItem('authToken');
 
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
 
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        headers,
-        ...options,
-      });
+    // Simple incremental retry to reduce transient "Failed to fetch" errors
+    const maxAttempts = 4;
+    let attempt = 0;
+    let lastError;
+
+    while (attempt < maxAttempts) {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          headers,
+          ...options,
+        });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized: Session expired, please log in again');
+        }
         throw new Error(`API Error: ${response.statusText}`);
       }
 
-      return await response.json();
-    } catch (error) {
-      console.error('API Request Failed:', error);
-      throw error;
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+        attempt += 1;
+
+        // Exponential backoff with jitter (0.5s, 1s, 2s, 4s-ish)
+        const delay = Math.min(4000, 500 * 2 ** (attempt - 1)) + Math.random() * 200;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+      }
     }
+
+    console.error('API Request Failed after retries:', lastError);
+    throw lastError || new Error('API request failed');
   }
 
   async get(endpoint: string) {
@@ -338,6 +358,54 @@ export class ApiService {
       }
     }
     return this.get(`/jobs/${jobId}`);
+  }
+
+  /**
+   * Polls a background job until completion or timeout.
+   * Returns the job result (e.g., { cards, recommendedTopics }).
+   */
+  async waitForJobResult(jobId: string, options: { maxWaitMs?: number; pollIntervalMs?: number; onProgress?: (progress: number) => void } = {}) {
+    const { maxWaitMs = 120000, pollIntervalMs = 2000, onProgress } = options;
+    const start = Date.now();
+
+    let lastStatus: any = null;
+    const expectedPolls = Math.max(1, Math.ceil(maxWaitMs / pollIntervalMs));
+    let attempt = 0;
+
+    while (Date.now() - start < maxWaitMs) {
+      attempt += 1;
+      lastStatus = await this.getJobStatus(jobId);
+      const status = (lastStatus?.status || '').toString().toLowerCase();
+
+      if (typeof onProgress === 'function') {
+        if (typeof lastStatus?.progress === 'number') {
+          onProgress(lastStatus.progress);
+        } else {
+          const elapsed = Date.now() - start;
+          const timeProgress = Math.min(95, Math.round((elapsed / maxWaitMs) * 90) + 5);
+          const attemptProgress = Math.min(95, Math.round((attempt / expectedPolls) * 90) + 5);
+          onProgress(Math.max(5, Math.min(95, Math.max(timeProgress, attemptProgress))));
+        }
+      }
+
+      if (status === 'completed' || status === 'succeeded') {
+        if (typeof onProgress === 'function') onProgress(100);
+        return lastStatus?.result;
+      }
+
+      if (status === 'failed') {
+        throw new Error(lastStatus?.error || 'Job failed to complete');
+      }
+
+      if (status === 'not_found') {
+        throw new Error('Job not found');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    }
+
+    if (typeof onProgress === 'function') onProgress(100);
+    throw new Error(`Job ${jobId} timed out after ${Math.round(maxWaitMs / 1000)}s`);
   }
 
   /**

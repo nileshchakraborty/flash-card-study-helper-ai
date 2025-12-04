@@ -1,9 +1,10 @@
 import http from 'http';
 import type { Application } from 'express';
+import { jest } from '@jest/globals';
 
 /**
  * Creates an in-memory HTTP server wrapper that satisfies supertest without binding a real port.
- * Avoids EPERM in restricted sandboxes by stubbing listen/close/address.
+ * Avoids EPERM in restricted sandboxes by stubbing listen/close/address and providing minimal _handle.
  */
 export function createMockServer(app: Application): http.Server {
   const server = http.createServer(app);
@@ -36,6 +37,22 @@ export function createMockServer(app: Application): http.Server {
   server._connectionKey = 'mock';
   // @ts-expect-error shim
   server._unref = () => server;
+  // supertest checks this when reusing agents
+  // @ts-expect-error shim
+  server.keepAliveTimeout = 0;
 
   return server;
+}
+
+/**
+ * Globally stub http.Server.listen/address for tests to avoid real socket binding.
+ */
+export function stubServerListen() {
+  jest.spyOn(http.Server.prototype, 'listen').mockImplementation(function (_port?: any, _host?: any, cb?: () => void) {
+    cb?.();
+    return this as unknown as http.Server;
+  });
+  jest.spyOn(http.Server.prototype, 'address').mockImplementation(function () {
+    return { port: 0, address: '127.0.0.1', family: 'IPv4' };
+  });
 }

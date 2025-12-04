@@ -10,7 +10,10 @@ export class OllamaAdapter implements AIServicePort {
   private cache?: CacheService<any>;
 
   constructor(cache?: CacheService<any>) {
-    this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+    // On Vercel there's no local Ollama, so default to the remote/cloud endpoint
+    this.baseUrl = process.env.OLLAMA_BASE_URL
+      || (isVercel ? 'https://api.ollama.com' : 'http://localhost:11434');
     this.model = process.env.OLLAMA_MODEL || 'llama3.2:latest';
     this.cache = cache;
   }
@@ -373,11 +376,16 @@ Create ${count} flashcards now:`;
 
   private async callOllama(prompt: string, system: string): Promise<string> {
     try {
+      const headers: Record<string, string> = {};
+      if (process.env.OLLAMA_API_KEY) {
+        headers['Authorization'] = `Bearer ${process.env.OLLAMA_API_KEY}`;
+      }
+
       const res = await axios.post(`${this.baseUrl}/api/generate`, {
         model: this.model,
         prompt: `${system}\n\n${prompt}`,
         stream: false
-      });
+      }, { headers });
       return res.data.response;
     } catch (error) {
       console.error('Ollama call failed:', error);
@@ -428,8 +436,8 @@ Create ${count} flashcards now:`;
     while ((match = objectRegex.exec(text)) !== null) {
       try {
         // Sanitize before parsing
-        const qRaw = match[1].replace(/\n/g, '\\n');
-        const aRaw = match[2].replace(/\n/g, '\\n');
+        const qRaw = (match[1] || '').replace(/\n/g, '\\n');
+        const aRaw = (match[2] || '').replace(/\n/g, '\\n');
 
         const question = JSON.parse(`"${qRaw}"`);
         const answer = JSON.parse(`"${aRaw}"`);
@@ -446,8 +454,8 @@ Create ${count} flashcards now:`;
       let looseMatch;
       while ((looseMatch = looseRegex.exec(text)) !== null) {
         try {
-          const qRaw = looseMatch[1].replace(/\n/g, '\\n');
-          const aRaw = looseMatch[2].replace(/\n/g, '\\n');
+          const qRaw = (looseMatch[1] || '').replace(/\n/g, '\\n');
+          const aRaw = (looseMatch[2] || '').replace(/\n/g, '\\n');
           const question = JSON.parse(`"${qRaw}"`);
           const answer = JSON.parse(`"${aRaw}"`);
           cards.push({ question, answer });
@@ -464,8 +472,8 @@ Create ${count} flashcards now:`;
 
     let textMatch;
     while ((textMatch = textRegex.exec(text)) !== null) {
-      const question = textMatch[1].trim();
-      const answer = textMatch[2].trim();
+      const question = (textMatch[1] || '').trim();
+      const answer = (textMatch[2] || '').trim();
       if (question && answer) {
         cards.push({ question, answer });
       }

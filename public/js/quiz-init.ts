@@ -8,6 +8,7 @@ import { storageService } from './services/storage.service.js';
 import { apiService } from './services/api.service.js';
 import { eventBus } from './utils/event-bus.js';
 import { quizModel } from './models/quiz.model.js';
+import { deckModel } from './models/deck.model.js';
 
 export function initializeQuizHandlers(quizView: any) {
     let selectedFlashcardIds = new Set<string>();
@@ -15,7 +16,12 @@ export function initializeQuizHandlers(quizView: any) {
     // From Flashcards button
     const fromFlashcardsBtn = document.getElementById('quiz-from-flashcards-btn');
     fromFlashcardsBtn?.addEventListener('click', async () => {
-        const flashcards = storageService.getAllFlashcards();
+        let flashcards = storageService.getAllFlashcards();
+
+        // Fallback to current deck in memory if storage is empty
+        if (flashcards.length === 0 && deckModel.cards?.length) {
+            flashcards = deckModel.cards;
+        }
 
         if (flashcards.length === 0) {
             fromFlashcardsBtn.setAttribute('disabled', 'true');
@@ -26,6 +32,22 @@ export function initializeQuizHandlers(quizView: any) {
 
         selectedFlashcardIds = new Set();
         quizView.renderFlashcardSelectionModal(flashcards, selectedFlashcardIds);
+    });
+
+    // From Current Deck button (uses all cards in deck/storage)
+    const fromDeckBtn = document.getElementById('quiz-from-deck-btn');
+    fromDeckBtn?.addEventListener('click', async () => {
+        let flashcards = storageService.getAllFlashcards();
+        if (flashcards.length === 0) {
+            flashcards = deckModel.cards || [];
+        }
+
+        if (!flashcards || flashcards.length === 0) {
+            alert('No flashcards available. Create some flashcards first!');
+            return;
+        }
+
+        await createQuizFromFlashcards(flashcards, Math.min(flashcards.length, 10));
     });
 
     // Flashcard selection toggle
@@ -62,25 +84,10 @@ export function initializeQuizHandlers(quizView: any) {
     document.getElementById('confirm-flashcard-selection')?.addEventListener('click', async () => {
         if (selectedFlashcardIds.size === 0) return;
 
-        try {
-            const response = await apiService.createQuiz({
-                flashcardIds: Array.from(selectedFlashcardIds),
-                count: Math.min(selectedFlashcardIds.size, 10)
-            });
+        const flashcards = storageService.getAllFlashcards().filter(fc => selectedFlashcardIds.has(fc.id));
+        const desiredCount = Math.min(selectedFlashcardIds.size, 10);
 
-            if (response.success && response.quiz) {
-                const quizData = await apiService.getQuiz(response.quiz.id);
-                if (quizData.success) {
-                    storageService.storeQuiz(quizData.quiz);
-                    refreshAvailableQuizzes(quizView);
-                    quizView.hideFlashcardSelectionModal();
-                    alert(`Quiz created with ${response.quiz.questionCount || response.quiz.questions?.length || 0} questions!`);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to create quiz:', error);
-            alert('Failed to create quiz. Please try again.');
-        }
+        await createQuizFromFlashcards(flashcards, desiredCount, () => quizView.hideFlashcardSelectionModal(), quizView);
     });
 
     // ...
@@ -144,4 +151,69 @@ export function initializeQuizHandlers(quizView: any) {
 
         quizView.renderAvailableQuizzes(storageService.getAllQuizzes());
     }
+}
+
+async function createQuizFromFlashcards(flashcards: any[], desiredCount: number, onSuccessClose?: () => void, quizView?: any) {
+    try {
+        const response = await apiService.createQuiz({
+            flashcardIds: flashcards.map(fc => fc.id).filter(Boolean),
+            flashcards,
+            count: desiredCount
+        });
+
+        if (response.success && response.quiz) {
+            const quizData = await apiService.getQuiz(response.quiz.id);
+            if (quizData.success) {
+                storageService.storeQuiz(quizData.quiz);
+                refreshAvailableQuizzes(quizView);
+                onSuccessClose?.();
+                alert(`Quiz created with ${response.quiz.questionCount || response.quiz.questions?.length || 0} questions!`);
+                return;
+            }
+        }
+        throw new Error('Quiz API did not return success');
+    } catch (error) {
+        console.warn('Falling back to local quiz creation:', error?.message || error);
+        const localQuiz = buildLocalQuizFromFlashcards(flashcards, desiredCount);
+        if (localQuiz.questions.length > 0) {
+            storageService.storeQuiz(localQuiz);
+            refreshAvailableQuizzes(quizView);
+            onSuccessClose?.();
+            alert(`Quiz created locally with ${localQuiz.questions.length} questions.`);
+        } else {
+            alert('Failed to create quiz. Please try again.');
+        }
+    }
+}
+
+// Local fallback quiz builder (simple multiple-choice)
+function buildLocalQuizFromFlashcards(flashcards: any[], count: number) {
+    if (!flashcards || flashcards.length === 0) return { id: '', topic: '', questions: [] };
+
+    const topic = flashcards[0].topic || 'Quiz';
+    const sampled = flashcards.slice(0, count);
+    const poolAnswers = flashcards.map(fc => fc.back).filter(Boolean);
+
+    const questions = sampled.map((fc, idx) => {
+        const correct = fc.back || 'Answer';
+        const distractors = poolAnswers
+            .filter(a => a !== correct)
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 3);
+        const options = [...distractors, correct].sort(() => 0.5 - Math.random());
+        return {
+            id: fc.id || `q-${idx}`,
+            question: fc.front || `Question ${idx + 1}?`,
+            options,
+            correctAnswer: correct
+        };
+    });
+
+    return {
+        id: `local-quiz-${Date.now()}`,
+        topic,
+        questions,
+        source: 'flashcards',
+        createdAt: Date.now()
+    };
 }

@@ -69,7 +69,7 @@ const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
             mockFlashcardStorage
         );
 
-        await server.setupGraphQL();
+        await server.setupGraphQL({ skipWebSocket: true });
         server.setupRoutes();
         app = createMockServer(server.getApp());
 

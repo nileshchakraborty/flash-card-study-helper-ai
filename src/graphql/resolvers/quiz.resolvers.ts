@@ -79,7 +79,7 @@ export const quizResolvers = {
             const quiz = await context.quizStorage.createQuiz({
                 topic: input.topic || 'General Quiz',
                 source: input.cards ? 'flashcards' : 'topic',
-                questions: questions
+                questions: questions as any
             });
 
             return quiz;
@@ -90,7 +90,7 @@ export const quizResolvers = {
             { quizId, answers }: SubmitAnswersArgs,
             context: GraphQLContext
         ): Promise<ReturnType<GraphQLContext['quizStorage']['submitAnswers']>> => {
-            const result = await context.quizStorage.submitAnswers(quizId, answers);
+            const result = await context.quizStorage.submitAnswers(quizId, answers as any);
             return result;
         },
     },

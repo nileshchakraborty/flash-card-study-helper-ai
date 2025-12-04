@@ -1,12 +1,11 @@
 import { jest, beforeAll, afterAll, describe, it, expect } from '@jest/globals';
-import request from 'supertest';
 import { ExpressServer } from '../src/adapters/primary/express/server.js';
 import { StudyService } from '../src/core/services/StudyService.js';
 import { QueueService } from '../src/core/services/QueueService.js';
-import { createMockServer } from './utils/mockServer.js';
+import { invoke } from './utils/invoke.js';
 
-// These integration tests require binding an HTTP port, which is blocked in the current sandbox.
-// Skip in sandbox/CI to avoid EPERM listen errors.
+const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
+
 describe('API Resilience Tests', () => {
     let app: any;
     let server: ExpressServer;
@@ -57,7 +56,7 @@ describe('API Resilience Tests', () => {
             mockFlashcardStorage
         );
         server.setupRoutes();
-        app = createMockServer(server.getApp());
+        app = server.getApp();
     });
 
     afterAll(async () => {
@@ -67,11 +66,13 @@ describe('API Resilience Tests', () => {
         }
     });
 
-    describe('POST /api/generate', () => {
+    const describeOrSkip = SKIP_SANDBOX ? describe.skip : describe;
+
+    describeOrSkip('POST /api/generate', () => {
         it('should return 401 without auth token', async () => {
-            const response = await request(app)
-                .post('/api/generate')
-                .send({ topic: 'Test', count: 5 });
+            const response = await invoke(app, 'POST', '/api/generate', {
+                body: { topic: 'Test', count: 5 }
+            });
 
             expect(response.status).toBe(401);
         });
@@ -82,20 +83,21 @@ describe('API Resilience Tests', () => {
             const authService = AuthService.getInstance();
             const validToken = await authService.encryptToken({ id: 'test-user', email: 'test@example.com' });
 
-            const response = await request(app)
-                .post('/api/generate')
-                .set('Authorization', `Bearer ${validToken}`)
-                .send({
+            const response = await invoke(app, 'POST', '/api/generate', {
+                headers: { Authorization: `Bearer ${validToken}` },
+                body: {
                     topic: 'JavaScript Async',
                     count: 5,
                     mode: 'standard',
                     knowledgeSource: 'ai-web'
-                });
+                }
+            });
 
             expect(response.status).toBe(202);
-            expect(response.body.success).toBe(true);
-            expect(response.body.jobId).toBeDefined();
-            expect(response.body.statusUrl).toContain('/api/jobs/');
+            const body = response.json as any;
+            expect(body.success).toBe(true);
+            expect(body.jobId).toBeDefined();
+            expect(body.statusUrl).toContain('/api/jobs/');
         });
     });
 
@@ -105,7 +107,7 @@ describe('API Resilience Tests', () => {
 
             // Make 6 requests (limit is 5 per hour for auth endpoints)
             for (let i = 0; i < 6; i++) {
-                const response = await request(app).get(endpoint);
+                const response = await invoke(app, 'GET', endpoint);
                 if (i < 5) {
                     expect(response.status).not.toBe(429);
                 } else {
@@ -117,11 +119,12 @@ describe('API Resilience Tests', () => {
 
     describe('GET /api/health', () => {
         it('should return health status', async () => {
-            const response = await request(app).get('/api/health');
+            const response = await invoke(app, 'GET', '/api/health');
 
             expect(response.status).toBe(200);
-            expect(response.body.ollama).toBeDefined();
-            expect(response.body.serper).toBeDefined();
+            const body = response.json as any;
+            expect(body.ollama).toBeDefined();
+            expect(body.serper).toBeDefined();
         });
     });
 
@@ -129,9 +132,9 @@ describe('API Resilience Tests', () => {
         it('should return queue statistics when authenticated', async () => {
             const mockToken = 'mock-jwt-token';
 
-            const response = await request(app)
-                .get('/api/queue/stats')
-                .set('Authorization', `Bearer ${mockToken}`);
+            const response = await invoke(app, 'GET', '/api/queue/stats', {
+                headers: { Authorization: `Bearer ${mockToken}` }
+            });
 
             if (mockQueueService) {
                 // Will fail auth with mock token, but endpoint exists

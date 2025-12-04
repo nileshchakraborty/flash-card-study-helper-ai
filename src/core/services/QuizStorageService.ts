@@ -56,7 +56,7 @@ export class QuizStorageService {
     /**
      * Get a quiz by ID
      */
-    getQuiz(quizId: string): Quiz | null {
+    getQuiz(quizId: string): Quiz | undefined {
         const quiz = this.quizzes.get(quizId);
         if (!quiz) {
             logger.debug('Quiz not found', { quizId });
@@ -148,7 +148,7 @@ export class QuizStorageService {
     /**
      * Get quiz with its attempt history
      */
-    getQuizWithHistory(quizId: string): { quiz: Quiz | null; attempts: QuizAttempt[] } {
+    getQuizWithHistory(quizId: string): { quiz: Quiz | undefined; attempts: QuizAttempt[] } {
         return {
             quiz: this.getQuiz(quizId),
             attempts: this.getAttempts(quizId)

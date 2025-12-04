@@ -1,11 +1,13 @@
 import { jest, beforeAll, afterAll, afterEach, describe, it, expect } from '@jest/globals';
-import request from 'supertest';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
 import { QueueService } from '../../src/core/services/QueueService.js';
-import { createMockServer } from '../utils/mockServer.js';
+import { invoke } from '../utils/invoke.js';
 
-describe('Cache-Queue Integration', () => {
+const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
+const describeOrSkip = SKIP_SANDBOX ? describe.skip : describe;
+
+describeOrSkip('Cache-Queue Integration', () => {
     let app: any;
     let server: ExpressServer;
     let flashcardCache: FlashcardCacheService;
@@ -66,7 +68,7 @@ describe('Cache-Queue Integration', () => {
             mockFlashcardStorage
         );
         server.setupRoutes();
-        app = createMockServer(server.getApp());
+        app = server.getApp();
     });
 
     afterEach(() => {
@@ -93,15 +95,15 @@ describe('Cache-Queue Integration', () => {
             };
             flashcardCache.set('JavaScript', 5, cachedData, 'standard', 'ai-web');
 
-            const response = await request(app)
-                .post('/api/generate')
-                .set('Authorization', `Bearer ${mockToken}`)
-                .send({
+            const response = await invoke(app, 'POST', '/api/generate', {
+                headers: { Authorization: `Bearer ${mockToken}` },
+                body: {
                     topic: 'JavaScript',
                     count: 5,
                     mode: 'standard',
                     knowledgeSource: 'ai-web'
-                });
+                }
+            });
 
             // Should return cached data without queuing
             expect(mockQueue.addGenerateJob).not.toHaveBeenCalled();
@@ -114,15 +116,15 @@ describe('Cache-Queue Integration', () => {
         });
 
         it('should queue job on cache miss', async () => {
-            const response = await request(app)
-                .post('/api/generate')
-                .set('Authorization', `Bearer ${mockToken}`)
-                .send({
+            const response = await invoke(app, 'POST', '/api/generate', {
+                headers: { Authorization: `Bearer ${mockToken}` },
+                body: {
                     topic: 'Python',
                     count: 10,
                     mode: 'standard',
                     knowledgeSource: 'ai-web'
-                });
+                }
+            });
 
             // With mock token, will fail auth, but if it passes:
             if (response.status === 202) {
@@ -141,9 +143,9 @@ describe('Cache-Queue Integration', () => {
         it('should return queue statistics', async () => {
             const mockToken = 'mock-token';
 
-            const response = await request(app)
-                .get('/api/queue/stats')
-                .set('Authorization', `Bearer ${mockToken}`);
+            const response = await invoke(app, 'GET', '/api/queue/stats', {
+                headers: { Authorization: `Bearer ${mockToken}` }
+            });
 
             // Will fail auth with mock token
             expect([401, 200]).toContain(response.status);

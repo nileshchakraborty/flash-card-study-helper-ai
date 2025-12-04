@@ -29,7 +29,7 @@ const DateTimeScalar = new GraphQLScalarType({
         if (value instanceof Date) {
             return value.toISOString();
         }
-        return new Date(value).toISOString();
+        return new Date(value as string | number | Date).toISOString();
     },
     parseValue(value: unknown) {
         return new Date(value as string);

@@ -9,7 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
-import type { Flashcard, QuizQuestion } from '../domain/models.js';
+import type { Flashcard } from '../domain/models.js';
 import type { CacheService } from './CacheService.js';
 import { LoggerService } from './LoggerService.js';
 
@@ -60,7 +60,7 @@ export class WebLLMService extends EventEmitter {
    */
   createSession(modelId: string, userId?: string): WebLLMSession {
     const sessionId = `webllm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const session: WebLLMSession = {
       id: sessionId,
       userId,
@@ -111,7 +111,7 @@ export class WebLLMService extends EventEmitter {
 
     session.wsConnection = ws;
     session.status = 'ready';
-    
+
     ws.on('close', () => {
       this.closeSession(sessionId);
     });
@@ -280,8 +280,8 @@ export class WebLLMService extends EventEmitter {
     sessionId: string,
     request: WebLLMGenerationRequest
   ): Promise<void> {
-    const { options } = request;
-    const flashcards = options?.flashcards || [];
+    const { options: _options } = request;
+    // const _flashcards = options?.flashcards || [];
 
     this.sendToClient(sessionId, {
       type: 'progress',

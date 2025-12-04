@@ -2,6 +2,7 @@ import { BaseView } from './base.view.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import type { Flashcard } from '../models/deck.model.js';
+import { settingsService } from '../services/settings.service.js';
 
 export class GeneratorView extends BaseView {
   constructor() {
@@ -19,10 +20,11 @@ export class GeneratorView extends BaseView {
       selectedFilesContainer: this.getElement('#selected-files'),
       fileList: this.getElement('#file-list'),
       uploadBtn: this.getElement('#upload-form button[type="submit"]'),
-      useBrowserLLM: this.getElement('#use-browser-llm'),
+      uploadQuizBtn: this.getElement('#upload-quiz-btn'),
       uploadTopic: this.getElement('#upload-topic')
     };
     this.selectedFiles = [];
+    this.lastUploadedCards = [];
 
     this.init();
   }
@@ -58,6 +60,18 @@ export class GeneratorView extends BaseView {
       });
     }
 
+    if (this.elements.uploadQuizBtn) {
+      this.bind(this.elements.uploadQuizBtn, 'click', async () => {
+        if (!this.lastUploadedCards || this.lastUploadedCards.length === 0) {
+          alert('Upload and generate flashcards first, then take a quiz.');
+          return;
+        }
+        // Ensure deck is set to these cards
+        eventBus.emit('deck:loaded', this.lastUploadedCards);
+        eventBus.emit('quiz:request-start', { count: this.lastUploadedCards.length, topic: this.lastUploadedCards[0]?.topic || 'Uploaded Content' });
+      });
+    }
+
     if (this.elements.fileInput) {
       this.bind(this.elements.fileInput, 'change', (e) => {
         const files = Array.from(e.target.files || []);
@@ -90,18 +104,20 @@ export class GeneratorView extends BaseView {
     const topic = this.elements.topicInput.value;
     const countRaw = this.elements.cardCount.value;
     const count = Math.max(1, parseInt(countRaw || '1', 10));
-    // Determine runtime based on presence of LLM Orchestrator (WebLLM)
+    // Determine runtime based on settings
     const orchestrator = (window as any).llmOrchestrator;
-    const useBrowser = !!orchestrator; // if orchestrator exists, we will use client‑side generation
-    // runtime variable kept for logging purposes
+    const prefersBrowser = settingsService.getPreferredRuntime() === 'webllm' && !!orchestrator;
+    const useBrowser = prefersBrowser; // single flag
     const runtime = useBrowser ? 'webllm' : 'ollama';
 
     this.showLoading();
     try {
       let cards = [];
+      let usedBackend = false;
 
       if (useBrowser) {
         console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: webllm (client-side)');
+        this.updateLoadingProgress(5, 'Loading browser model...');
 
         const orchestrator = (window as any).llmOrchestrator;
         if (!orchestrator) {
@@ -113,6 +129,8 @@ export class GeneratorView extends BaseView {
           const { config } = orchestrator.getRecommendedStrategy();
           await orchestrator.loadModel(config);
         }
+
+        this.updateLoadingProgress(15, 'Generating locally...');
 
         const prompt = `You must generate flashcards in STRICT JSON format.
 
@@ -157,22 +175,40 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         const response = await orchestrator.generate(prompt);
         console.log('Client-side LLM Response:', response);
 
-        cards = this.parseLLMResponseStrict(response, count);
-        console.log('Parsed raw cards (strict):', JSON.stringify(cards, null, 2));
-
-        // If client-side parsing failed to produce the requested count, fallback to backend generation
-        if (cards.length < count) {
-          console.warn(`Client-side generation returned ${cards.length}/${count}. Falling back to backend.`);
-          const fallback = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' });
-          cards = (fallback.cards || []).slice(0, count);
+        try {
+          cards = this.parseLLMResponseStrict(response, count);
+        } catch (e) {
+          console.warn('Client-side parsing error, will fallback to backend:', e);
+          cards = [];
         }
 
-        // Enforce requested count client-side
+        console.log(`Parsed ${cards.length} raw cards (strict), expected: ${count}`);
+
+        // If client-side failed or count mismatched, fallback to backend queue
+        if (cards.length !== count) {
+          this.updateLoadingProgress(35, 'Switching to backend for reliable generation...');
+          usedBackend = true;
+          const backendResponse = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' });
+
+          let backendResult = backendResponse;
+          if ((!backendResponse.cards || backendResponse.cards.length === 0) && backendResponse.jobId) {
+            backendResult = await apiService.waitForJobResult(backendResponse.jobId, {
+              maxWaitMs: 180000,
+              pollIntervalMs: 2000,
+              onProgress: (p) => this.updateLoadingProgress(p, 'Generating on server...')
+            });
+          }
+
+          cards = (backendResult?.cards || []).slice(0, count);
+        }
+
+        // Enforce requested count client-side - final check
         if (cards.length > count) {
           cards = cards.slice(0, count);
         }
 
         if (cards.length > 0) {
+          this.updateLoadingProgress(95, usedBackend ? 'Finalizing server results...' : 'Finalizing local results...');
           // Robust mapping to handle various property names
           cards = cards.map((c, i) => {
             // Try to find the question and answer in common properties
@@ -192,10 +228,8 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
             (c.front !== "Question missing" || c.back !== "Answer missing") &&
             c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
           );
-        } else {
-          throw new Error('Failed to generate valid flashcards from client-side LLM response');
         }
-
+      
       } else {
         console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: ollama (server-side)');
 
@@ -204,13 +238,25 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         const knowledgeSource = ConfigurationService.getKnowledgeSource();
 
         // Use hybrid method - supports both GraphQL and REST
+        this.updateLoadingProgress(10, 'Queuing backend job...');
+
         const data = await apiService.generateFlashcards({
           topic,
           count,
           runtime: useBrowser ? 'webllm' : 'ollama',
           knowledgeSource
         });
-        cards = data.cards || [];
+        let backendResult = data;
+
+        if ((!data.cards || data.cards.length === 0) && data.jobId) {
+          backendResult = await apiService.waitForJobResult(data.jobId, {
+            maxWaitMs: 180000,
+            pollIntervalMs: 2000,
+            onProgress: (p) => this.updateLoadingProgress(p, 'Waiting for backend to finish...')
+          });
+        }
+
+        cards = (backendResult?.cards || []);
         console.log('Received response from backend:', data);
 
         // Enforce requested count in case backend over-returns
@@ -220,6 +266,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       }
 
       if (cards.length > 0) {
+        this.updateLoadingProgress(100, 'Flashcards ready!');
         console.log('Emitting deck:loaded with', cards.length, 'cards');
         eventBus.emit('deck:loaded', cards);
 
@@ -235,7 +282,12 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       }
     } catch (error) {
       console.error('Generation error:', error);
-      alert('Failed to generate flashcards. Please try again. Error: ' + error.message);
+      if (error?.message?.includes('Unauthorized')) {
+        alert('Your session expired. Please log in again to generate flashcards.');
+        window.location.href = '/api/auth/google';
+      } else {
+        alert('Failed to generate flashcards. Please try again. Error: ' + (error.message || error));
+      }
     } finally {
       this.hideLoading();
     }
@@ -276,9 +328,10 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       const topic = this.elements.uploadForm.querySelector('#upload-topic')?.value || 'Uploaded Content';
 
       const prompt = `You are a strict JSON generator.
+IMPORTANT: Use ONLY the provided text. Do NOT use the internet or outside knowledge. If information is missing, answer with "Not specified in the provided PDF".
 TASK: Create 10 educational flashcards about "${topic}".
 
-Text:
+Text (from uploaded files only):
 ${text.substring(0, 15000)}
 
 OUTPUT RULES:
@@ -317,6 +370,9 @@ Generate the JSON array now:`;
           topic: topic
         };
       }).filter(c => (c.front && c.back));
+
+      // Remember last uploaded batch for quiz
+      this.lastUploadedCards = formattedCards;
 
       eventBus.emit('deck:loaded', formattedCards);
 
@@ -594,9 +650,29 @@ Generate the JSON array now:`;
 
   showLoading() {
     this.show(this.elements.loadingOverlay);
+    this.updateLoadingProgress(0, 'Starting...');
   }
 
   hideLoading() {
     this.hide(this.elements.loadingOverlay);
+  }
+
+  updateLoadingProgress(progress?: number, message?: string) {
+    const overlay = document.getElementById('loading-overlay');
+    const progressEl = document.getElementById('loading-progress');
+    const progressBar = document.getElementById('loading-progress-bar') as HTMLElement | null;
+    if (!overlay) return;
+
+    const parts = [];
+    if (typeof progress === 'number') {
+      const pct = Math.max(0, Math.min(100, Math.round(progress)));
+      parts.push(`Progress: ${pct}%`);
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    }
+    if (message) parts.push(message);
+
+    if (progressEl) {
+      progressEl.textContent = parts.join(' • ') || 'Working...';
+    }
   }
 }

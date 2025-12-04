@@ -5,6 +5,7 @@ import { injectSpeedInsights } from '@vercel/speed-insights';
 import { apiService } from './services/api.service.js';
 import { graphqlService } from './services/graphql.service.js';
 import { settingsService } from './services/settings.service.js';
+import { eventBus } from './utils/event-bus.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Speed Insights
@@ -27,9 +28,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   await orchestrator.initialize();
   (window as any).llmOrchestrator = orchestrator;
 
-  // Initialize Model Manager UI
-  const modelManager = new ModelManagerUI(orchestrator);
-  modelManager.initialize();
+  // Model Manager is opt-in
+  let modelManager: ModelManagerUI | null = null;
+  let modelManagerInitialized = false;
+  const ensureModelManager = () => {
+    if (!modelManagerInitialized) {
+      modelManager = new ModelManagerUI(orchestrator);
+      modelManager.initialize();
+      modelManagerInitialized = true;
+    }
+  };
 
   // Setup login/logout button state
   const authBtn = document.getElementById('auth-btn');
@@ -40,6 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsCancel = document.getElementById('settings-cancel');
   const settingsSave = document.getElementById('settings-save');
   const runtimeRadios = Array.from(document.querySelectorAll('.runtime-radio')) as HTMLInputElement[];
+  const modelManagerToggle = document.getElementById('model-manager-enabled') as HTMLInputElement | null;
   const navToggle = document.getElementById('nav-toggle');
   const navLinks = document.getElementById('nav-links');
 
@@ -64,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openSettings = () => {
     const pref = settingsService.getPreferredRuntime();
     runtimeRadios.forEach(r => r.checked = r.value === pref);
+    if (modelManagerToggle) modelManagerToggle.checked = settingsService.getModelManagerEnabled();
     settingsModal?.classList.remove('hidden');
     settingsModal?.classList.add('flex');
   };
@@ -78,8 +88,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   settingsSave?.addEventListener('click', () => {
     const selected = runtimeRadios.find(r => r.checked);
     if (selected) settingsService.setPreferredRuntime(selected.value as any);
+    if (modelManagerToggle) {
+      const enabled = modelManagerToggle.checked;
+      settingsService.setModelManagerEnabled(enabled);
+      if (enabled) ensureModelManager();
+    }
     closeSettings();
   });
+
+  // Auto-enable model manager if user previously opted in
+  if (settingsService.getModelManagerEnabled()) {
+    ensureModelManager();
+  }
 
   // Hamburger toggle
   navToggle?.addEventListener('click', () => {
@@ -87,4 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     navLinks?.classList.toggle('flex');
     navLinks?.classList.toggle('flex-col');
   });
+
+  // Expose eventBus for inline handlers (legacy refresh button)
+  (window as any).eventBus = eventBus;
 });

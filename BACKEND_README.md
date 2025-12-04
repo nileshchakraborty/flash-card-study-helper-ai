@@ -7,12 +7,12 @@ This backend service provides a complete, independent API that can be integrated
 ## 🎯 Overview
 
 MindFlip AI Backend supports both **REST** and **GraphQL** APIs, providing:
-- **LLM Integration**: Ollama (server-side) and WebLLM (browser-based via WebSocket)
-- **Web Search**: Serper.dev integration for real-time knowledge retrieval
-- **File Processing**: PDF and image (OCR) support
-- **Quiz Generation**: AI-powered quiz creation from flashcards
-- **Runtime Preference & Fallback**: User can choose preferred runtime (Ollama or WebLLM); backend automatically falls back to the alternate runtime, then to a local generator.
-- **Validation & Repair**: Flashcard outputs are validated for correct JSON/question-answer shape; invalid/insufficient results trigger an automatic repair prompt before returning to clients.
+- **LLM Integration**: WebLLM-first (browser) with quality gate; Ollama used only when WebLLM output is missing/low-quality; then local fallback.
+- **Web Search**: Serper.dev integration for real-time knowledge retrieval (skipped for PDF-only flows).
+- **File Processing**: PDF and image (OCR) support; uploaded cards are stored server-side for quizzes.
+- **Quiz Generation**: AI-powered quiz creation from flashcards or topic; PDF-only quizzes never hit web search.
+- **Runtime Preference & Fallback**: User selects runtime in Settings; backend respects preference, applies quality gate, and falls back to the alternate runtime.
+- **Validation & Repair**: Flashcard/quiz outputs are validated for structure and completeness; automatic repair/retry prompts applied.
 
 ## 🚀 Quick Start
 
@@ -117,13 +117,16 @@ GET  /api/auth/google/callback     # OAuth callback (returns JWE token)
 ```http
 POST /api/generate                  # Generate flashcards (async, returns jobId)
 GET  /api/jobs/:id                 # Poll job status and retrieve results
-POST /api/upload                   # Upload PDF/Image for processing
+POST /api/upload                   # Upload PDF/Image for processing (stores flashcards server-side)
 ```
 
 #### Quiz Generation
 
 ```http
 POST /api/quiz                     # Generate quiz (from topic or flashcards)
+POST /api/quiz/create-from-topic    # Generate quiz directly from topic
+POST /api/quiz/create-from-flashcards
+                                  # Accepts flashcardIds OR inline flashcards payload; caches payload if provided
 POST /api/quiz/generate-advanced    # Generate advanced quiz
 GET  /api/quiz/history             # Get quiz history
 POST /api/quiz/history             # Save quiz result

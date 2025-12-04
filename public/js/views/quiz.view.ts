@@ -80,6 +80,10 @@ export class QuizView extends BaseView {
     eventBus.on('quiz:history-updated', (history) => {
       this.renderHistory(history);
     });
+
+    eventBus.on('quiz:available-updated', (quizzes) => {
+      this.renderAvailableQuizzes(quizzes);
+    });
   }
 
   // NEW METHODS FOR ENHANCED QUIZ SYSTEM
@@ -154,34 +158,45 @@ export class QuizView extends BaseView {
 
     if (!quizzes || quizzes.length === 0) {
       this.DOM.availableQuizzesList.innerHTML = `
-        <div class="text-gray-500 text-sm italic">No quizzes created yet. Create your first quiz above!</div>
+        <div class="text-gray-500 text-sm italic flex items-center justify-between">
+          <span>No quizzes created yet.</span>
+          <button class="text-indigo-600 hover:text-indigo-800 font-semibold" id="available-create-btn">Create Quiz</button>
+        </div>
       `;
+      const btn = document.getElementById('available-create-btn');
+      if (btn) btn.addEventListener('click', () => {
+        const tabBtn = document.querySelector('[data-tab="create-quiz"]') as HTMLElement;
+        tabBtn?.click();
+      });
       return;
     }
 
     this.DOM.availableQuizzesList.innerHTML = quizzes.map(quiz => `
-      <div 
-        class="quiz-item p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group"
+      <button type="button"
+        class="quiz-item w-full text-left p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/70 transition-all cursor-pointer group flex items-center justify-between"
         data-quiz-id="${quiz.id}">
-        <div class="flex items-start justify-between">
-          <div class="flex-1">
-            <div class="font-semibold text-gray-900 mb-1">${this.escapeHtml(quiz.topic)}</div>
-            <div class="text-sm text-gray-600">
-              ${quiz.questionCount} questions • 
-              ${quiz.source === 'flashcards' ? '📚 From Flashcards' : '🌐 From Topic'}
-            </div>
-            <div class="text-xs text-gray-500 mt-1">
-              Created ${this.formatTimeAgo(quiz.createdAt)}
-            </div>
+        <div class="flex-1">
+          <div class="font-semibold text-gray-900 mb-1">${this.escapeHtml(quiz.topic)}</div>
+          <div class="text-sm text-gray-600">
+            ${(quiz.questions?.length || 0)} questions • 
+            ${quiz.source === 'flashcards' ? '📚 From Flashcards' : '🌐 From Topic'}
           </div>
-          <button 
-            class="text-indigo-600 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity"
-            onclick="event.stopPropagation(); eventBus.emit('quiz:start', { quizId: '${quiz.id}' });">
-            <span class="material-icons">play_circle</span>
-          </button>
+          <div class="text-xs text-gray-500 mt-1">
+            Created ${this.formatTimeAgo(quiz.createdAt)}
+          </div>
         </div>
-      </div>
+        <span class="material-icons text-3xl text-indigo-600 group-hover:text-indigo-800">play_circle_filled</span>
+      </button>
     `).join('');
+
+    // Delegate click handling to the container to avoid missing bindings
+    this.DOM.availableQuizzesList.onclick = (e: Event) => {
+      const target = (e.target as HTMLElement);
+      const container = target.closest('.quiz-item') as HTMLElement | null;
+      const quizId = container?.dataset.quizId;
+      if (!quizId) return;
+      eventBus.emit('quiz:start-prefetched', { quizId });
+    };
   }
 
   /**
@@ -531,6 +546,7 @@ export class QuizView extends BaseView {
     if (loadingOverlay) {
       loadingOverlay.classList.remove('hidden');
     }
+    this.updateLoadingProgress(0, 'Preparing your quiz...');
   }
 
   hideLoading() {
@@ -538,5 +554,18 @@ export class QuizView extends BaseView {
     if (loadingOverlay) {
       loadingOverlay.classList.add('hidden');
     }
+  }
+
+  updateLoadingProgress(progress?: number, message?: string) {
+    const progressEl = document.getElementById('loading-progress');
+    const progressBar = document.getElementById('loading-progress-bar') as HTMLElement | null;
+    const parts = [];
+    if (typeof progress === 'number') {
+      const pct = Math.max(0, Math.min(100, Math.round(progress)));
+      parts.push(`Progress: ${pct}%`);
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    }
+    if (message) parts.push(message);
+    if (progressEl) progressEl.textContent = parts.join(' • ') || 'Working...';
   }
 }

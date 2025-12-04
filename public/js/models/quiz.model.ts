@@ -7,6 +7,7 @@ export class QuizModel {
   currentIndex: number = 0;
   answers: Record<string, any> = {};
   history: any[] = [];
+  prefetched: Array<{ id: string; topic: string; questions: any[]; source: 'flashcards' | 'topic'; createdAt: number }> = [];
   mode: string = 'standard'; // standard, web, advanced
   currentTopic: string = 'General';
 
@@ -25,6 +26,18 @@ export class QuizModel {
 
   getCurrentQuestion() {
     return this.questions[this.currentIndex];
+  }
+
+  addPrefetchedQuiz(entry: { id: string; topic: string; questions: any[]; source: 'flashcards' | 'topic'; createdAt?: number }) {
+    const createdAt = entry.createdAt ?? Date.now();
+    // Replace if same topic/source existing
+    this.prefetched = this.prefetched.filter(q => !(q.topic === entry.topic && q.source === entry.source));
+    this.prefetched.unshift({ ...entry, createdAt });
+    eventBus.emit('quiz:available-updated', this.prefetched);
+  }
+
+  listPrefetched() {
+    return this.prefetched;
   }
 
   answerQuestion(questionId, back) {

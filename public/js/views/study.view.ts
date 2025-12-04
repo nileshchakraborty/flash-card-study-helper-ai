@@ -150,7 +150,7 @@ export class StudyView extends BaseView {
   updateStats(stats) {
     if (this.elements.leftCount) this.elements.leftCount.textContent = stats.left;
     if (this.elements.rightCount) this.elements.rightCount.textContent = stats.right;
-    if (this.elements.remaining) this.elements.remaining.textContent = `${stats.remaining} cards remaining`;
+    if (this.elements.remaining) this.elements.remaining.textContent = stats.remaining.toString();
     if (this.elements.progressBar) this.elements.progressBar.style.width = `${stats.progress}%`;
 
     if (this.elements.planOutput) {

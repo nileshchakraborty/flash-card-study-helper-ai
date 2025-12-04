@@ -2,7 +2,30 @@
 
 **A backend-focused service for AI-powered flashcard generation and study assistance.**
 
-This project implements a **Clean Architecture**-based API that leverages LLMs (Ollama, WebLLM) and web search (Serper) to generate high-quality educational content. The frontend is provided as a reference implementation to demonstrate the API's capabilities.
+This project implements a **Clean Architecture** API that leverages LLMs (WebLLM-first with quality gate and Ollama fallback) plus optional web search (Serper) to generate high-quality educational content. Frontend is a reference SPA that now supports PDF-only generation/quiz, prefetched quizzes, and settings-driven runtime selection.
+
+### Current Architecture Snapshot
+
+```mermaid
+flowchart TD
+  UI[SPA (public/*)] -->|events| AppController
+  AppController --> QuizHandlers
+  AppController --> GeneratorView
+  AppController --> StudyView
+  AppController --> QuizView
+
+  AppController -->|REST/GraphQL| API[/Express Server/]
+  API --> StudyService
+  StudyService -->|AI adapters (quality gate)| WebLLM[(WebLLM runtime)]
+  StudyService -->|fallback/validation| Ollama[(Ollama API)]
+  StudyService --> Serper[(Serper/Web search)]
+  StudyService --> FlashcardStorage[(FlashcardStorageService)]
+  StudyService --> QuizStorage[(QuizStorageService)]
+  StudyService --> Queue[(BullMQ Queue)]
+  API --> Upload[/File Upload -> processFile/]
+  Upload --> FlashcardStorage
+  GeneratorView -->|llmOrchestrator| WebLLM
+```
 
 ## Type Safety & Code Quality
 - TypeScript strict mode is enabled (noImplicitAny, strictNullChecks, noUnusedLocals/Params, noFallthroughCasesInSwitch).

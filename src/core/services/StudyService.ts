@@ -63,6 +63,33 @@ export class StudyService implements StudyUseCase {
 
       return { ...result, cards: adjustedCards };
     } catch (error: any) {
+      // Fallback: if Ollama is unreachable (e.g., ENOTFOUND), retry once with WebLLM runtime
+      const message = (error as Error)?.message || '';
+      const isDns = /ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(message);
+      if (runtime === 'ollama' && isDns && this.getAdapter('webllm')) {
+        console.warn('⚠️ Ollama unreachable, falling back to WebLLM runtime');
+        try {
+          const webResult = await this.doGenerateFlashcards(topic, desiredCount, mode, knowledgeSource, this.getAdapter('webllm'), parentTopic);
+          const validated = await this.validateAndRepairFlashcards(webResult.cards, desiredCount, topic, this.getAdapter('webllm'));
+          const adjustedCards = this.enforceCardCount(validated, desiredCount, topic);
+          if (this.metricsService) {
+            this.metricsService.recordGeneration({
+              runtime: 'webllm',
+              knowledgeSource,
+              mode,
+              topic,
+              cardCount: Math.min(desiredCount, adjustedCards.length),
+              duration: Date.now() - startTime,
+              success: true
+            });
+          }
+          return { ...webResult, cards: adjustedCards };
+        } catch (fallbackError: any) {
+          // if fallback also fails, keep original error for clarity
+          console.error('WebLLM fallback failed:', fallbackError?.message || fallbackError);
+        }
+      }
+
       // Record failure metrics
       if (this.metricsService) {
         this.metricsService.recordGeneration({
@@ -85,7 +112,7 @@ export class StudyService implements StudyUseCase {
     count: number,
     mode: QuizMode,
     knowledgeSource: KnowledgeSource,
-    aiAdapter: AIServicePort,
+    _aiAdapter: AIServicePort,
     parentTopic?: string
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     if (mode === 'deep-dive') {
@@ -102,7 +129,7 @@ export class StudyService implements StudyUseCase {
         aiSummary = await this.getAdapter('ollama').generateSummary(topic);
         console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
       } catch (e) {
-        console.warn('   Failed to get AI summary:', e.message);
+        console.warn('   Failed to get AI summary:', (e as Error).message);
       }
     }
 
@@ -115,8 +142,8 @@ export class StudyService implements StudyUseCase {
         cards = this.enforceCardCount(cards, count, topic);
         return { cards };
       } catch (e) {
-        console.error('   Failed to generate from AI knowledge:', e.message);
-        throw new Error(`Failed to generate flashcards from AI knowledge: ${e.message}`);
+        console.error('   Failed to generate from AI knowledge:', (e as Error).message);
+        throw new Error(`Failed to generate flashcards from AI knowledge: ${(e as Error).message}`);
       }
     }
 
@@ -240,7 +267,7 @@ export class StudyService implements StudyUseCase {
 
       combinedContext = `DEEP DIVE TOPIC: ${currentSubTopic} (Parent: ${topic})\n${content}\n---\n`;
     } catch (e) {
-      console.warn(`   x Failed to research sub-topic "${currentSubTopic}": ${e.message}`);
+      console.warn(`   x Failed to research sub-topic "${currentSubTopic}": ${(e as Error).message}`);
     }
 
     // 4. Generate Flashcards
@@ -277,7 +304,7 @@ export class StudyService implements StudyUseCase {
         // Limit per site to avoid overwhelming context window
         return `SOURCE (${url}):\n${text.substring(0, 2000)}\n---\n`;
       } catch (e) {
-        console.warn(`   x Failed to scrape ${url}: ${e.message}`);
+        console.warn(`   x Failed to scrape ${url}: ${(e as any).message}`);
         return '';
       }
     });
@@ -334,24 +361,42 @@ export class StudyService implements StudyUseCase {
       return null;
     };
 
+    const qualityGate = (questions: QuizQuestion[] | null): QuizQuestion[] | null => {
+      if (!questions || questions.length === 0) return null;
+      // Basic quality checks: require question and correctAnswer populated
+      const valid = questions.filter(q => q?.question && q?.correctAnswer);
+      if (valid.length < Math.max(1, Math.floor((questions.length || 1) * 0.5))) {
+        return null;
+      }
+      return valid;
+    };
+
     // 1) Flashcard-based quiz
     if (flashcards && flashcards.length > 0) {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
 
       // fast local quiz first
-      const localQuiz = this.generateQuizFallbackFromFlashcards(flashcards, count);
-      if (localQuiz.length > 0) return localQuiz;
+      const localQuiz = qualityGate(this.generateQuizFallbackFromFlashcards(flashcards, count));
+      if (localQuiz) return localQuiz;
 
-      const result = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count));
-      if (result) return result;
+      // Try primary
+      const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
+      if (primaryResult) return primaryResult;
+
+      // Quality failed or generation failed; try secondary for validation
+      const secondaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
+      if (secondaryResult) return secondaryResult;
 
       console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
       return this.generateQuizFallbackFromFlashcards(flashcards, count);
     }
 
     // 2) Topic-based quiz
-    const result = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder'));
-    if (result) return result;
+    const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
+    if (primaryResult) return primaryResult;
+
+    const secondaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
+    if (secondaryResult) return secondaryResult;
 
     console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
     return this.generateQuizFallbackFromTopic(topic, count);
@@ -389,14 +434,14 @@ export class StudyService implements StudyUseCase {
 
     for (let i = 0; i < take; i++) {
       const card = pool[i % pool.length];
-      const distractors = shuffle(pool.filter((c) => c.id !== card.id)).slice(0, 3).map((c) => c.back);
-      const options = shuffle([card.back, ...distractors]);
+      const distractors = shuffle(pool.filter((c) => c.id !== card?.id)).slice(0, 3).map((c) => c.back);
+      const options = shuffle([card?.back || '', ...distractors]);
 
       questions.push({
-        id: `fallback-${card.id || i}`,
-        question: card.front?.endsWith('?') ? card.front : `${card.front}?`,
+        id: `fallback-${card?.id || i}`,
+        question: card?.front?.endsWith('?') ? card.front : `${card?.front}?`,
         options,
-        correctAnswer: card.back,
+        correctAnswer: card?.back || '',
         explanation: 'Based on your existing flashcard content.'
       });
     }

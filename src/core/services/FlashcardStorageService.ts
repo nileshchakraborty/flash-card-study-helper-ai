@@ -190,7 +190,7 @@ export class FlashcardStorageService {
         return topics.map(topic => {
             const cards = this.getFlashcardsByTopic(topic);
             const latestCard = cards.reduce((latest, card) =>
-                card.createdAt > latest.createdAt ? card : latest, cards[0]);
+                (card.createdAt > (latest?.createdAt || 0) ? card : latest), cards[0]);
 
             return {
                 id: this.getDeckId(topic),
@@ -216,7 +216,7 @@ export class FlashcardStorageService {
         if (cards.length === 0) return null;
 
         const latestCard = cards.reduce((latest, card) =>
-            card.createdAt > latest.createdAt ? card : latest, cards[0]);
+            (card.createdAt > (latest?.createdAt || 0) ? card : latest), cards[0]);
 
         return {
             id: this.getDeckId(topic),

@@ -1,6 +1,6 @@
 import { HeaderMap } from '@apollo/server';
 import type { ApolloServerPlugin } from '@apollo/server';
-import type { LRUCache } from 'lru-cache';
+// import type { LRUCache } from 'lru-cache';
 
 /**
  * Simple in-memory response caching for GraphQL queries

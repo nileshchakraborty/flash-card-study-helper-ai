@@ -6,15 +6,18 @@ export class QuizModel {
     currentIndex = 0;
     back = {};
     history = [];
+    prefetched = [];
     mode = 'standard'; // standard, web, advanced
+    currentTopic = 'General';
     constructor() {
         // Properties are now initialized directly on the class
     }
-    startQuiz(questions, mode = 'standard') {
+    startQuiz(questions, mode = 'standard', topic = 'General') {
         this.questions = questions;
         this.mode = mode;
         this.currentIndex = 0;
         this.answers = {};
+        this.currentTopic = topic;
         eventBus.emit('quiz:started', this.getCurrentQuestion());
     }
     getCurrentQuestion() {
@@ -38,6 +41,17 @@ export class QuizModel {
             return true;
         }
         return false;
+    }
+
+    addPrefetchedQuiz(entry) {
+        const createdAt = entry.createdAt ?? Date.now();
+        this.prefetched = this.prefetched.filter(q => !(q.topic === entry.topic && q.source === entry.source));
+        this.prefetched.unshift({ ...entry, createdAt });
+        eventBus.emit('quiz:available-updated', this.prefetched);
+    }
+
+    listPrefetched() {
+        return this.prefetched;
     }
     async submitQuiz(topic = 'General') {
         let score = 0;
