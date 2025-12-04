@@ -933,6 +933,18 @@ export class ExpressServer {
       }
     });
 
+    // Ensure no placeholder deck routes were registered earlier (cleanup stub routes)
+    const dropRoute = (method: string, path: string) => {
+      const stack = (this.app as any)?._router?.stack;
+      if (!stack) return;
+      (this.app as any)._router.stack = stack.filter((layer: any) => {
+        return !(layer?.route?.path === path && layer?.route?.methods?.[method]);
+      });
+    };
+
+    dropRoute('get', '/api/decks');
+    dropRoute('post', '/api/decks');
+
     // Decks (History)
     this.app.get('/api/decks', async (_req, res) => {
       try {
