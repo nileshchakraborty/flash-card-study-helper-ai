@@ -1,6 +1,7 @@
 import type { GraphQLContext } from '../context.js';
 import { requireAuth } from '../context.js';
-import type { QuizQuestion } from '../../core/domain/models.js';
+import type { QuizQuestion, Flashcard } from '../../core/domain/models.js';
+import type { Quiz as StoredQuiz, QuizQuestion as StoredQuizQuestion } from '../../core/services/QuizStorageService.js';
 
 type CreateQuizInput = {
     topic?: string;
@@ -18,11 +19,13 @@ type SubmitAnswersArgs = {
     answers: string[];
 };
 
-const withMode = (quiz: any) => {
-    if (!quiz) return quiz;
+type QuizWithMode = StoredQuiz & { mode: string };
+
+const withMode = (quiz: StoredQuiz | null): QuizWithMode | null => {
+    if (!quiz) return null;
     return {
         ...quiz,
-        mode: quiz.mode ?? 'standard'
+        mode: (quiz as unknown as { mode?: string }).mode ?? 'standard'
     };
 };
 
@@ -81,7 +84,13 @@ export const quizResolvers = {
                 const desiredCount = input.count ?? (hasCards ? Math.min(cards.length, 10) : 5);
 
                 if (hasCards) {
-                    questions = await context.studyService.generateQuiz(topic, desiredCount, cards as any);
+                    const normalized: Flashcard[] = cards.map((card) => ({
+                        id: card.id,
+                        front: card.front,
+                        back: card.back,
+                        topic: card.topic ?? topic,
+                    }));
+                    questions = await context.studyService.generateQuiz(topic, desiredCount, normalized);
                 } else {
                     questions = await context.studyService.generateQuiz(topic, desiredCount);
                 }
@@ -91,13 +100,20 @@ export const quizResolvers = {
                 // Continue with empty questions or handle error
             }
 
+            const storageQuestions: Array<Omit<StoredQuizQuestion, 'id'>> = questions.map((q) => ({
+                question: q.question,
+                options: [...q.options],
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation
+            }));
+
             const quiz = await context.quizStorage.createQuiz({
                 topic: input.topic ?? input.cards?.[0]?.topic ?? 'General Quiz',
                 source: input.cards ? 'flashcards' : 'topic',
-                questions: questions as any
+                questions: storageQuestions
             });
 
-            return withMode(quiz);
+            return withMode(quiz) as QuizWithMode;
         },
 
         submitQuizAnswer: async (
@@ -105,7 +121,13 @@ export const quizResolvers = {
             { quizId, answers }: SubmitAnswersArgs,
             context: GraphQLContext
         ): Promise<ReturnType<GraphQLContext['quizStorage']['submitAnswers']>> => {
-            const result = await context.quizStorage.submitAnswers(quizId, answers as any);
+            const normalizedAnswers = (answers || []).map((answer, idx) => (
+                typeof answer === 'string'
+                    ? { questionId: String(idx), answer }
+                    : answer
+            ));
+
+            const result = await context.quizStorage.submitAnswers(quizId, normalizedAnswers as { questionId: string; answer: string }[]);
             return result;
         },
     },

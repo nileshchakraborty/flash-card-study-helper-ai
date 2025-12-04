@@ -17,7 +17,7 @@ export class WebLLMGenerator {
         topic: string,
         count: number,
         knowledgeSource: KnowledgeSource = 'ai-web'
-    ): Promise<any[]> {
+    ): Promise<Flashcard[]> {
         console.log(`\n=== WebLLM Knowledge Retrieval for: "${topic}" (Mode: ${knowledgeSource}) ===`);
 
         // Step 1: AI Summary (skip if web-only)
@@ -73,7 +73,7 @@ export class WebLLMGenerator {
     /**
      * Generate flashcards from AI knowledge only (no web search)
      */
-    private async generateFromAIOnly(topic: string, count: number): Promise<any[]> {
+    private async generateFromAIOnly(topic: string, count: number): Promise<Flashcard[]> {
         const prompt = `You are a helpful study assistant creating educational flashcards. You create QUESTIONS and ANSWERS, NOT code examples.
 
 ⚠️ CRITICAL RULES - FOLLOW EXACTLY:
@@ -112,7 +112,7 @@ Now create ${count} flashcards about: ${topic}`;
     /**
      * Generate flashcards from combined context (AI + Web or Web only)
      */
-    private async generateFromContext(context: string, topic: string, count: number): Promise<any[]> {
+    private async generateFromContext(context: string, topic: string, count: number): Promise<Flashcard[]> {
         const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.
 
 ⚠️ TASK: Create ${count} educational flashcards about: ${topic}
@@ -152,7 +152,7 @@ Create ${count} flashcards now:`;
     /**
      * Search web using backend Serper API
      */
-    private async searchWeb(query: string): Promise<any[]> {
+    private async searchWeb(query: string): Promise<SearchResult[]> {
         try {
             // Call backend search endpoint (we'll need to create this)
             const response = await fetch('/api/search', {
@@ -171,7 +171,7 @@ Create ${count} flashcards now:`;
     /**
      * Scrape content from URLs using backend
      */
-    private async scrapeContent(results: any[]): Promise<string> {
+    private async scrapeContent(results: SearchResult[]): Promise<string> {
         const urls = results.map(r => r.link);
         if (urls.length === 0) return '';
 
@@ -193,11 +193,11 @@ Create ${count} flashcards now:`;
     /**
      * Parse LLM response to extract flashcards
      */
-    private parseLLMResponse(response: string, topic: string): any[] {
+    private parseLLMResponse(response: string, topic: string): Flashcard[] {
         const isCodeLike = (text: string) => /import\s+|class\s+|def\s+|function\s|console\.log|System\.out\.println|flashcards_json|randomly selected/i.test(text);
-        const normalizeCard = (raw: any) => ({
-            question: (raw?.question || raw?.front || '').trim(),
-            answer: (raw?.answer || raw?.back || '').trim()
+        const normalizeCard = (raw: Partial<Flashcard>) => ({
+            question: (raw?.question || (raw as { front?: string }).front || '').trim(),
+            answer: (raw?.answer || (raw as { back?: string }).back || '').trim()
         });
         const isValidCard = (card: { question: string; answer: string }) =>
             !!card.question && !!card.answer && card.question.length > 6 && card.answer.length > 6 && !isCodeLike(card.question + ' ' + card.answer);
@@ -257,9 +257,9 @@ Create ${count} flashcards now:`;
                 const keys = Object.keys(parsed);
                 const qKey = keys.find(k => k.toLowerCase().includes('question') || k.toLowerCase().includes('front'));
                 const aKey = keys.find(k => k.toLowerCase().includes('answer') || k.toLowerCase().includes('back'));
-                if (qKey && aKey && Array.isArray((parsed as any)[qKey])) {
-                    const filtered = (parsed as any)[qKey]
-                        .map((q: string, i: number) => normalizeCard({ question: q, answer: (parsed as any)[aKey][i] || '' }))
+                if (qKey && aKey && Array.isArray((parsed as Record<string, unknown>)[qKey])) {
+                    const filtered = (parsed as Record<string, string[]>)[qKey]
+                        .map((q: string, i: number) => normalizeCard({ question: q, answer: (parsed as Record<string, string[]>)[aKey][i] || '' }))
                         .filter(isValidCard);
                     if (filtered.length) {
                         return filtered.map((card, index) => ({
@@ -270,8 +270,8 @@ Create ${count} flashcards now:`;
                         }));
                     }
                 }
-                if ((parsed as any).questions && Array.isArray((parsed as any).questions)) {
-                    const filtered = (parsed as any).questions.map(normalizeCard).filter(isValidCard);
+                if ((parsed as Record<string, unknown>).questions && Array.isArray((parsed as Record<string, unknown>).questions)) {
+                    const filtered = (parsed as { questions: Partial<Flashcard>[] }).questions.map(normalizeCard).filter(isValidCard);
                     if (filtered.length) {
                         return filtered.map((card, index) => ({
                             id: `webllm-${Date.now()}-${index}`,
@@ -285,7 +285,7 @@ Create ${count} flashcards now:`;
         }
 
         // 3) Regex fallback for inline objects
-        const cards: any[] = [];
+        const cards: Flashcard[] = [];
         const objectRegex = /\{\s*\"question\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*,\s*\"answer\"\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*\}/g;
         let match;
         while ((match = objectRegex.exec(response)) !== null) {
@@ -298,7 +298,7 @@ Create ${count} flashcards now:`;
             } catch (e) { }
         }
 
-        return cards.map((card: any, index: number) => ({
+        return cards.map((card, index) => ({
             id: `webllm-${Date.now()}-${index}`,
             front: card.question,
             back: card.answer,
@@ -306,3 +306,16 @@ Create ${count} flashcards now:`;
         }));
     }
 }
+
+type Flashcard = {
+    id?: string;
+    question?: string;
+    answer?: string;
+    front?: string;
+    back?: string;
+    topic?: string;
+};
+
+type SearchResult = {
+    link: string;
+};

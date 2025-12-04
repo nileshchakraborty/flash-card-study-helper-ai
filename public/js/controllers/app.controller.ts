@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { GeneratorView } from '../views/generator.view.js';
 import { StudyView } from '../views/study.view.js';
 import { QuizView } from '../views/quiz.view.js';
@@ -10,11 +9,32 @@ import { initializeQuizHandlers } from '../quiz-init.js';
 import { settingsService } from '../services/settings.service.js';
 import { storageService } from '../services/storage.service.js';
 
+type DeckHistoryEntry = {
+  id: string;
+  topic: string;
+  cards: Array<{ id: string; front: string; back: string; topic?: string }>;
+  timestamp: number;
+};
+
+type QuizPrefetched = {
+  id: string;
+  topic: string;
+  questions: Array<{ id: string; question: string; options: string[]; correctAnswer: string; explanation?: string }>;
+  source: 'flashcards' | 'topic';
+  createdAt: number;
+};
+
+type DeckCard = { id?: string; front: string; back: string; topic?: string };
+type QuizStartEvent = { count: number; topic?: string; timer?: number };
+type QuizStartPrefetchedEvent = { quizId: string };
+type HarderEvent = { difficulty?: 'deep-dive' | 'basics' };
+type QuizResultPayload = { cards: DeckCard[]; recommendedTopics?: string[] };
+
 export class AppController {
-  private generatorView: any;
-  private studyView: any;
-  private quizView: any;
-  private deckHistory: any[] = [];
+  private generatorView: GeneratorView;
+  private studyView: StudyView;
+  private quizView: QuizView;
+  private deckHistory: DeckHistoryEntry[] = [];
 
   constructor() {
     this.generatorView = new GeneratorView();
@@ -90,7 +110,7 @@ export class AppController {
 
   setupGlobalEvents() {
     // Handle deck loaded event (from generator or history)
-    eventBus.on('deck:loaded', (cards) => {
+    eventBus.on('deck:loaded', (cards: DeckCard[]) => {
       console.log('AppController received deck:loaded event with', cards?.length, 'cards');
       deckModel.setCards(cards);
       storageService.storeFlashcards(cards || []);
@@ -105,9 +125,9 @@ export class AppController {
     });
 
     // Handle quiz start request
-    eventBus.on('quiz:request-start', async ({ count, topic, timer }) => {
+    eventBus.on('quiz:request-start', async ({ count, topic, timer }: QuizStartEvent) => {
       // If we already have a prefetched quiz for this topic, start instantly
-      const prefetched = quizModel.listPrefetched().find(q => q.topic === (topic || deckModel.currentTopic));
+      const prefetched = quizModel.listPrefetched().find((q: QuizPrefetched) => q.topic === (topic || deckModel.currentTopic));
       if (prefetched && prefetched.questions?.length) {
         quizModel.startQuiz(prefetched.questions, 'standard', prefetched.topic);
         this.switchTab('create-quiz');
@@ -228,12 +248,12 @@ export class AppController {
     });
 
     // Start a prefetched quiz (from available list)
-    eventBus.on('quiz:start-prefetched', async ({ quizId }) => {
+    eventBus.on('quiz:start-prefetched', async ({ quizId }: QuizStartPrefetchedEvent) => {
       console.log('[Quiz] start-prefetched clicked', { quizId });
-      let quiz: any = null;
+      let quiz: QuizPrefetched | ReturnType<typeof storageService.getQuiz> | null = null;
 
       const prefetched = typeof quizModel.listPrefetched === 'function'
-        ? quizModel.listPrefetched().find((q: any) => q.id === quizId)
+        ? quizModel.listPrefetched().find((q: QuizPrefetched) => q.id === quizId)
         : null;
       const stored = storageService.getQuiz ? storageService.getQuiz(quizId) : null;
       quiz = prefetched || stored;
@@ -248,10 +268,10 @@ export class AppController {
             quiz = apiQuiz.quiz;
             // Normalize shape if backend returns questions array without ids
             if (quiz.questions) {
-              quiz.questions = quiz.questions.map((q: any, idx: number) => ({
-                id: q.id || q.cardId || `${quiz.id}-q-${idx}`,
-                question: q.question,
-                options: q.options || [],
+            quiz.questions = quiz.questions.map((q: any, idx: number) => ({
+              id: q.id || q.cardId || `${quiz.id}-q-${idx}`,
+              question: q.question,
+              options: q.options || [],
                 correctAnswer: q.correctAnswer || q.answer || q.expected,
                 explanation: q.explanation
               }));
@@ -431,7 +451,7 @@ export class AppController {
         } else {
           throw new Error('No flashcards generated');
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Generation error:', error);
         alert('Failed to generate harder cards.');
       } finally {
@@ -453,7 +473,7 @@ export class AppController {
   /**
    * Pre-generate a quiz for a given set of cards and cache it for quick start.
    */
-  async prefetchQuizFromCards(cards: any[]) {
+  async prefetchQuizFromCards(cards: DeckCard[]) {
     if (!cards || cards.length === 0) return;
     const topic = cards[0].topic || 'General';
     try {

@@ -43,31 +43,33 @@ class GraphQLService {
   /**
    * Execute a GraphQL query
    */
-  async query<T = any>(query: string, variables?: any): Promise<T> {
+  async query<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     try {
       return await this.client.request<T>(query, variables);
-    } catch (error: any) {
-      console.error('GraphQL Query Error:', error);
-      throw new Error(error.response?.errors?.[0]?.message || error.message);
+    } catch (error: unknown) {
+      const err = error as { response?: { errors?: { message?: string }[] }; message?: string };
+      console.error('GraphQL Query Error:', err);
+      throw new Error(err.response?.errors?.[0]?.message || err.message || 'GraphQL query failed');
     }
   }
 
   /**
    * Execute a GraphQL mutation
    */
-  async mutate<T = any>(mutation: string, variables?: any): Promise<T> {
+  async mutate<T>(mutation: string, variables?: Record<string, unknown>): Promise<T> {
     try {
       return await this.client.request<T>(mutation, variables);
-    } catch (error: any) {
-      console.error('GraphQL Mutation Error:', error);
-      throw new Error(error.response?.errors?.[0]?.message || error.message);
+    } catch (error: unknown) {
+      const err = error as { response?: { errors?: { message?: string }[] }; message?: string };
+      console.error('GraphQL Mutation Error:', err);
+      throw new Error(err.response?.errors?.[0]?.message || err.message || 'GraphQL mutation failed');
     }
   }
 
   /**
    * Health check query
    */
-  async healthCheck(): Promise<any> {
+  async healthCheck(): Promise<{ health: { status: string; timestamp: string; service: string } }> {
     const query = `query { health }`;
     return this.query(query);
   }
@@ -77,7 +79,12 @@ class GraphQLService {
   /**
    * Get all decks
    */
-  async getDecks(): Promise<any[]> {
+  async getDecks(): Promise<{
+    id: string;
+    topic: string;
+    cards: { id: string; front: string; back: string; topic: string }[];
+    timestamp: string;
+  }[]> {
     const query = `
       query {
         decks {
@@ -93,14 +100,19 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ decks: any[] }>(query);
+    const result = await this.query<{ decks: { id: string; topic: string; cards: { id: string; front: string; back: string; topic: string }[]; timestamp: string }[] }>(query);
     return result.decks;
   }
 
   /**
    * Get a specific deck by ID
    */
-  async getDeck(id: string): Promise<any> {
+  async getDeck(id: string): Promise<{
+    id: string;
+    topic: string;
+    cards: { id: string; front: string; back: string; topic: string }[];
+    timestamp: string;
+  } | null> {
     const query = `
       query GetDeck($id: ID!) {
         deck(id: $id) {
@@ -116,14 +128,19 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ deck: any }>(query, { id });
+    const result = await this.query<{ deck: { id: string; topic: string; cards: { id: string; front: string; back: string; topic: string }[]; timestamp: string } | null }>(query, { id });
     return result.deck;
   }
 
   /**
    * Create a new deck
    */
-  async createDeck(input: { topic: string; cards: any[] }): Promise<any> {
+  async createDeck(input: { topic: string; cards: { id: string; front: string; back: string; topic?: string }[] }): Promise<{
+    id: string;
+    topic: string;
+    cards: { id: string; front: string; back: string; topic: string }[];
+    timestamp: string;
+  }> {
     const mutation = `
       mutation CreateDeck($input: DeckInput!) {
         createDeck(input: $input) {
@@ -139,7 +156,7 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.mutate<{ createDeck: any }>(mutation, { input });
+    const result = await this.mutate<{ createDeck: { id: string; topic: string; cards: { id: string; front: string; back: string; topic: string }[]; timestamp: string } }>(mutation, { input });
     return result.createDeck;
   }
 
@@ -161,7 +178,13 @@ class GraphQLService {
   /**
    * Get quiz by ID
    */
-  async getQuiz(id: string): Promise<any> {
+  async getQuiz(id: string): Promise<{
+    id: string;
+    topic: string;
+    questions: { id: string; question: string; options: string[]; correctAnswer: string; explanation?: string | null }[];
+    mode: string;
+    createdAt: string;
+  } | null> {
     const query = `
       query GetQuiz($id: ID!) {
         quiz(id: $id) {
@@ -179,14 +202,14 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ quiz: any }>(query, { id });
+    const result = await this.query<{ quiz: { id: string; topic: string; questions: { id: string; question: string; options: string[]; correctAnswer: string; explanation?: string | null }[]; mode: string; createdAt: string } | null }>(query, { id });
     return result.quiz;
   }
 
   /**
    * Get quiz history
    */
-  async getQuizHistory(): Promise<any[]> {
+  async getQuizHistory(): Promise<{ quizId: string; score: number; total: number; timestamp: string }[]> {
     const query = `
       query {
         quizHistory {
@@ -197,14 +220,14 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ quizHistory: any[] }>(query);
+    const result = await this.query<{ quizHistory: { quizId: string; score: number; total: number; timestamp: string }[] }>(query);
     return result.quizHistory;
   }
 
   /**
    * Get all quizzes
    */
-  async getAllQuizzes(): Promise<any[]> {
+  async getAllQuizzes(): Promise<{ id: string; topic: string; questionCount: number; source: string; createdAt: string }[]> {
     const query = `
       query {
         allQuizzes {
@@ -217,14 +240,14 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ allQuizzes: any[] }>(query);
+    const result = await this.query<{ allQuizzes: { id: string; topic: string; questionCount: number; source: string; createdAt: string }[] }>(query);
     return result.allQuizzes;
   }
 
   /**
    * Create a quiz
    */
-  async createQuiz(input: { topic?: string; cards?: any[]; count?: number }): Promise<any> {
+  async createQuiz(input: { topic?: string; cards?: { id: string; front: string; back: string; topic?: string }[]; count?: number }): Promise<{ id: string; topic: string; questionCount: number; source: string; createdAt: string }> {
     const mutation = `
       mutation CreateQuiz($input: QuizInput!) {
         createQuiz(input: $input) {
@@ -239,14 +262,14 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.mutate<{ createQuiz: any }>(mutation, { input });
+    const result = await this.mutate<{ createQuiz: { id: string; topic: string; questionCount: number; source: string; createdAt: string } }>(mutation, { input });
     return result.createQuiz;
   }
 
   /**
    * Submit quiz answers
    */
-  async submitQuizAnswers(quizId: string, answers: any[]): Promise<any> {
+  async submitQuizAnswers(quizId: string, answers: { questionId: string; answer: string }[]): Promise<{ score: number; total: number; percentage: number; attemptId?: string }> {
     const mutation = `
       mutation SubmitQuizAnswer($quizId: ID!, $answers: [QuizAnswerInput!]!) {
         submitQuizAnswer(quizId: $quizId, answers: $answers) {
@@ -257,7 +280,7 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.mutate<{ submitQuizAnswer: any }>(mutation, { quizId, answers });
+    const result = await this.mutate<{ submitQuizAnswer: { score: number; total: number; percentage: number; attemptId?: string } }>(mutation, { quizId, answers });
     return result.submitQuizAnswer;
   }
 
@@ -272,7 +295,7 @@ class GraphQLService {
     mode?: string;
     knowledgeSource?: string;
     parentTopic?: string;
-  }): Promise<any> {
+  }): Promise<{ cards: { id: string; front: string; back: string; topic: string }[] }> {
     const mutation = `
       mutation GenerateFlashcards($input: GenerateInput!) {
         generateFlashcards(input: $input) {
@@ -287,7 +310,7 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.mutate<{ generateFlashcards: any }>(mutation, { input });
+    const result = await this.mutate<{ generateFlashcards: { cards: { id: string; front: string; back: string; topic: string }[] } }>(mutation, { input });
     return result.generateFlashcards;
   }
 
@@ -296,7 +319,7 @@ class GraphQLService {
   /**
    * Get job status
    */
-  async getJobStatus(id: string): Promise<any> {
+  async getJobStatus(id: string): Promise<{ id: string; status: string; progress?: number; result?: unknown; error?: string | null } | null> {
     const query = `
       query GetJob($id: ID!) {
         job(id: $id) {
@@ -308,7 +331,7 @@ class GraphQLService {
         }
       }
     `;
-    const result = await this.query<{ job: any }>(query, { id });
+    const result = await this.query<{ job: { id: string; status: string; progress?: number; result?: unknown; error?: string | null } | null }>(query, { id });
     return result.job;
   }
 }

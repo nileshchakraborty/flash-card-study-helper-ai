@@ -12,6 +12,39 @@ type DeckPayload = {
   cards: Array<{ front: string; back: string; id?: string; topic?: string }>;
 };
 
+type DeckResponse = {
+  id: string;
+  topic: string;
+  cards: Array<{ id: string; front: string; back: string; topic: string }>;
+  timestamp: string | number;
+};
+
+type QuizSummary = {
+  id: string;
+  topic: string;
+  questionCount: number;
+  source: string;
+  createdAt: string | number;
+};
+
+type QuizDetail = {
+  id: string;
+  topic: string;
+  questions: Array<{ id: string; question: string; options: string[]; correctAnswer: string; explanation?: string | null }>;
+  mode: string;
+  createdAt: string | number;
+};
+
+type QuizHistoryEntry = { quizId: string; score: number; total: number; timestamp: string | number };
+
+type JobStatus = {
+  id: string;
+  status: string;
+  progress?: number;
+  result?: unknown;
+  error?: string | null;
+};
+
 type CreateQuizParams = {
   topic?: string;
   count?: number;
@@ -80,7 +113,7 @@ export class ApiService {
     // Simple incremental retry to reduce transient "Failed to fetch" errors
     const maxAttempts = 4;
     let attempt = 0;
-    let lastError;
+    let lastError: unknown;
 
     while (attempt < maxAttempts) {
       try {
@@ -97,7 +130,7 @@ export class ApiService {
       }
 
         return await response.json();
-      } catch (error) {
+      } catch (error: unknown) {
         lastError = error;
         attempt += 1;
 
@@ -134,85 +167,85 @@ export class ApiService {
   /**
    * Get all decks - supports both REST and GraphQL
    */
-  async getDecks() {
+  async getDecks(): Promise<DeckResponse[]> {
     if (this.useGraphQL) {
       try {
         return await graphqlService.getDecks();
       } catch (error) {
         console.warn('[API] GraphQL getDecks failed, falling back to REST', error);
-        return this.get('/decks');
+        return this.get('/decks') as Promise<DeckResponse[]>;
       }
     }
-    return this.get('/decks');
+    return this.get('/decks') as Promise<DeckResponse[]>;
   }
 
   /**
    * Create a deck - supports both REST and GraphQL
    */
-  async createDeck(deck: DeckPayload) {
+  async createDeck(deck: DeckPayload): Promise<DeckResponse> {
     if (this.useGraphQL) {
       try {
         return await graphqlService.createDeck(deck);
       } catch (error) {
         console.warn('[API] GraphQL createDeck failed, falling back to REST', error);
-        return this.post('/decks', deck);
+        return this.post('/decks', deck) as Promise<DeckResponse>;
       }
     }
-    return this.post('/decks', deck);
+    return this.post('/decks', deck) as Promise<DeckResponse>;
   }
 
   /**
    * Get quiz history - supports both REST and GraphQL
    */
-  async getQuizHistory() {
+  async getQuizHistory(): Promise<QuizHistoryEntry[]> {
     if (this.useGraphQL) {
       try {
         return await graphqlService.getQuizHistory();
       } catch (error) {
         console.warn('[API] GraphQL getQuizHistory failed, falling back to REST', error);
-        return this.get('/quiz/history');
+        return this.get('/quiz/history') as Promise<QuizHistoryEntry[]>;
       }
     }
-    return this.get('/quiz/history');
+    return this.get('/quiz/history') as Promise<QuizHistoryEntry[]>;
   }
 
   /**
    * Get all quizzes - supports both REST and GraphQL
    */
-  async getAllQuizzes() {
+  async getAllQuizzes(): Promise<{ success: boolean; quizzes: QuizSummary[] }> {
     if (this.useGraphQL) {
       try {
         const quizzes = await graphqlService.getAllQuizzes();
         return { success: true, quizzes };
       } catch (error) {
         console.warn('[API] GraphQL getAllQuizzes failed, falling back to REST', error);
-        return this.get('/quiz/list/all');
+        return this.get('/quiz/list/all') as Promise<{ success: boolean; quizzes: QuizSummary[] }>;
       }
     }
-    return this.get('/quiz/list/all');
+    return this.get('/quiz/list/all') as Promise<{ success: boolean; quizzes: QuizSummary[] }>;
   }
 
   /**
    * Get quiz by ID - supports both REST and GraphQL
    */
-  async getQuiz(id: string) {
+  async getQuiz(id: string): Promise<{ success: boolean; quiz: QuizDetail | null }> {
     if (this.useGraphQL) {
       try {
         const quiz = await graphqlService.getQuiz(id);
         return { success: true, quiz };
       } catch (error) {
         console.warn('[API] GraphQL getQuiz failed, falling back to REST', error);
-        return this.get(`/quiz/${id}`);
+        return this.get(`/quiz/${id}`) as Promise<{ success: boolean; quiz: QuizDetail | null }>;
       }
     }
-    return this.get(`/quiz/${id}`);
+    return this.get(`/quiz/${id}`) as Promise<{ success: boolean; quiz: QuizDetail | null }>;
   }
 
   /**
    * Create quiz - supports both REST and GraphQL
    * Unified method for topic or flashcards
    */
-  async createQuiz(params: CreateQuizParams) {
+  async createQuiz(params: CreateQuizParams): Promise<{ success?: boolean; quiz?: QuizSummary; quizId?: string }> {
     if (this.useGraphQL) {
       try {
         const input = {
@@ -266,7 +299,7 @@ export class ApiService {
    * Submit quiz - supports both REST and GraphQL
    * Handles the difference between server-side scoring (GraphQL) and client-side (REST legacy)
    */
-  async submitQuiz(quizId, data) {
+  async submitQuiz(quizId: string, data: { answers?: Record<string, string> | Array<{ questionId: string; answer: string }>; results?: Array<{ cardId?: string; id?: string; userAnswer: string }> }) {
     if (this.useGraphQL) {
       try {
         // GraphQL expects answers array: { questionId, answer }
@@ -274,14 +307,14 @@ export class ApiService {
         // We need to extract answers if possible, or change caller.
 
         // If data has 'answers' map/record, convert to array
-        let answers = [];
+        let answers: Array<{ questionId: string; answer: string }> = [];
         if (data.answers && !Array.isArray(data.answers)) {
           answers = Object.entries(data.answers).map(([qId, ans]) => ({
             questionId: qId,
             answer: ans
           }));
         } else if (Array.isArray(data.answers)) {
-          answers = data.answers;
+          answers = data.answers as Array<{ questionId: string; answer: string }>;
         } else if (data.results && Array.isArray(data.results)) {
           // Extract from QuizModel results
           answers = data.results.map(r => ({
@@ -298,17 +331,17 @@ export class ApiService {
         // If no answers to submit (e.g. just saving history), fallback?
       } catch (error) {
         console.warn('[API] GraphQL submitQuiz failed, falling back to REST', error);
-        return this.post('/api/quiz/history', data);
+        return this.post('/quiz/history', data);
       }
     }
     // REST legacy: save client-calculated result
-    return this.post('/api/quiz/history', data);
+    return this.post('/quiz/history', data);
   }
 
   /**
    * Generate flashcards - supports both REST and GraphQL
    */
-  async generateFlashcards(params) {
+  async generateFlashcards(params: { topic: string; count: number; mode?: string; knowledgeSource?: string; parentTopic?: string }) {
     if (this.useGraphQL) {
       try {
         const input = {
@@ -340,7 +373,7 @@ export class ApiService {
   /**
    * Get job status - supports both REST and GraphQL
    */
-  async getJobStatus(jobId) {
+  async getJobStatus(jobId: string): Promise<JobStatus | null> {
     if (this.useGraphQL) {
       try {
         const job = await graphqlService.getJobStatus(jobId);
@@ -354,10 +387,10 @@ export class ApiService {
         };
       } catch (error) {
         console.warn('[API] GraphQL getJobStatus failed, falling back to REST', error);
-        return this.get(`/jobs/${jobId}`);
+        return this.get(`/jobs/${jobId}`) as Promise<JobStatus>;
       }
     }
-    return this.get(`/jobs/${jobId}`);
+    return this.get(`/jobs/${jobId}`) as Promise<JobStatus>;
   }
 
   /**
@@ -368,7 +401,7 @@ export class ApiService {
     const { maxWaitMs = 120000, pollIntervalMs = 2000, onProgress } = options;
     const start = Date.now();
 
-    let lastStatus: any = null;
+    let lastStatus: JobStatus | null = null;
     const expectedPolls = Math.max(1, Math.ceil(maxWaitMs / pollIntervalMs));
     let attempt = 0;
 
