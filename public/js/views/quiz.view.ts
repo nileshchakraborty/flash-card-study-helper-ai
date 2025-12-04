@@ -185,7 +185,7 @@ export class QuizView extends BaseView {
             Created ${this.formatTimeAgo(quiz.createdAt)}
           </div>
         </div>
-        <span class="material-icons text-3xl text-indigo-600 group-hover:text-indigo-800">play_circle_filled</span>
+        <span class="material-icons text-4xl text-indigo-600 group-hover:text-indigo-800">play_circle_filled</span>
       </button>
     `).join('');
 
@@ -194,6 +194,13 @@ export class QuizView extends BaseView {
       const target = (e.target as HTMLElement);
       const container = target.closest('.quiz-item') as HTMLElement | null;
       const quizId = container?.dataset.quizId;
+
+      console.log('[QuizView] available quiz click', {
+        target: target.tagName,
+        quizId,
+        hasContainer: !!container
+      });
+
       if (!quizId) return;
       eventBus.emit('quiz:start-prefetched', { quizId });
     };

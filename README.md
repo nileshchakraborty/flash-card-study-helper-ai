@@ -8,7 +8,7 @@ This project implements a **Clean Architecture** API that leverages LLMs (WebLLM
 
 ```mermaid
 flowchart TD
-  UI[SPA (public/*)] -->|events| AppController
+  UI[SPA (public assets)] -->|events| AppController
   AppController --> QuizHandlers
   AppController --> GeneratorView
   AppController --> StudyView

@@ -237,7 +237,7 @@ export class AppController {
         : null;
       const stored = storageService.getQuiz ? storageService.getQuiz(quizId) : null;
       quiz = prefetched || stored;
-      console.log('[Quiz] prefetched/stored lookup', { hasPrefetched: !!prefetched, hasStored: !!stored, quiz });
+      console.log('[Quiz] prefetched/stored lookup', { hasPrefetched: !!prefetched, hasStored: !!stored, quizHasQuestions: !!quiz?.questions?.length });
 
       // If we don't have questions, try fetching from API
       if (!quiz || !quiz.questions || quiz.questions.length === 0) {
@@ -262,6 +262,13 @@ export class AppController {
         } catch (err) {
           console.warn('Failed to fetch quiz from API:', err?.message || err);
         }
+      }
+
+      // Final guard: if quiz exists but still has no questions, surface detailed log
+      if (quiz && (!quiz.questions || quiz.questions.length === 0)) {
+        console.warn('[Quiz] quiz loaded without questions, cannot start', { quizId, quizKeys: Object.keys(quiz || {}) });
+        alert('Quiz data is missing questions. Please refresh quizzes or regenerate.');
+        return;
       }
 
       if (quiz && quiz.questions?.length) {
