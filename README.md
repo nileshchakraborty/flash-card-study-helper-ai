@@ -16,8 +16,8 @@ flowchart TD
 
   AppController -->|REST or GraphQL| API["Express Server"]
   API --> StudyService
-  StudyService -->|AI adapters (quality gate)| WebLLM["WebLLM runtime"]
-  StudyService -->|fallback/validation| Ollama["Ollama API"]
+  StudyService -->|AI adapters quality gate| WebLLM["WebLLM runtime"]
+  StudyService -->|fallback validation| Ollama["Ollama API"]
   StudyService --> Serper["Serper / Web search"]
   StudyService --> FlashcardStorage["FlashcardStorageService"]
   StudyService --> QuizStorage["QuizStorageService"]
