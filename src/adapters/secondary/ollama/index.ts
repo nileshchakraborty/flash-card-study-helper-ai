@@ -10,10 +10,10 @@ export class OllamaAdapter implements AIServicePort {
   private cache?: CacheService<any>;
 
   constructor(cache?: CacheService<any>) {
-    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
-    // On Vercel there's no local Ollama, so default to the remote/cloud endpoint
-    this.baseUrl = process.env.OLLAMA_BASE_URL
-      || (isVercel ? 'https://api.ollama.com' : 'http://localhost:11434');
+    // const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+    // On Vercel, we require OLLAMA_BASE_URL to be set for backend generation.
+    // Otherwise, we expect the frontend to use WebLLM (client-side).
+    this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     this.model = process.env.OLLAMA_MODEL || 'llama3.2:latest';
     this.cache = cache;
   }

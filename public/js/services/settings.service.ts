@@ -7,7 +7,9 @@ export type RuntimePref = 'ollama' | 'webllm';
 export const settingsService = {
   getPreferredRuntime(): RuntimePref {
     const stored = localStorage.getItem(RUNTIME_KEY);
-    return stored === 'webllm' ? 'webllm' : 'ollama';
+    // Default to 'webllm' (client-side) if not set, as it works everywhere (including Vercel)
+    // whereas 'ollama' requires a local/remote backend instance.
+    return stored === 'ollama' ? 'ollama' : 'webllm';
   },
   setPreferredRuntime(runtime: RuntimePref) {
     localStorage.setItem(RUNTIME_KEY, runtime);
