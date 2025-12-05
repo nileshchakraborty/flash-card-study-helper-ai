@@ -85,7 +85,17 @@ export class ExpressServer {
   private setupPassport() {
     const deriveCallbackUrl = (req: express.Request) => {
       const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-      const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol || 'http');
+      // Vercel sets x-forwarded-proto, but also check for production domains
+      let proto = req.headers['x-forwarded-proto'] as string;
+
+      // Force HTTPS for production/Vercel domains
+      if (!proto && typeof host === 'string' && (host.includes('vercel.app') || host.includes('mindflipai'))) {
+        proto = 'https';
+      }
+
+      // Fallback to http for local development
+      proto = proto || req.protocol || 'http';
+
       return `${proto}://${host}/api/auth/google/callback`;
     };
 
