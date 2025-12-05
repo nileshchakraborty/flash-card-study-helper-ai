@@ -12,3 +12,7 @@ build/
 .vercel
 .env*.local
 .env.backup
+coverage/*
+coverage/*/*
+test_output.txt
+dump.rdb
