@@ -68,3 +68,8 @@ Welcome to the MindFlip AI Backend documentation wiki. This wiki provides compre
 - [Issue Tracker](https://github.com/your-repo/mindflip-ai/issues)
 - [Changelog](https://github.com/your-repo/mindflip-ai/blob/main/CHANGELOG.md)
 
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+
+**Latest:** Runtime preference (Ollama/WebLLM) with automatic fallback; flashcard validation/repair ensures correct JSON and requested counts; client-side generation will fall back to backend if underfilled.

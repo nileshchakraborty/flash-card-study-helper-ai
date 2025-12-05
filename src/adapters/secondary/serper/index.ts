@@ -1,12 +1,12 @@
 import axios from 'axios';
-import type { SearchServicePort } from '../../../core/ports/interfaces.js';
+import type { SearchResult, SearchServicePort } from '../../../core/ports/interfaces.js';
 import type { CacheService } from '../../../core/services/CacheService.js';
 
 export class SerperAdapter implements SearchServicePort {
   private apiKey: string;
-  private cache?: CacheService<any[]>;
+  private cache?: CacheService<SearchResult[]>;
 
-  constructor(cache?: CacheService<any[]>) {
+  constructor(cache?: CacheService<SearchResult[]>) {
     this.apiKey = process.env.SERPER_API_KEY || '';
     this.cache = cache;
 
@@ -18,7 +18,7 @@ export class SerperAdapter implements SearchServicePort {
     }
   }
 
-  async search(query: string): Promise<any[]> {
+  async search(query: string): Promise<SearchResult[]> {
     if (!this.apiKey) {
       console.warn('Serper API key not configured, skipping web search');
       return [];
@@ -40,7 +40,11 @@ export class SerperAdapter implements SearchServicePort {
         { q: query },
         { headers: { 'X-API-KEY': this.apiKey, 'Content-Type': 'application/json' } }
       );
-      const results = response.data.organic || [];
+      const results: SearchResult[] = (response.data.organic || []).map((item: any) => ({
+        title: item.title ?? '',
+        link: item.link ?? '',
+        snippet: item.snippet ?? ''
+      }));
       console.log('Serper returned', results.length, 'results');
 
       // Store in cache

@@ -10,23 +10,41 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
     return msg;
 });
 
+const isServerless =
+    process.env.VERCEL === '1' ||
+    process.env.NOW_REGION !== undefined ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
+
+// Never write to disk in serverless or production to avoid ENOENT on /tmp
+const enableFileLogs =
+    process.env.LOG_TO_FILE === 'true' &&
+    !isServerless &&
+    process.env.NODE_ENV !== 'production';
+
+const transports: winston.transport[] = [
+    new winston.transports.Console({
+        format: combine(
+            colorize(),
+            timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            logFormat
+        )
+    })
+];
+
+if (enableFileLogs) {
+    transports.push(
+        new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'logs/combined.log' })
+    );
+}
+
 export const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
     format: combine(
         timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         json()
     ),
-    transports: [
-        new winston.transports.Console({
-            format: combine(
-                colorize(),
-                timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-                logFormat
-            )
-        }),
-        new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'logs/combined.log' })
-    ]
+    transports
 });
 
 export class LoggerService {

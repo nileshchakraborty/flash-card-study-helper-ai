@@ -7,23 +7,53 @@ import { apiService } from '../services/api.service.js';
 export class QuizView extends BaseView {
   constructor() {
     super();
-    this.elements = {
-      setup: this.getElement('#quiz-setup'),
-      questions: this.getElement('#quiz-questions'),
-      results: this.getElement('#quiz-results'),
-      questionText: this.getElement('#question-text'),
-      optionsContainer: this.getElement('#options-container'),
-      prevBtn: this.getElement('#prev-question'),
-      nextBtn: this.getElement('#next-question'),
-      submitBtn: this.getElement('#submit-quiz'),
-      historyList: this.getElement('#quiz-history-list'),
-      startBtn: this.getElement('#start-quiz-btn'),
-      webQuizBtn: this.getElement('#quiz-from-web'),
-      webOptions: this.getElement('#web-quiz-options'),
-      popup: this.getElement('#quiz-completion-popup'),
-      popupScore: this.getElement('#popup-score'),
-      popupMessage: this.getElement('#popup-message'),
-      closePopupBtn: this.getElement('#btn-close-popup')
+    this.DOM = {
+      setup: document.getElementById('quiz-setup'),
+      questions: document.getElementById('quiz-questions'),
+      results: document.getElementById('quiz-results'),
+      historySection: document.getElementById('quiz-history-section'),
+      historyList: document.getElementById('quiz-history-list'),
+      quizForm: document.getElementById('quiz-form'),
+      fromCardsBtn: document.getElementById('quiz-from-cards'),
+      fromWebBtn: document.getElementById('quiz-from-web'),
+      webQuizOptions: document.getElementById('web-quiz-options'),
+      topicInput: document.getElementById('quiz-topic-input'),
+      sizeInput: document.getElementById('quiz-size') as HTMLInputElement,
+      timerSelect: document.getElementById('quiz-timer') as HTMLSelectElement,
+      completionPopup: document.getElementById('quiz-completion-popup'),
+      popupScore: document.getElementById('popup-score'),
+      popupMessage: document.getElementById('popup-message'),
+      btnTryHarder: document.getElementById('btn-try-harder'),
+      btnRevise: document.getElementById('btn-revise'),
+      btnNewQuiz: document.getElementById('btn-new-quiz'),
+      closePopup: document.getElementById('close-quiz-popup'),
+      // New elements
+      fromFlashcardsBtn: document.getElementById('quiz-from-flashcards-btn'),
+      fromTopicBtn: document.getElementById('quiz-from-topic-btn'),
+      topicQuizForm: document.getElementById('topic-quiz-form'),
+      createQuizTopicForm: document.getElementById('create-quiz-topic-form'),
+      quizTopicInputNew: document.getElementById('quiz-topic-input-new') as HTMLInputElement,
+      quizTopicCount: document.getElementById('quiz-topic-count') as HTMLInputElement,
+      quizTopicTimer: document.getElementById('quiz-topic-timer') as HTMLSelectElement,
+      cancelTopicQuiz: document.getElementById('cancel-topic-quiz'),
+      availableQuizzesList: document.getElementById('available-quizzes-list'),
+      flashcardModal: document.getElementById('flashcard-selection-modal'),
+      flashcardList: document.getElementById('flashcard-list'),
+      selectedFlashcardCount: document.getElementById('selected-flashcard-count'),
+      confirmFlashcardSelection: document.getElementById('confirm-flashcard-selection'),
+      cancelFlashcardSelection: document.getElementById('cancel-flashcard-selection'),
+      closeFlashcardModal: document.getElementById('close-flashcard-modal'),
+      // Existing elements that need to be updated to DOM
+      questionText: document.getElementById('question-text'),
+      optionsContainer: document.getElementById('options-container'),
+      prevBtn: document.getElementById('prev-question'),
+      nextBtn: document.getElementById('next-question'),
+      submitBtn: document.getElementById('submit-quiz'),
+      startBtn: document.getElementById('start-quiz-btn'),
+      webQuizBtn: document.getElementById('quiz-from-web'),
+      webOptions: document.getElementById('web-quiz-options'),
+      popup: document.getElementById('quiz-completion-popup'),
+      closePopupBtn: document.getElementById('btn-close-popup')
     };
 
     this.init();
@@ -50,25 +80,195 @@ export class QuizView extends BaseView {
     eventBus.on('quiz:history-updated', (history) => {
       this.renderHistory(history);
     });
+
+    eventBus.on('quiz:available-updated', (quizzes) => {
+      this.renderAvailableQuizzes(quizzes);
+    });
+  }
+
+  // NEW METHODS FOR ENHANCED QUIZ SYSTEM
+
+  /**
+   * Render flashcard selection modal
+   */
+  renderFlashcardSelectionModal(flashcards: any[], selectedIds: Set<string> = new Set()) {
+    if (!this.DOM.flashcardList || !this.DOM.flashcardModal) return;
+
+    if (!flashcards || flashcards.length === 0) {
+      this.DOM.flashcardList.innerHTML = `
+        <div class="col-span-2 text-center text-gray-500 py-8">
+          <span class="material-icons text-5xl mb-2 opacity-50">inbox</span>
+          <p>No flashcards available.</p>
+          <p class="text-sm mt-2">Create some flashcards first!</p>
+        </div>
+      `;
+      return;
+    }
+
+    this.DOM.flashcardList.innerHTML = flashcards.map(fc => `
+      <div 
+        class="flashcard-item p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-lg ${selectedIds.has(fc.id)
+        ? 'border-purple-500 bg-purple-50'
+        : 'border-gray-200 hover:border-purple-200'
+      }"
+        data-flashcard-id="${fc.id}">
+        <div class="flex items-start justify-between mb-2">
+          <div class="flex-1">
+            <div class="font-semibold text-gray-900 mb-1">${this.escapeHtml(fc.front)}</div>
+            <div class="text-sm text-gray-600">${this.escapeHtml(fc.back)}</div>
+          </div>
+          <div class="ml-3">
+            <span class="material-icons text-purple-500 ${selectedIds.has(fc.id) ? '' : 'opacity-0'}">
+              check_circle
+            </span>
+          </div>
+        </div>
+        ${fc.topic ? `<div class="text-xs text-gray-500 mt-1">${this.escapeHtml(fc.topic)}</div>` : ''}
+      </div>
+    `).join('');
+
+    // Update count
+    if (this.DOM.selectedFlashcardCount) {
+      this.DOM.selectedFlashcardCount.textContent = `${selectedIds.size} selected`;
+    }
+
+    // Update button state
+    if (this.DOM.confirmFlashcardSelection) {
+      this.DOM.confirmFlashcardSelection.disabled = selectedIds.size === 0;
+    }
+
+    // Show modal
+    this.DOM.flashcardModal.classList.remove('hidden');
+  }
+
+  /**
+   * Hide flashcard selection modal
+   */
+  hideFlashcardSelectionModal() {
+    if (this.DOM.flashcardModal) {
+      this.DOM.flashcardModal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Render available quizzes list
+   */
+  renderAvailableQuizzes(quizzes: any[]) {
+    if (!this.DOM.availableQuizzesList) return;
+
+    if (!quizzes || quizzes.length === 0) {
+      this.DOM.availableQuizzesList.innerHTML = `
+        <div class="text-gray-500 text-sm italic flex items-center justify-between">
+          <span>No quizzes created yet.</span>
+          <button class="text-indigo-600 hover:text-indigo-800 font-semibold" id="available-create-btn">Create Quiz</button>
+        </div>
+      `;
+      const btn = document.getElementById('available-create-btn');
+      if (btn) btn.addEventListener('click', () => {
+        const tabBtn = document.querySelector('[data-tab="create-quiz"]') as HTMLElement;
+        tabBtn?.click();
+      });
+      return;
+    }
+
+    this.DOM.availableQuizzesList.innerHTML = quizzes.map(quiz => `
+      <button type="button"
+        class="quiz-item w-full text-left p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/70 transition-all cursor-pointer group flex items-center justify-between"
+        data-quiz-id="${quiz.id}">
+        <div class="flex-1">
+          <div class="font-semibold text-gray-900 mb-1">${this.escapeHtml(quiz.topic)}</div>
+          <div class="text-sm text-gray-600">
+            ${(quiz.questions?.length || 0)} questions • 
+            ${quiz.source === 'flashcards' ? '📚 From Flashcards' : '🌐 From Topic'}
+          </div>
+          <div class="text-xs text-gray-500 mt-1">
+            Created ${this.formatTimeAgo(quiz.createdAt)}
+          </div>
+        </div>
+        <span class="material-icons text-4xl text-indigo-600 group-hover:text-indigo-800">play_circle_filled</span>
+      </button>
+    `).join('');
+
+    // Delegate click handling to the container to avoid missing bindings
+    this.DOM.availableQuizzesList.onclick = (e: Event) => {
+      const target = (e.target as HTMLElement);
+      const container = target.closest('.quiz-item') as HTMLElement | null;
+      const quizId = container?.dataset.quizId;
+
+      console.log('[QuizView] available quiz click', {
+        target: target.tagName,
+        quizId,
+        hasContainer: !!container
+      });
+
+      if (!quizId) return;
+      eventBus.emit('quiz:start-prefetched', { quizId });
+    };
+  }
+
+  /**
+   * Show topic quiz form
+   */
+  showTopicQuizForm() {
+    if (this.DOM.topicQuizForm) {
+      this.DOM.topicQuizForm.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Hide topic quiz form
+   */
+  hideTopicQuizForm() {
+    if (this.DOM.topicQuizForm) {
+      this.DOM.topicQuizForm.classList.add('hidden');
+      // Reset form
+      if (this.DOM.createQuizTopicForm) {
+        (this.DOM.createQuizTopicForm as HTMLFormElement).reset();
+      }
+    }
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Format time ago
+   */
+  private formatTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
   }
 
   bindEvents() {
     // Quiz form submission
-    const quizForm = this.getElement('#quiz-form');
+    const quizForm = this.DOM.quizForm; // Changed from this.getElement('#quiz-form')
     if (quizForm) {
       this.bind(quizForm, 'submit', async (e) => {
         e.preventDefault();
         const countInput = this.getElement('#quiz-size') as HTMLInputElement;
         const topicInput = this.getElement('#quiz-topic-input') as HTMLInputElement;
         const timerInput = this.getElement('#quiz-timer') as HTMLSelectElement;
-        
+
         const count = parseInt(countInput?.value || '5');
         const topic = topicInput?.value || 'General';
         const timer = parseInt(timerInput?.value || '0');
-        
+
         // Store timer setting
         (window as any).quizTimer = timer;
-        
+
         eventBus.emit('quiz:request-start', { count, topic, timer });
       });
     }
@@ -166,7 +366,7 @@ export class QuizView extends BaseView {
         `).join('')}
       </div>
     `;
-    
+
     if (this.elements.results) {
       this.elements.results.innerHTML = resultsHTML;
     }
@@ -180,7 +380,7 @@ export class QuizView extends BaseView {
     if (questionText) {
       // Clear existing content
       questionText.innerHTML = '';
-      
+
       // Create question element
       const questionDiv = document.createElement('div');
       questionDiv.className = 'mb-6';
@@ -189,19 +389,18 @@ export class QuizView extends BaseView {
         <div class="space-y-3" id="quiz-options-container"></div>
       `;
       questionText.appendChild(questionDiv);
-      
+
       const optionsContainer = questionText.querySelector('#quiz-options-container');
-      
+
       // Render options
       if (optionsContainer && question.options) {
         question.options.forEach((option, index) => {
           const btn = document.createElement('button');
           const isSelected = quizModel.answers[question.id] === option;
-          btn.className = `w-full text-left p-4 rounded-lg border-2 transition-all ${
-            isSelected 
-              ? 'border-primary bg-primary/10 text-primary' 
+          btn.className = `w-full text-left p-4 rounded-lg border-2 transition-all ${isSelected
+              ? 'border-primary bg-primary/10 text-primary'
               : 'border-gray-200 hover:border-gray-300 bg-white'
-          }`;
+            }`;
           btn.textContent = option;
           btn.onclick = () => {
             quizModel.answerQuestion(question.id, option);
@@ -354,6 +553,7 @@ export class QuizView extends BaseView {
     if (loadingOverlay) {
       loadingOverlay.classList.remove('hidden');
     }
+    this.updateLoadingProgress(0, 'Preparing your quiz...');
   }
 
   hideLoading() {
@@ -361,5 +561,18 @@ export class QuizView extends BaseView {
     if (loadingOverlay) {
       loadingOverlay.classList.add('hidden');
     }
+  }
+
+  updateLoadingProgress(progress?: number, message?: string) {
+    const progressEl = document.getElementById('loading-progress');
+    const progressBar = document.getElementById('loading-progress-bar') as HTMLElement | null;
+    const parts = [];
+    if (typeof progress === 'number') {
+      const pct = Math.max(0, Math.min(100, Math.round(progress)));
+      parts.push(`Progress: ${pct}%`);
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    }
+    if (message) parts.push(message);
+    if (progressEl) progressEl.textContent = parts.join(' • ') || 'Working...';
   }
 }

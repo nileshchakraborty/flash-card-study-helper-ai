@@ -2,7 +2,37 @@
 
 **A backend-focused service for AI-powered flashcard generation and study assistance.**
 
-This project implements a **Clean Architecture**-based API that leverages LLMs (Ollama, WebLLM) and web search (Serper) to generate high-quality educational content. The frontend is provided as a reference implementation to demonstrate the API's capabilities.
+This project implements a **Clean Architecture** API that leverages LLMs (WebLLM-first with quality gate and Ollama fallback) plus optional web search (Serper) to generate high-quality educational content. Frontend is a reference SPA that now supports PDF-only generation/quiz, prefetched quizzes, and settings-driven runtime selection.
+
+### Current Architecture Snapshot
+
+```mermaid
+flowchart TD
+  UI["SPA"] -->|events| AppController
+  AppController --> QuizHandlers
+  AppController --> GeneratorView
+  AppController --> StudyView
+  AppController --> QuizView
+
+  AppController -->|REST or GraphQL| API["Express Server"]
+  API --> StudyService
+  StudyService -->|AI adapters quality gate| WebLLM["WebLLM runtime"]
+  StudyService -->|fallback validation| Ollama["Ollama API"]
+  StudyService --> Serper["Serper / Web search"]
+  StudyService --> FlashcardStorage["FlashcardStorageService"]
+  StudyService --> QuizStorage["QuizStorageService"]
+  StudyService --> Queue["BullMQ Queue"]
+  API --> Upload["File Upload -> processFile"]
+  Upload --> FlashcardStorage
+  GeneratorView -->|llmOrchestrator| WebLLM
+```
+
+## Type Safety & Code Quality
+- TypeScript strict mode is enabled (noImplicitAny, strictNullChecks, noUnusedLocals/Params, noFallthroughCasesInSwitch).
+- Prefer `unknown` over `any`; add type guards at API/LLM boundaries. See `src/adapters/primary/express/validators.ts` for request guards.
+- Core models are readonly and use literal unions for runtimes (`ollama` | `webllm`) and knowledge sources.
+- ESLint config (`.eslintrc.cjs`) enforces: no explicit `any`, prefer-readonly, no non-null assertions, explicit return types for exported APIs.
+- When adding routes, include a small runtime validator before using request bodies; keep assertions to a minimum.
 
 ## 🏗 Architecture
 
@@ -15,12 +45,16 @@ The system follows **Clean Architecture** principles to ensure separation of con
   - `StudyUseCase`: Primary port for the application.
   - `LLMPort`, `SearchPort`: Secondary ports for AI and Search services.
 - **Adapters**: Implements the ports.
-  - **Primary**: Express Server (REST API).
+  - **Primary**: 
+    - `Express Server` (REST API).
+    - `Apollo Server` (GraphQL API).
   - **Secondary**: 
     - `HybridOllamaAdapter`: Connects to Ollama via MCP or direct (with fallback).
     - `WebLLMAdapter`: Connects to browser-based LLM (via client bridge).
     - `HybridSerperAdapter`: Connects to Serper.dev via MCP or direct (with fallback).
     - `FileSystemAdapter`: Handles file I/O.
+    - `SubscriptionService`: Handles real-time updates via PubSub (WebSocket ready).
+    - **Runtime Preference + Fallback**: User-selectable runtime (Ollama or WebLLM). Server tries preferred runtime → alternate runtime → local fallback.
 - **MCP Layer** (Optional, Feature Flag):
   - `MCPClientWrapper`: Connects to MCP server with circuit breaker.
   - `MCP Server`: Standalone process with tools for Ollama, Serper, etc.
@@ -94,12 +128,51 @@ graph TB
 
 ## 📖 API Documentation
 
+### REST API
+
 Interactive API documentation is available via **Swagger UI**:
 
 - **URL**: `http://localhost:3000/api-docs`
 - **Specification**: `swagger.yaml`
 
 Explore and test all endpoints directly from your browser.
+
+### GraphQL API ✨ NEW
+
+The application now supports a modern GraphQL API alongside REST:
+
+- **Endpoint**: `http://localhost:3000/graphql`
+- **Documentation**: See [docs/graphql-api.md](docs/graphql-api.md) | [Examples](docs/graphql-examples.md)
+- **Playground**: Apollo Sandbox available in development at `/graphql`
+
+**Key Features:**
+- 🔀 **Hybrid Mode**: Automatic fallback to REST API if GraphQL fails
+- 🔐 **Full Authentication**: JWT-based auth for protected operations
+- ⚡ **Efficient Queries**: Request only the data you need
+- 🎯 **Type Safety**: GraphQL schema with strong typing
+- 📦 **Batching Support**: Multiple operations in single request
+
+**Enable GraphQL Mode:**
+```javascript
+localStorage.setItem('USE_GRAPHQL', 'true');
+location.reload();
+```
+
+**LLM Runtime Preference (NEW):**
+- Choose preferred runtime (Ollama or WebLLM) in the in-app **Settings** modal (header → Settings).
+- The app will try your preference first, then automatically fall back to the other runtime, then to a local quiz fallback.
+
+**Compare APIs:**
+```bash
+# REST: Multiple requests for deck + cards
+curl /api/decks
+curl /api/decks/:id
+
+# GraphQL: Single request
+curl -X POST /graphql -d '{
+  "query": "{ deck(id: \"abc\") { topic cards { front back } } }"
+}'
+```
 
 ## ✨ Key Features
 
@@ -127,6 +200,9 @@ Explore and test all endpoints directly from your browser.
 - 🔍 Web search integration (Serper)
 - 📄 PDF/Image processing for flashcard generation
 - 🎓 Quiz generation from flashcards
+- ✅ Validation & Self-Repair: Generated flashcards are validated for strict JSON/question-answer shape; if invalid/insufficient, the system re-prompts the runtime to repair before returning.
+- 📏 Count Enforcement: Returned flashcards are trimmed/padded to match the requested count; client-side generation auto-falls back to backend if underfilled.
+- 🛡️ Runtime fallback ladder: Preferred runtime (configurable) → alternate runtime → local quiz fallback to prevent failures when an LLM is unavailable
 
 ## 🚀 Getting Started
 
@@ -216,7 +292,7 @@ npm run dev
 
 - **API Root**: `http://localhost:3000/api`
 - **Swagger UI**: `http://localhost:3000/api-docs`
-- **Demo Client**: `http://localhost:3000`
+- **Demo Client**: `http://localhost:3000` (Quiz now lives inside the SPA; `Take Quiz` no longer redirects to `quiz.html`)
 - **Health Check**: `http://localhost:3000/api/health`
 
 ## 📡 Key API Endpoints
@@ -303,6 +379,10 @@ flash-card-study-helper-ai/
 │   │   ├── domain/      # Business Models
 │   │   ├── ports/       # Interface Definitions
 │   │   └── services/    # Core Business Logic
+│   ├── graphql/         # GraphQL API (New)
+│   │   ├── resolvers/   # Query/Mutation resolvers
+│   │   ├── schema/      # Type definitions
+│   │   └── plugins/     # Apollo plugins
 │   └── index.ts         # Composition Root
 ├── public/              # Frontend Demo
 ├── tests/               # Unit & Integration Tests

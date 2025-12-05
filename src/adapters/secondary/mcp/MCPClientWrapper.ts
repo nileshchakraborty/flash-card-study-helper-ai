@@ -21,7 +21,7 @@ export class MCPClientWrapper {
     private transport: StdioClientTransport | null = null;
     private serverProcess: ChildProcess | null = null;
     private connected = false;
-    private circuitBreaker: CircuitBreaker;
+    private circuitBreaker: any;
     private config: MCPClientConfig;
     private reconnecting = false;
 
@@ -73,18 +73,20 @@ export class MCPClientWrapper {
             logger.info('Starting MCP server', { command, args });
 
             // Spawn MCP server process
-            this.serverProcess = spawn(command, args, {
+            const serverProcess = spawn(command || 'node', args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
                 cwd: process.cwd(),
             });
 
+            this.serverProcess = serverProcess;
+
             // Handle server process errors
-            this.serverProcess.on('error', (error) => {
+            serverProcess.on('error', (error) => {
                 logger.error('MCP server process error', { error: error.message });
                 this.connected = false;
             });
 
-            this.serverProcess.on('exit', (code) => {
+            serverProcess.on('exit', (code) => {
                 logger.warn('MCP server process exited', { code });
                 this.connected = false;
                 this.attemptReconnect();
@@ -92,7 +94,7 @@ export class MCPClientWrapper {
 
             // Create transport
             this.transport = new StdioClientTransport({
-                command,
+                command: command || 'node',
                 args,
             });
 
@@ -156,12 +158,14 @@ export class MCPClientWrapper {
             });
 
             if (response.isError) {
-                const errorText = response.content[0]?.text || 'Unknown error';
+                const content: any = response.content;
+                const errorText = content[0]?.text || 'Unknown error';
                 logger.error('MCP tool returned error', { tool: name, error: errorText });
                 throw new Error(`MCP tool ${name} failed: ${errorText}`);
             }
 
-            const resultText = response.content[0]?.text || '{}';
+            const content: any = response.content;
+            const resultText = content[0]?.text || '{}';
             const result = JSON.parse(resultText);
 
             logger.debug('MCP tool succeeded', { tool: name });

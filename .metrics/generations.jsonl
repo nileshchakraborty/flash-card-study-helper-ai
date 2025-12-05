@@ -13,3 +13,63 @@
 {"runtime":"webllm","knowledgeSource":"ai-web","mode":"standard","topic":"calculus","cardCount":2,"duration":6503,"success":true,"timestamp":1763943878213}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"calculus","cardCount":10,"duration":12889,"success":true,"timestamp":1763943898319}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Euler's Method, Multivariable Calculus, Differential Equations, Variational Calculus, Integral Equations (Fundamentals)","cardCount":10,"duration":19271,"success":true,"timestamp":1763943942384}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Test Flashcards","cardCount":1,"duration":4746,"success":true,"timestamp":1764285811214}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Testing","cardCount":0,"duration":2238,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764463959656}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Test Auth","cardCount":0,"duration":4884,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464346205}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"GraphQL Auth Success Test","cardCount":0,"duration":1543,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764464819742}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"go lang","cardCount":3,"duration":12289,"success":true,"timestamp":1764732843143}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":10696,"success":true,"timestamp":1764732951397}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"The Moon","cardCount":2,"duration":9654,"success":true,"timestamp":1764817143317}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"solar","cardCount":10,"duration":14688,"success":true,"timestamp":1764818603772}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"solar","cardCount":10,"duration":883,"success":true,"timestamp":1764818604660}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"solar","cardCount":10,"duration":684,"success":true,"timestamp":1764818605352}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Thermal Power Generation","cardCount":5,"duration":16375,"success":true,"timestamp":1764818621738}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Photovoltaic Panel Efficiency and Optimization","cardCount":5,"duration":19183,"success":true,"timestamp":1764818640925}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Smart Grid Integration for Renewable Energy","cardCount":5,"duration":9682,"success":true,"timestamp":1764818650610}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Thermal Power Generation","cardCount":5,"duration":527,"success":true,"timestamp":1764818651140}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Photovoltaic Panel Efficiency and Optimization","cardCount":5,"duration":1401,"success":true,"timestamp":1764818652543}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Smart Grid Integration for Renewable Energy","cardCount":5,"duration":295,"success":true,"timestamp":1764818652841}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Thermal Power Generation","cardCount":5,"duration":222,"success":true,"timestamp":1764818653065}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Solar Photovoltaic Panel Efficiency and Optimization","cardCount":5,"duration":925,"success":true,"timestamp":1764818653992}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Smart Grid Integration for Renewable Energy","cardCount":5,"duration":355,"success":true,"timestamp":1764818654349}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"planets","cardCount":4,"duration":15227,"success":true,"timestamp":1764819608501}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"planet","cardCount":2,"duration":8097,"success":true,"timestamp":1764819817837}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"planet","cardCount":10,"duration":16308,"success":true,"timestamp":1764819855902}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Tidal Heating","cardCount":5,"duration":12845,"success":true,"timestamp":1764819868757}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Exoplanetary Habitability","cardCount":5,"duration":13193,"success":true,"timestamp":1764819881955}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":8120,"success":true,"timestamp":1764820091588}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":4,"duration":13598,"success":true,"timestamp":1764820302753}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"python","cardCount":10,"duration":20009,"success":true,"timestamp":1764820333509}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Decorators with Context Managers","cardCount":5,"duration":12220,"success":true,"timestamp":1764820345740}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Asynchronous Programming with async/await","cardCount":5,"duration":12394,"success":true,"timestamp":1764820358142}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Type Hints and Advanced Type Checking","cardCount":5,"duration":12567,"success":true,"timestamp":1764820370719}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":1476,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821484848}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":525,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821487477}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":720,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821492245}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":1406,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821556133}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":170,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821558322}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":0,"duration":124,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821562548}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"groovy","cardCount":0,"duration":2342,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821743087}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"groovy","cardCount":0,"duration":380,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821745528}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"groovy","cardCount":0,"duration":1113,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821750727}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":2375,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821791167}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":1147,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821794390}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":1273,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764821799702}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":10,"duration":24429,"success":true,"timestamp":1764821980880}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"python","cardCount":10,"duration":27310,"success":true,"timestamp":1764822022223}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Concurrency and Parallelism: Asyncio & Multithreading Patterns","cardCount":5,"duration":12110,"success":true,"timestamp":1764822034343}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Memory Management and the GIL (Global Interpreter Lock)","cardCount":5,"duration":20068,"success":true,"timestamp":1764822054418}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Advanced Design Patterns in Python","cardCount":5,"duration":25600,"success":true,"timestamp":1764822080029}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"neural network","cardCount":10,"duration":51451,"success":true,"timestamp":1764822580660}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"neural network","cardCount":10,"duration":45726,"success":true,"timestamp":1764822976096}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":10,"duration":42891,"success":true,"timestamp":1764823277380}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"fastapi","cardCount":10,"duration":21654,"success":true,"timestamp":1764824243655}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":40909,"success":true,"timestamp":1764824395921}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"go lang","cardCount":10,"duration":31665,"success":true,"timestamp":1764824552936}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":54090,"success":true,"timestamp":1764824772136}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"spring boot","cardCount":10,"duration":28959,"success":true,"timestamp":1764824942204}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":10,"duration":23109,"success":true,"timestamp":1764825751510}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":16700,"success":true,"timestamp":1764825962214}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":11956,"success":true,"timestamp":1764826157747}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":14208,"success":true,"timestamp":1764826305089}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":11154,"success":true,"timestamp":1764826469531}

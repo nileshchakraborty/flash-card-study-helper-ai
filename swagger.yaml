@@ -452,6 +452,10 @@ components:
           type: string
           enum: [ollama, webllm]
           description: Which AI runtime to use
+        preferredRuntime:
+          type: string
+          enum: [ollama, webllm]
+          description: User-preferred runtime; server falls back to alternate then local validation
         knowledgeSource:
           type: string
           enum: [ai-only, web-only, ai-web]
@@ -577,16 +581,21 @@ components:
             $ref: '#/components/schemas/Flashcard'
     QuizRequest:
       type: object
-      required:
-        - cards
-        - topic
       properties:
-        cards:
-          type: array
-          items:
-            $ref: '#/components/schemas/Flashcard'
         topic:
           type: string
+          description: Topic to generate quiz from (mutually exclusive with flashcardIds)
+        flashcardIds:
+          type: array
+          items:
+            type: string
+          description: Array of flashcard IDs to generate quiz from (mutually exclusive with topic)
+        numQuestions:
+          type: integer
+          description: Number of questions to generate (default: 5 or 10)
+      example:
+        topic: "Neural Networks"
+        numQuestions: 5
     QuizResponse:
       type: object
       properties:

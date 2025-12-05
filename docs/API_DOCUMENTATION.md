@@ -13,6 +13,7 @@
    - [File Upload](#file-upload)
    - [Storage & History](#storage--history)
    - [Admin & Monitoring](#admin--monitoring)
+   - [GraphQL API](#graphql-api)
 5. [WebSocket API](#websocket-api)
 6. [Error Handling](#error-handling)
 7. [Rate Limiting](#rate-limiting)
@@ -83,7 +84,7 @@ OAuth callback endpoint.
 
 #### `POST /api/generate`
 
-Generate flashcards for a topic. Returns immediately with a job ID for async processing.
+Generate flashcards for a topic. Returns immediately with a job ID for async processing. Server validates and, if needed, self-repairs malformed model output before returning results.
 
 **Authentication**: Required  
 **Rate Limit**: 100 requests/15 minutes
@@ -106,6 +107,7 @@ Generate flashcards for a topic. Returns immediately with a job ID for async pro
 - `mode` (string, optional): `"standard"` or `"deep-dive"` (default: "standard")
 - `knowledgeSource` (string, optional): `"ai-only"`, `"web-only"`, or `"ai-web"` (default: "ai-web")
 - `runtime` (string, optional): `"ollama"` or `"webllm"` (default: "ollama")
+- `preferredRuntime` (string, optional): user-preferred runtime; server will try preferred → alternate → local fallback
 - `parentTopic` (string, optional): Parent topic for context
 
 **Response** (200 OK):
@@ -523,6 +525,42 @@ Get queue statistics.
   "delayed": 0
 }
 ```
+
+---
+
+---
+
+## GraphQL API
+
+The application now supports a modern GraphQL API alongside REST.
+
+**Endpoint**: `/graphql`  
+**Documentation**: [docs/graphql-api.md](graphql-api.md)
+
+### Key Features
+- **Hybrid Mode**: Automatic fallback to REST API if GraphQL fails
+- **Full Authentication**: JWT-based auth for protected operations
+- **Efficient Queries**: Request only the data you need
+- **Batching Support**: Multiple operations in single request
+- **Subscriptions**: Real-time updates (via polling or WebSocket)
+
+### Example Query
+
+```graphql
+query {
+  health
+  decks {
+    id
+    topic
+    cards {
+      front
+      back
+    }
+  }
+}
+```
+
+For full documentation, schema details, and examples, please refer to the [GraphQL API Documentation](graphql-api.md).
 
 ---
 

@@ -6,7 +6,7 @@ export interface CacheOptions {
     maxEntries: number;
 }
 
-export class CacheService<T = any> {
+export class CacheService<T extends {} = any> {
     private cache: LRUCache<string, T>;
 
     constructor(options: CacheOptions) {

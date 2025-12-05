@@ -13,19 +13,19 @@ import type { WebLLMService } from '../../../core/services/WebLLMService.js';
 
 export class WebLLMAdapter implements AIServicePort {
     private cache?: CacheService<any>;
-    private webllmService?: WebLLMService;
+    // private _webllmService?: WebLLMService;
 
-    constructor(cache?: CacheService<any>, webllmService?: WebLLMService) {
+    constructor(cache?: CacheService<any>, _webllmService?: WebLLMService) {
         this.cache = cache;
-        this.webllmService = webllmService;
+        // this._webllmService = webllmService;
         console.log('🌐 WebLLMAdapter initialized (WebSocket-based)');
     }
 
     /**
      * Set WebLLM service (injected after service creation)
      */
-    setWebLLMService(service: WebLLMService): void {
-        this.webllmService = service;
+    setWebLLMService(_service: WebLLMService): void {
+        // this._webllmService = service;
     }
 
     /**
@@ -49,7 +49,7 @@ export class WebLLMAdapter implements AIServicePort {
         throw new Error('WebLLM generation requires WebSocket session. Use /api/webllm/session endpoint first.');
     }
 
-    async generateFlashcardsFromText(text: string, topic: string, count: number, pageInfo?: any): Promise<Flashcard[]> {
+    async generateFlashcardsFromText(text: string, topic: string, count: number, _pageInfo?: any): Promise<Flashcard[]> {
         const crypto = await import('crypto');
         const textHash = crypto.createHash('sha256').update(text.substring(0, 10000)).digest('hex').substring(0, 16);
         const cacheKey = `webllm:flashcards-text:${textHash}:${topic}:${count}`;
@@ -62,7 +62,7 @@ export class WebLLMAdapter implements AIServicePort {
         throw new Error('WebLLM generation requires WebSocket session. Use /api/webllm/session endpoint first.');
     }
 
-    async generateBriefAnswer(question: string, context: string): Promise<string> {
+    async generateBriefAnswer(question: string, _context: string): Promise<string> {
         const cacheKey = `webllm:brief:${question.substring(0, 50)}`;
         if (this.cache) {
             const cached = this.cache.get(cacheKey);
@@ -102,11 +102,11 @@ export class WebLLMAdapter implements AIServicePort {
         throw new Error('WebLLM generation requires WebSocket session. Use /api/webllm/session endpoint first.');
     }
 
-    async generateQuizFromFlashcards(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]> {
+    async generateQuizFromFlashcards(_flashcards: Flashcard[], _count: number): Promise<QuizQuestion[]> {
         throw new Error('WebLLM generation requires WebSocket session. Use /api/webllm/session endpoint first.');
     }
 
-    async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
+    async generateAdvancedQuiz(_previousResults: any, _mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
         throw new Error('WebLLM generation requires WebSocket session. Use /api/webllm/session endpoint first.');
     }
 }

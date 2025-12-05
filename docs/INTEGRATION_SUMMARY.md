@@ -47,7 +47,13 @@
 - ✅ All business logic in backend
 - ✅ Frontend only provides WebGPU runtime
 - ✅ WebLLM orchestration handled by backend
-
+### 8. GraphQL API Integration
+- ✅ Implemented Apollo Server alongside Express
+- ✅ Created dual-mode API (REST + GraphQL)
+- ✅ Implemented hybrid adapters with automatic fallback
+- ✅ Added Subscription support (backend ready)
+- ✅ Integrated Authentication (JWE) into GraphQL context
+- ✅ Created `docs/graphql-api.md` documentation
 ## 📁 File Structure
 
 ```
@@ -238,3 +244,11 @@ The backend can be:
 - Used by mobile apps
 - Consumed by third-party services
 
+
+
+**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
+
+### 9. Runtime Preference & Validation (Latest)
+✅ User-selectable preferred runtime (Ollama or WebLLM) with automatic fallback to alternate then local
+✅ Flashcard generation validated for strict Q/A JSON; malformed/insufficient outputs are auto-repaired before returning
+✅ Client-side generation falls back to backend if underfilled

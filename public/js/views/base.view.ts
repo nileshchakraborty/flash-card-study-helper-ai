@@ -18,9 +18,14 @@ export class BaseView {
   show(element: HTMLElement | null): void {
     if (element) element.classList.remove('hidden');
   }
-  
+
   hide(element: HTMLElement | null): void {
     if (element) element.classList.add('hidden');
+  }
+
+  setText(selector: string, text: string): void {
+    const el = document.querySelector(selector);
+    if (el) el.textContent = text;
   }
   
   bind(element: HTMLElement | null, event: string, handler: EventListener): void {

@@ -103,10 +103,10 @@ export class DeckModel {
   getStats() {
     return {
       total: this.cards.length,
-      remaining: this.cards.length - this.currentIndex,
+      remaining: Math.max(this.cards.length - this.currentIndex - 1, 0),
       left: this.leftSwipes,
       right: this.rightSwipes,
-      progress: this.cards.length > 0 ? (this.currentIndex / this.cards.length) * 100 : 0
+      progress: this.cards.length > 0 ? ((this.currentIndex + 1) / this.cards.length) * 100 : 0
     };
   }
   

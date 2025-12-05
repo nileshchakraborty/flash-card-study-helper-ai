@@ -4,13 +4,13 @@ import { LoggerService } from './LoggerService.js';
 const logger = new LoggerService();
 
 export class ResilienceService {
-    private breakers: Map<string, CircuitBreaker>;
+    private breakers: Map<string, any>;
 
     constructor() {
         this.breakers = new Map();
     }
 
-    getBreaker(name: string, action: any, options?: CircuitBreaker.Options): CircuitBreaker {
+    getBreaker(name: string, action: any, options?: any): any {
         if (!this.breakers.has(name)) {
             const breaker = new CircuitBreaker(action, {
                 timeout: 10000, // If function takes longer than 10 seconds, trigger failure
@@ -33,7 +33,7 @@ export class ResilienceService {
         return this.breakers.get(name)!;
     }
 
-    async execute<T>(name: string, action: () => Promise<T>, options?: CircuitBreaker.Options): Promise<T> {
+    async execute<T>(name: string, action: () => Promise<T>, options?: any): Promise<T> {
         const breaker = this.getBreaker(name, action, options);
         return breaker.fire() as Promise<T>;
     }

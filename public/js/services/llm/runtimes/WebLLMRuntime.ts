@@ -31,12 +31,7 @@ export class WebLLMRuntime implements LLMRuntime {
         // or assume the config.id is valid for WebLLM.
         // 'Phi-3-mini-4k-instruct-q4f16_1-MLC' is a common one, let's try to map or use directly.
 
-        let modelId = config.id;
-        if (config.family === 'phi-2') {
-            modelId = 'phi-2-q4f16_1-MLC';
-        } else if (config.family === 'llama-3') {
-            modelId = 'Llama-3-8B-Instruct-q4f16_1-MLC'; // Check if this exists, or use a safer one like Llama-2 if needed, but Llama-3 is likely there.
-        }
+        const modelId = config.id; // now expect official MLC model IDs (e.g., Llama-3-8B-Instruct-q4f16_1-MLC)
 
         try {
             await this.engine.reload(modelId);
