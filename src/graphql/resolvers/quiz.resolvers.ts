@@ -53,6 +53,10 @@ export const quizResolvers = {
             // Require auth for queue stats
             requireAuth(context);
 
+            if (!context.queueService) {
+                return { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 };
+            }
+
             const stats = await context.queueService.getStats();
             return stats;
         },
@@ -60,6 +64,10 @@ export const quizResolvers = {
         job: async (_: unknown, { id }: { id: string }, context: GraphQLContext) => {
             // Require auth for job status
             requireAuth(context);
+
+            if (!context.queueService) {
+                throw new Error('Queue service not available');
+            }
 
             const job = await context.queueService.getJob(id);
             if (!job) {

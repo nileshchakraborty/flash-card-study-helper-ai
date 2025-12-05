@@ -50,7 +50,7 @@ export class ExpressServer {
 
   constructor(
     private studyService: StudyUseCase,
-    private queueService: QueueService,
+    private queueService: QueueService | null,
     private flashcardCache: FlashcardCacheService,
     private webllmService: WebLLMService,
     quizStorage: QuizStorageService,

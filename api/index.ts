@@ -14,6 +14,7 @@ import { QuizStorageService } from '../src/core/services/QuizStorageService.js';
 import { FlashcardStorageService } from '../src/core/services/FlashcardStorageService.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+// @ts-ignore
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'path';
@@ -37,7 +38,8 @@ const metricsService = new MetricsService('/tmp/.metrics'); // Use /tmp for serv
 // Storage and caches (lightweight, in-memory for serverless)
 const quizStorage = new QuizStorageService();
 const flashcardStorage = new FlashcardStorageService();
-const queueService = new QueueService();
+// Only initialize QueueService if Redis is configured (prevents crash on Vercel)
+const queueService = process.env.REDIS_URL ? new QueueService() : null;
 const flashcardCache = new FlashcardCacheService(3600);
 const webllmService = new WebLLMService(llmCache);
 

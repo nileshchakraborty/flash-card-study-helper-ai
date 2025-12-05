@@ -11,7 +11,7 @@ export interface GraphQLContext {
     studyService: StudyUseCase;
     quizStorage: QuizStorageService;
     flashcardStorage: FlashcardStorageService;
-    queueService: QueueService;
+    queueService: QueueService | null;
     webllmService: WebLLMService;
     user?: {
         id: string;
@@ -28,7 +28,7 @@ export async function createContext(
         studyService: StudyUseCase;
         quizStorage: QuizStorageService;
         flashcardStorage: FlashcardStorageService;
-        queueService: QueueService;
+        queueService: QueueService | null;
         webllmService: WebLLMService;
     }
 ): Promise<GraphQLContext> {
