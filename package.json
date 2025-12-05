@@ -31,8 +31,10 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.1",
     "@apollo/server": "^4.12.2",
     "@cfworker/json-schema": "^4.1.1",
+    "@google/generative-ai": "^0.24.1",
     "@graphql-tools/schema": "^10.0.30",
     "@mlc-ai/web-llm": "^0.2.78",
     "@modelcontextprotocol/sdk": "^1.24.0",
@@ -60,6 +62,7 @@
     "jose": "^6.1.2",
     "lru-cache": "^11.2.2",
     "multer": "^2.0.2",
+    "openai": "^6.10.0",
     "opossum": "^9.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",

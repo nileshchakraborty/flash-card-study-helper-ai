@@ -10,8 +10,19 @@ import type { AIServicePort } from '../../../core/ports/interfaces.js';
 import type { Flashcard, QuizQuestion } from '../../../core/domain/models.js';
 import type { CacheService } from '../../../core/services/CacheService.js';
 import type { WebLLMService } from '../../../core/services/WebLLMService.js';
+import type { LLMAdapter } from '../../../core/services/AdapterManager.js';
 
-export class WebLLMAdapter implements AIServicePort {
+export class WebLLMAdapter implements AIServicePort, LLMAdapter {
+    readonly name = 'webllm';
+
+    async isAvailable(): Promise<boolean> {
+        // WebLLM is CLIENT-SIDE ONLY and requires a WebSocket session established from the browser.
+        // This backend adapter is just a coordination layer and CANNOT serve requests independently.
+        // Always return false so AdapterManager doesn't select this for backend generation.
+        // WebLLM should only be used explicitly by the frontend, not via automatic adapter selection.
+        return false;
+    }
+
     private cache?: CacheService<any>;
     // private _webllmService?: WebLLMService;
 

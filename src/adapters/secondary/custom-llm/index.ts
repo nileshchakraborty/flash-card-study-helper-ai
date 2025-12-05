@@ -1,0 +1,321 @@
+import OpenAI from 'openai';
+import type { Flashcard, QuizQuestion } from '../../../core/domain/models.js';
+import type { LLMAdapter } from '../../../core/services/AdapterManager.js';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Custom LLM adapter for OpenAI-compatible APIs (Groq, Together, OpenRouter, etc.)
+ */
+export class CustomLLMAdapter implements LLMAdapter {
+    readonly name = 'custom';
+    private client: OpenAI | null = null;
+    private model!: string; // Definite assignment - initialized in constructor
+
+    constructor() {
+        const baseURL = process.env.CUSTOM_LLM_URL;
+        const apiKey = process.env.CUSTOM_LLM_API_KEY || 'dummy';
+        const model = process.env.CUSTOM_LLM_MODEL || 'llama-3.1-70b-versatile';
+
+        if (baseURL) {
+            this.client = new OpenAI({ baseURL, apiKey });
+            this.model = model;
+            console.log(`[CustomLLMAdapter] Configured with baseURL: ${baseURL}, model: ${model}`);
+        } else {
+            console.log('[CustomLLMAdapter] No base URL configured');
+        }
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this.client !== null;
+    }
+
+    async generateFlashcards(topic: string, count: number): Promise<Flashcard[]> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured. Set CUSTOM_LLM_URL environment variable.');
+        }
+
+        const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts clearly.
+
+Create ${count} educational flashcards about: ${topic}
+
+CRITICAL RULES:
+1. Ask questions ABOUT the concepts
+2. Provide explanatory answers in plain English  
+3. NEVER copy code snippets as questions or answers
+4. Questions must end with "?"
+5. Answers must be 1-3 sentences explaining the concept
+
+JSON FORMAT:
+- Return ONLY: [{"question": "...", "answer": "..."}]
+- No code blocks, no markdown, pure JSON array
+
+Create ${count} flashcards now:`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2048,
+        });
+
+        const text = completion.choices[0]?.message?.content || '';
+        return this.parseFlashcards(text, count, topic);
+    }
+
+    async generateFlashcardsFromText(text: string, topic: string, count: number, _options?: { filename?: string }): Promise<Flashcard[]> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const prompt = `You are a helpful study assistant creating educational flashcards. You explain concepts clearly.
+
+Text: ${text}
+
+⚠️ TASK: Create ${count} educational flashcards about: ${topic}
+
+⚠️ CRITICAL RULES:
+1. Ask questions ABOUT the concepts in the text
+2. Provide explanatory answers in plain English  
+3. NEVER copy code snippets as questions or answers
+4. Questions must end with "?"
+5. Answers must be 1-3 sentences explaining the concept
+
+JSON FORMAT:
+- Return ONLY: [{"question": "...", "answer": "..."}]
+- No code blocks, no markdown, pure JSON array
+
+Create ${count} flashcards now:`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2048,
+        });
+
+        const responseText = completion.choices[0]?.message?.content || '';
+        return this.parseFlashcards(responseText, count, topic);
+    }
+
+    async generateQuiz(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const flashcardsText = flashcards.map((card, i) =>
+            `${i + 1}. Q: ${card.front}\n   A: ${card.back}`
+        ).join('\n\n');
+
+        const prompt = `Based on these flashcards, create ${count} multiple-choice quiz questions.
+
+Flashcards:
+${flashcardsText}
+
+RULES:
+1. Create ${count} questions that test understanding of the flashcard concepts
+2. Each question must have EXACTLY 4 options
+3. All options must be plausible (no obvious wrong answers)
+4. Options must be different from each other
+5. Include the correct answer index (0-3)
+
+JSON FORMAT:
+[{
+  "question": "...",
+  "options": ["A", "B", "C", "D"],
+  "correctAnswer": 2
+}]
+
+Return ONLY the JSON array:`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2048,
+        });
+
+        const text = completion.choices[0]?.message?.content || '';
+        return this.parseQuizQuestions(text, count);
+    }
+
+    async generateQuizFromFlashcards(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]> {
+        // Alias method required by interface - delegates to generateQuiz
+        return this.generateQuiz(flashcards, count);
+    }
+
+    async generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const previousQuestionsText = (previousResults as any)?.questions?.map((q: any, i: number) =>
+            `${i + 1}. ${q.question}\nCorrect answer: ${q.options[q.correctAnswer]}`
+        ).join('\n\n') || '';
+
+        let modeInstructions = '';
+        if (mode === 'harder') {
+            modeInstructions = 'Create MORE DIFFICULT questions that test deeper understanding.';
+        } else {
+            modeInstructions = 'Focus on the concepts from questions the user got wrong (remedial review).';
+        }
+
+        const prompt = `Generate 5 advanced quiz questions based on:
+
+Previous questions:
+${previousQuestionsText}
+
+MODE: ${modeInstructions}
+
+REQUIREMENTS:
+- EXACTLY 4 options per question
+- All options must be plausible
+- Test deeper understanding
+- Return JSON: [{"question": "...", "options": ["A","B","C","D"], "correctAnswer": 0-3}]`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2048,
+        });
+
+        const text = completion.choices[0]?.message?.content || '';
+        return this.parseQuizQuestions(text, 5);
+    }
+
+    async generateBriefAnswer(question: string, context: string): Promise<string> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const prompt = `Context: ${context}
+
+Question: ${question}
+
+Provide a brief, direct answer (1-2 sentences):`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 512,
+        });
+
+        return completion.choices[0]?.message?.content?.trim() || '';
+    }
+
+    async generateSubTopics(topic: string): Promise<string[]> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const prompt = `Generate 5 advanced sub-topics for deep learning about: ${topic}
+
+Return as JSON array: ["subtopic1", "subtopic2", ...]`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 512,
+        });
+
+        const text = completion.choices[0]?.message?.content || '';
+        return this.parseStringArray(text);
+    }
+
+    async generateSearchQuery(topic: string, parentTopic?: string): Promise<string> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const prompt = parentTopic
+            ? `Create a search query to find information about "${topic}" in the context of "${parentTopic}". Return only the query.`
+            : `Create a search query to find information about "${topic}". Return only the query.`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 128,
+        });
+
+        return completion.choices[0]?.message?.content?.trim() || topic;
+    }
+
+    async generateSummary(topic: string): Promise<string> {
+        if (!this.client) {
+            throw new Error('Custom LLM client not configured');
+        }
+
+        const prompt = `Provide a brief summary of: ${topic} (2-3 sentences)`;
+
+        const completion = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 256,
+        });
+
+        return completion.choices[0]?.message?.content?.trim() || '';
+    }
+
+    // Helper methods
+    private parseFlashcards(text: string, _expectedCount: number, topic: string): Flashcard[] {
+        try {
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('No JSON array found');
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!Array.isArray(parsed)) throw new Error('Response is not an array');
+
+            return parsed.map(item => ({
+                id: uuidv4(),
+                front: item.question || item.q || item.front || '',
+                back: item.answer || item.a || item.back || '',
+                topic
+            }));
+        } catch (error) {
+            console.error('[CustomLLMAdapter] Failed to parse flashcards:', error);
+            return [];
+        }
+    }
+
+    private parseQuizQuestions(text: string, _expectedCount: number): QuizQuestion[] {
+        try {
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('No JSON array found');
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!Array.isArray(parsed)) throw new Error('Response is not an array');
+
+            return parsed.map(item => {
+                const correctIdx = item.correctAnswer ?? 0;
+                return {
+                    id: uuidv4(),
+                    question: item.question || '',
+                    options: item.options || [],
+                    correctAnswer: item.options?.[correctIdx] || item.options?.[0] || ''
+                };
+            });
+        } catch (error) {
+            console.error('[CustomLLMAdapter] Failed to parse quiz questions:', error);
+            return [];
+        }
+    }
+
+    private parseStringArray(text: string): string[] {
+        try {
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('No JSON array found');
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!Array.isArray(parsed)) throw new Error('Response is not an array');
+
+            return parsed.filter(item => typeof item === 'string');
+        } catch (error) {
+            console.error('[CustomLLMAdapter] Failed to parse string array:', error);
+            return [];
+        }
+    }
+}

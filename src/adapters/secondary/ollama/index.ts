@@ -1,21 +1,57 @@
 import axios from 'axios';
-import type { AIServicePort } from '../../../core/ports/interfaces.js';
 import type { Flashcard, QuizQuestion } from '../../../core/domain/models.js';
 import type { CacheService } from '../../../core/services/CacheService.js';
 import { CacheService as CacheServiceClass } from '../../../core/services/CacheService.js';
+import type { LLMAdapter } from '../../../core/services/AdapterManager.js';
 
-export class OllamaAdapter implements AIServicePort {
+export class OllamaAdapter implements LLMAdapter {
+  readonly name = 'ollama';
   private baseUrl: string;
   private model: string;
   private cache?: CacheService<any>;
 
   constructor(cache?: CacheService<any>) {
-    // const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
-    // On Vercel, we require OLLAMA_BASE_URL to be set for backend generation.
-    // Otherwise, we expect the frontend to use WebLLM (client-side).
-    this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    // Normalize OLLAMA_BASE_URL: strip trailing slashes and /api/ suffix
+    const rawUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    this.baseUrl = this.normalizeBaseUrl(rawUrl);
     this.model = process.env.OLLAMA_MODEL || 'llama3.2:latest';
     this.cache = cache;
+  }
+
+  /**
+   * Normalize base URL by removing trailing slashes and `/api/` suffix
+   * Examples:
+   *   https://ollama.com/api/ -> https://ollama.com
+   *   http://localhost:11434/ -> http://localhost:11434
+   *   https://ollama.com/api -> https://ollama.com
+   */
+  private normalizeBaseUrl(url: string): string {
+    let normalized = url.trim();
+
+    // Remove trailing slashes
+    while (normalized.endsWith('/')) {
+      normalized = normalized.slice(0, -1);
+    }
+
+    // Remove /api or /api/ suffix (we'll add it back in API calls)
+    if (normalized.endsWith('/api')) {
+      normalized = normalized.slice(0, -4);
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Check if Ollama is available (quick health check)
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/api/tags`, { timeout: 2000 });
+      return response.status === 200;
+    } catch (error) {
+      console.log('[OllamaAdapter] Not available:', error instanceof Error ? error.message : 'Unknown error');
+      return false;
+    }
   }
 
   async generateFlashcards(topic: string, count: number): Promise<Flashcard[]> {
