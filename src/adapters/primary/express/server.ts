@@ -948,6 +948,16 @@ export class ExpressServer {
         next();
       }
     });
+
+    // Global error handler (must be last)
+    this.app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      console.error('🔥 Unhandled Server Error:', err);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message || 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
+    });
   }
 
   private async handleGenerate(req: express.Request, res: express.Response) {
@@ -1044,6 +1054,16 @@ export class ExpressServer {
 
     // Setup REST routes (must be after GraphQL to avoid capturing /graphql requests if we had a catch-all)
     this.setupRoutes();
+
+    // Global error handler (must be last)
+    this.app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      console.error('🔥 Unhandled Server Error:', err);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message || 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
+    });
 
     this.httpServer.listen(port, () => {
       console.log(`Server running on port ${port}`);

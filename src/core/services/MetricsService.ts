@@ -43,15 +43,28 @@ export class MetricsService {
 
     constructor(metricsDir: string = '.metrics') {
         // Create metrics directory if it doesn't exist
-        const metricsPath = path.join(process.cwd(), metricsDir);
+        const metricsPath = path.isAbsolute(metricsDir)
+            ? metricsDir
+            : path.join(process.cwd(), metricsDir);
+
         if (!fs.existsSync(metricsPath)) {
-            fs.mkdirSync(metricsPath, { recursive: true });
+            try {
+                fs.mkdirSync(metricsPath, { recursive: true });
+            } catch (error) {
+                console.warn(`[MetricsService] Failed to create metrics directory at ${metricsPath}, using in-memory only.`, error);
+                // Fallback to not using file persistence if mkdir fails
+                this.metricsFile = '';
+                this.loadRecentMetrics();
+                return;
+            }
         }
 
-        this.metricsFile = path.join(metricsPath, 'generations.jsonl');
+        this.metricsFile = metricsPath ? path.join(metricsPath, 'generations.jsonl') : '';
 
         // Load recent metrics into memory
-        this.loadRecentMetrics();
+        if (this.metricsFile) {
+            this.loadRecentMetrics();
+        }
     }
 
     /**
@@ -158,6 +171,8 @@ export class MetricsService {
      * Persist metric to JSONL file
      */
     private persist(metric: GenerationMetric): void {
+        if (!this.metricsFile) return;
+
         try {
             const line = JSON.stringify(metric) + '\n';
             fs.appendFileSync(this.metricsFile, line, 'utf-8');
@@ -171,7 +186,7 @@ export class MetricsService {
      */
     private loadRecentMetrics(): void {
         try {
-            if (!fs.existsSync(this.metricsFile)) {
+            if (!this.metricsFile || !fs.existsSync(this.metricsFile)) {
                 return;
             }
 
@@ -207,7 +222,7 @@ export class MetricsService {
      */
     private getAllMetricsFromFile(): GenerationMetric[] {
         try {
-            if (!fs.existsSync(this.metricsFile)) {
+            if (!this.metricsFile || !fs.existsSync(this.metricsFile)) {
                 return [];
             }
 
