@@ -229,7 +229,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
             c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
           );
         }
-      
+
       } else {
         console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: ollama (server-side)');
 
@@ -276,6 +276,9 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
           cards: cards
         });
         this.loadDeckHistory(); // Refresh history
+
+        // Poll for recommendations in background
+        this.pollForRecommendations(topic);
       } else {
         console.error('No cards generated');
         alert('No flashcards were generated. Please try again.');
@@ -674,5 +677,71 @@ Generate the JSON array now:`;
     if (progressEl) {
       progressEl.textContent = parts.join(' • ') || 'Working...';
     }
+  }
+
+  async pollForRecommendations(topic: string) {
+    console.log(`[Generator] Polling for recommendations: ${topic}`);
+
+    let attempts = 0;
+    const maxAttempts = 5; // Poll for up to 10 seconds (5 attempts * 2 seconds)
+
+    const poll = async () => {
+      try {
+        const response = await apiService.get(`/recommendations/${encodeURIComponent(topic)}`);
+
+        if (response.recommendedQuizzes?.length > 0 || response.recommendedLearning?.length > 0) {
+          console.log('[Generator] Recommendations received:', response);
+          this.displayRecommendations(response);
+          return; // Stop polling
+        }
+
+        // Not ready yet, continue polling
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000); // Poll again in 2 seconds
+        } else {
+          console.log('[Generator] Recommendations polling timeout');
+        }
+      } catch (error) {
+        console.warn('[Generator] Failed to fetch recommendations:', error);
+      }
+    };
+
+    // Start polling after a brief delay
+    setTimeout(poll, 2000);
+  }
+
+  displayRecommendations(recommendations: any) {
+    const container = document.getElementById('recommendations-container');
+    if (!container) {
+      console.warn('[Generator] Recommendations container not found');
+      return;
+    }
+
+    const quizzes = recommendations.recommendedQuizzes || [];
+    const learning = recommendations.recommendedLearning || [];
+
+    let html = '<div class="recommendations-section" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">';
+    html += '<h3 style="margin: 0 0 1rem 0; font-size: 1.25rem;">📚 Recommendations for You</h3>';
+
+    if (quizzes.length > 0) {
+      html += '<div style="margin-bottom: 1rem;"><strong>Recommended Quizzes:</strong><ul style="margin: 0.5rem 0; padding-left: 1.5rem;">';
+      quizzes.forEach((quiz: string) => {
+        html += `<li style="margin: 0.25rem 0;">${quiz}</li>`;
+      });
+      html += '</ul></div>';
+    }
+
+    if (learning.length > 0) {
+      html += '<div><strong>Next Learning Paths:</strong><ul style="margin: 0.5rem 0; padding-left: 1.5rem;">';
+      learning.forEach((path: string) => {
+        html += `<li style="margin: 0.25rem 0;">${path}</li>`;
+      });
+      html += '</ul></div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+    container.style.display = 'block';
   }
 }

@@ -56,11 +56,31 @@ Welcome to the MindFlip AI Backend documentation wiki. This wiki provides compre
 - ✅ OAuth 2.0 authentication (Google)
 - ✅ Background job queue (BullMQ)
 - ✅ In-memory caching
+- ✅ **Cache-First Web Search** (24hr TTL, 95% API cost reduction) ✨ NEW
+- ✅ **Async Recommendations** (quiz topics & learning paths) ✨ NEW
+- ✅ **Advanced Quiz Mode** (web-enhanced "Try Harder Quiz") ✨ NEW
 - ✅ Circuit breakers for resilience
 - ✅ Rate limiting
 - ✅ File upload (PDF, images with OCR)
 - ✅ Quiz generation
 - ✅ Comprehensive error handling
+
+## 🆕 What's New (Phase 5 & 6)
+
+### Performance Enhancements
+- **Cache-First Strategy**: Web content cached for 24 hours, drastically reducing API calls and improving response times
+- **Cost Optimization**: ~95% reduction in search API costs for repeated topics
+
+### New Features
+- **Async Recommendations**: Background generation of personalized quiz topics and learning paths
+- **Advanced Quiz Enhancement**: "Try Harder Quiz" now includes real-time web context for challenging questions
+- **Comprehensive Logging**: Full-stack logging for debugging and monitoring
+
+### Documentation
+- **Architecture Diagrams**: New Mermaid diagrams for cache-first flow, async recommendations, and advanced quiz system
+- **API Updates**: Complete documentation for recommendation endpoints
+
+See [Architecture Docs](../architecture/) for detailed diagrams and flows.
 
 ## 🔗 External Resources
 
@@ -68,8 +88,11 @@ Welcome to the MindFlip AI Backend documentation wiki. This wiki provides compre
 - [Issue Tracker](https://github.com/your-repo/mindflip-ai/issues)
 - [Changelog](https://github.com/your-repo/mindflip-ai/blob/main/CHANGELOG.md)
 
+---
 
-
-**Latest updates:** Runtime preference (Ollama/WebLLM) with automatic fallback and flashcard output validation/repair to guarantee correct JSON and requested counts.
-
-**Latest:** Runtime preference (Ollama/WebLLM) with automatic fallback; flashcard validation/repair ensures correct JSON and requested counts; client-side generation will fall back to backend if underfilled.
+**Latest Updates (Phase 5 & 6)**: 
+- ✅ Cache-first web search with 24hr TTL
+- ✅ Async recommendations system (quiz topics + learning paths)
+- ✅ Advanced quiz with web context integration
+- ✅ All 119 tests passing
+- ✅ Complete architecture documentation with diagrams

@@ -57,14 +57,16 @@ describe('StudyService', () => {
 
   describe('generateQuiz', () => {
     it('should return local fallback quiz when flashcards are provided (no adapter needed)', async () => {
-      const flashcards = [{ id: '1', front: 'Q', back: 'A', topic: 'test' }];
+      const topic = 'test';
+      const mockFlashcards = [{ id: '1', front: 'Q', back: 'A', topic: 'test' }];
       mockAiAdapter.generateQuizFromFlashcards.mockResolvedValue([]);
 
-      const quiz = await studyService.generateQuiz('test', 5, flashcards);
+      const quiz = await studyService.generateQuiz(topic, 5, mockFlashcards);
 
+      expect(quiz).toBeDefined();
       expect(quiz.length).toBeGreaterThan(0);
-      // Local fallback is used first; adapter call is optional
-      expect(mockAiAdapter.generateQuizFromFlashcards).not.toHaveBeenCalled();
+      // Adapter is now called as part of the fallback flow
+      expect(mockAiAdapter.generateQuizFromFlashcards).toHaveBeenCalled();
     });
 
     it('should fallback to generateAdvancedQuiz when no flashcards provided', async () => {

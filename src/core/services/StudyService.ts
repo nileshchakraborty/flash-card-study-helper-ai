@@ -2,6 +2,7 @@ import type { StudyUseCase, AIServicePort, SearchServicePort, StoragePort } from
 import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models.js';
 import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
+import { CacheService } from './CacheService.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 // @ts-ignore
@@ -21,7 +22,8 @@ export class StudyService implements StudyUseCase {
     private aiAdapters: Record<string, AIServicePort>,
     private searchAdapter: SearchServicePort,
     private storageAdapter: StoragePort,
-    private metricsService?: MetricsService
+    private metricsService?: MetricsService,
+    private webContextCache?: CacheService<string>
   ) { }
 
   /**
@@ -60,6 +62,11 @@ export class StudyService implements StudyUseCase {
           success: true
         });
       }
+
+      // Trigger async recommendations generation (fire-and-forget)
+      this.generateRecommendationsAsync(topic).catch(err => {
+        console.warn('[StudyService] Failed to generate recommendations:', err);
+      });
 
       return { ...result, cards: adjustedCards };
     } catch (error: any) {
@@ -147,52 +154,12 @@ export class StudyService implements StudyUseCase {
       }
     }
 
-    // Step 2: Generate Search Query (for web-only or ai-web)
-    console.log('2. Generating refined search query...');
-    let searchQuery = topic;
-    try {
-      searchQuery = await this.getAdapter('ollama').generateSearchQuery(topic, parentTopic);
-      console.log(`   Refined Query: "${searchQuery}"`);
-    } catch (e) {
-      console.warn('   Failed to refine query, using original topic.');
-    }
+    // Step 2: Get web context (cache-first)
+    // At this point, we know it's either 'web-only' or 'ai-web' mode
+    const scrapedContent = await this.getCachedOrFreshWebContext(topic, parentTopic);
 
-    console.log('3. Searching web for top sources...');
-    const searchResults = await this.searchAdapter.search(searchQuery);
-    console.log(`   Found ${searchResults.length} results.`);
-
-    // Step 3: Filter & Select Top Sources
-    // Filter for unique domains to ensure "different websites"
-    const uniqueDomains = new Set();
-    const diverseSources = searchResults.filter(result => {
-      try {
-        const hostname = new URL(result.link).hostname;
-        if (uniqueDomains.has(hostname)) {
-          return false;
-        }
-        uniqueDomains.add(hostname);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    });
-
-    const topSources = diverseSources.slice(0, 5);
-    console.log(`   Selected top ${topSources.length} unique sources for scraping.`);
-
-    // Step 4: Scrape Content Concurrently
-    let scrapedContent = '';
-    if (topSources.length > 0) {
-      console.log('4. Scraping sources concurrently...');
-      const urls = topSources.map(r => r.link);
-      scrapedContent = await this.scrapeMultipleSources(urls);
-      console.log(`   Total scraped content: ${scrapedContent.length} chars.`);
-    } else {
-      console.log('   No sources to scrape.');
-    }
-
-    // Step 5: Synthesize & Generate
-    console.log('5. Synthesizing context and generating flashcards...');
+    // Step 3: Synthesize & Generate
+    console.log('3. Synthesizing context and generating flashcards...');
     let combinedContext = '';
     if (aiSummary) {
       combinedContext += `AI KNOWLEDGE SUMMARY:\n${aiSummary}\n\n`;
@@ -313,6 +280,72 @@ export class StudyService implements StudyUseCase {
     return results.join('\n');
   }
 
+  /**
+   * Cache-first web context retrieval
+   * Checks cache first, performs fresh search if miss
+   */
+  private async getCachedOrFreshWebContext(topic: string, parentTopic?: string): Promise<string> {
+    const cacheKey = `web-context:${topic}`;
+
+    //Check cache first
+    if (this.webContextCache) {
+      const cached = this.webContextCache.get(cacheKey);
+      if (cached) {
+        console.log(`[Cache Hit] Using cached web context for: ${topic}`);
+        return cached;
+      }
+    }
+
+    // Cache miss - perform fresh search
+    console.log(`[Cache Miss] Fetching fresh web context for: ${topic}`);
+
+    // Step 1: Generate search query
+    let searchQuery = topic;
+    try {
+      searchQuery = await this.getAdapter('ollama').generateSearchQuery(topic, parentTopic);
+      console.log(`   Refined Query: "${searchQuery}"`);
+    } catch (e) {
+      console.warn('   Failed to refine query, using original topic.');
+    }
+
+    // Step 2: Search web
+    const searchResults = await this.searchAdapter.search(searchQuery);
+    console.log(`   Found ${searchResults.length} results.`);
+
+    // Step 3: Filter for unique domains
+    const uniqueDomains = new Set();
+    const diverseSources = searchResults.filter(result => {
+      try {
+        const hostname = new URL(result.link).hostname;
+        if (uniqueDomains.has(hostname)) {
+          return false;
+        }
+        uniqueDomains.add(hostname);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    const topSources = diverseSources.slice(0, 5);
+    console.log(`   Selected top ${topSources.length} unique sources for scraping.`);
+
+    // Step 4: Scrape content
+    let webContext = '';
+    if (topSources.length > 0) {
+      const urls = topSources.map(r => r.link);
+      webContext = await this.scrapeMultipleSources(urls);
+      console.log(`   Total scraped content: ${webContext.length} chars.`);
+    }
+
+    // Store in cache
+    if (this.webContextCache && webContext) {
+      this.webContextCache.set(cacheKey, webContext);
+    }
+
+    return webContext;
+  }
+
   async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
     let text = '';
 
@@ -375,10 +408,6 @@ export class StudyService implements StudyUseCase {
     if (flashcards && flashcards.length > 0) {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
 
-      // fast local quiz first
-      const localQuiz = qualityGate(this.generateQuizFallbackFromFlashcards(flashcards, count));
-      if (localQuiz) return localQuiz;
-
       // Try primary
       const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
       if (primaryResult) return primaryResult;
@@ -403,7 +432,32 @@ export class StudyService implements StudyUseCase {
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
-    return this.getAdapter('ollama').generateAdvancedQuiz(previousResults, mode);
+    console.log('[StudyService.generateAdvancedQuiz] START');
+    console.log('[StudyService.generateAdvancedQuiz] Mode:', mode);
+    console.log('[StudyService.generateAdvancedQuiz] Previous results:', JSON.stringify(previousResults, null, 2));
+
+    let context = '';
+
+    // For "Harder" mode, get web context (cache-first)
+    if (mode === 'harder' && previousResults.topic) {
+      try {
+        console.log(`[StudyService] Getting web context for advanced quiz on: ${previousResults.topic}`);
+        context = await this.getCachedOrFreshWebContext(previousResults.topic);
+        console.log(`[StudyService] Web context retrieved, length: ${context.length} chars`);
+        console.log('[StudyService] Added web context to advanced quiz generation.');
+      } catch (e) {
+        console.error('[StudyService] Web context retrieval ERROR:', e);
+        console.warn('[StudyService] Web context retrieval failed for advanced quiz, proceeding without context:', e);
+      }
+    } else {
+      console.log(`[StudyService] Skipping web context - mode: ${mode}, has topic: ${!!previousResults.topic}`);
+    }
+
+    console.log('[StudyService] Calling adapter.generateAdvancedQuiz with context length:', context.length);
+    const result = await this.getAdapter('ollama').generateAdvancedQuiz(previousResults, mode, context);
+    console.log('[StudyService.generateAdvancedQuiz] COMPLETE - Generated', result.length, 'questions');
+
+    return result;
   }
 
   async saveQuizResult(result: QuizResult): Promise<string> {
@@ -434,7 +488,26 @@ export class StudyService implements StudyUseCase {
 
     for (let i = 0; i < take; i++) {
       const card = pool[i % pool.length];
-      const distractors = shuffle(pool.filter((c) => c.id !== card?.id)).slice(0, 3).map((c) => c.back);
+      const otherCards = pool.filter((c) => c.id !== card?.id);
+      let distractors = shuffle(otherCards).slice(0, 3).map((c) => c.back);
+
+      // Ensure 4 options by padding with generic distractors if needed
+      const genericDistractors = [
+        "None of the above",
+        "All of the above",
+        "Depends on the context",
+        "Not applicable"
+      ];
+
+      let added = 0;
+      while (distractors.length < 3 && added < genericDistractors.length) {
+        const generic = genericDistractors[added];
+        if (generic && !distractors.includes(generic)) {
+          distractors.push(generic);
+        }
+        added++;
+      }
+
       const options = shuffle([card?.back || '', ...distractors]);
 
       questions.push({
@@ -527,6 +600,56 @@ export class StudyService implements StudyUseCase {
     }
 
     return trimmed;
+  }
+
+  /**
+   * Generate recommendations asynchronously (fire-and-forget)
+   * Generates recommended quiz topics and learning paths based on web context
+   */
+  private async generateRecommendationsAsync(topic: string): Promise<void> {
+    try {
+      console.log(`[StudyService] Generating async recommendations for: ${topic}`);
+
+      // Get web context for the topic (will use cache if available)
+      const webContext = await this.getCachedOrFreshWebContext(topic);
+
+      // Generate recommendations using AI
+      const prompt = `Based on the following content about "${topic}", suggest:
+1. Three related quiz topics that would help deepen understanding
+2. Three recommended learning paths or next topics to study
+
+Content:
+${webContext.substring(0, 3000)}
+
+Respond in JSON format:
+{
+  "recommendedQuizzes": ["topic1", "topic2", "topic3"],
+  "recommendedLearning": ["path1", "path2", "path3"]
+}`;
+
+      const response = await this.getAdapter('ollama').generateBriefAnswer(
+        'Generate recommendations',
+        prompt
+      );
+
+      // Parse the AI response
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const recommendations = JSON.parse(jsonMatch[0]);
+
+        // Store in cache
+        if (this.webContextCache) {
+          this.webContextCache.set(
+            `recommendations:${topic}`,
+            JSON.stringify(recommendations)
+          );
+          console.log(`[StudyService] Cached recommendations for: ${topic}`);
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.warn(`[StudyService] Recommendation generation failed for ${topic}:`, message);
+    }
   }
 
 

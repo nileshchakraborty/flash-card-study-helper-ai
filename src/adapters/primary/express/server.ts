@@ -740,7 +740,23 @@ export class ExpressServer {
           return;
         }
 
-        res.json({ success: true, quiz });
+        // Shuffle options for each question to ensure variety on retry
+        const shuffledQuestions = quiz.questions.map(q => {
+          // Create a copy of options and shuffle them
+          const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+          return {
+            ...q,
+            options: shuffledOptions
+          };
+        });
+
+        res.json({
+          success: true,
+          quiz: {
+            ...quiz,
+            questions: shuffledQuestions
+          }
+        });
       } catch (error: unknown) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
@@ -819,6 +835,54 @@ export class ExpressServer {
       }
     });
 
+    // Get recommendations for a topic
+    this.app.get('/api/recommendations/:topic', async (req, res) => {
+      try {
+        const topic = decodeURIComponent(req.params.topic);
+
+        // Check if we have a webContextCache on the studyService
+        const cacheKey = `recommendations:${topic}`;
+        const cached = (this.studyService as any).webContextCache?.get(cacheKey);
+
+        if (cached) {
+          const recommendations = JSON.parse(cached);
+          res.json({
+            success: true,
+            topic,
+            recommendedQuizzes: recommendations.recommendedQuizzes || [],
+            recommendedLearning: recommendations.recommendedLearning || []
+          });
+        } else {
+          // Not yet generated
+          res.json({
+            success: true,
+            topic,
+            recommendedQuizzes: [],
+            recommendedLearning: [],
+            pending: true
+          });
+        }
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Force refresh recommendations for a topic
+    this.app.post('/api/recommendations/refresh/:topic', async (req, res) => {
+      try {
+        const topic = decodeURIComponent(req.params.topic);
+
+        // Trigger async generation (fire-and-forget)
+        (this.studyService as any).generateRecommendationsAsync(topic).catch((err: Error) => {
+          console.warn(`[Server] Recommendation refresh failed for ${topic}:`, err.message);
+        });
+
+        res.json({ success: true, message: 'Recommendation generation triggered', topic });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
     // List flashcards for selection
     this.app.get('/api/flashcards/list/all', async (_req, res) => {
       try {
@@ -851,11 +915,19 @@ export class ExpressServer {
     });
 
     this.app.post('/api/quiz/generate-advanced', async (req, res) => {
+      console.log('[Server] POST /api/quiz/generate-advanced received');
+      console.log('[Server] Body:', JSON.stringify(req.body, null, 2));
+
       try {
         const { previousResults, mode } = req.body;
+        console.log(`[Server] Generating advanced quiz - mode: ${mode}, topic: ${previousResults?.topic}`);
+
         const quiz = await this.studyService.generateAdvancedQuiz(previousResults, mode);
+        console.log(`[Server] Advanced quiz generated: ${quiz.length} questions`);
+
         res.json({ success: true, quiz });
       } catch (error: any) {
+        console.error('[Server] Advanced quiz error:', error);
         res.status(500).json({ error: error.message });
       }
     });

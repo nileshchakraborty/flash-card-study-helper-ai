@@ -73,3 +73,32 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":11956,"success":true,"timestamp":1764826157747}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":14208,"success":true,"timestamp":1764826305089}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"one piece","cardCount":10,"duration":11154,"success":true,"timestamp":1764826469531}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":24445,"success":true,"timestamp":1764901485858}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":22881,"success":true,"timestamp":1764901847167}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":21606,"success":true,"timestamp":1764902058478}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"pydantic","cardCount":10,"duration":11393,"success":true,"timestamp":1764902242639}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":14812,"success":true,"timestamp":1764902873046}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":1606,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764903352863}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":631,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764903355553}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":0,"duration":1121,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1764903360715}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":10400,"success":true,"timestamp":1764903534438}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":9568,"success":true,"timestamp":1764903974564}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":7218,"success":true,"timestamp":1764904234117}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":9682,"success":true,"timestamp":1764904609258}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":10,"duration":25199,"success":true,"timestamp":1764904956547}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":8604,"success":true,"timestamp":1764905404220}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":8329,"success":true,"timestamp":1764905667848}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":13235,"success":true,"timestamp":1764906708685}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":2,"duration":6117,"success":true,"timestamp":1764906935592}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":3,"duration":7537,"success":true,"timestamp":1764907215508}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":16213,"success":true,"timestamp":1764908789580}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":13867,"success":true,"timestamp":1764909093240}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"java","cardCount":10,"duration":23781,"success":true,"timestamp":1764909146935}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Java Performance Optimization Techniques","cardCount":5,"duration":15259,"success":true,"timestamp":1764909162204}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Advanced Java Data Structures (e.g., Trie, Segment Tree)","cardCount":5,"duration":10779,"success":true,"timestamp":1764909172989}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Aspect-Oriented Programming in Java","cardCount":5,"duration":17661,"success":true,"timestamp":1764909190654}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":14955,"success":true,"timestamp":1764909451099}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"java","cardCount":10,"duration":12339,"success":true,"timestamp":1764909579671}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Java Generics and Type Erasure","cardCount":5,"duration":13767,"success":true,"timestamp":1764909593446}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Java Performance Optimization Techniques","cardCount":5,"duration":30824,"success":true,"timestamp":1764909624276}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Concurrency Utilities in Java","cardCount":5,"duration":16173,"success":true,"timestamp":1764909640456}

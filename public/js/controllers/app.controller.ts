@@ -130,7 +130,7 @@ export class AppController {
       const prefetched = quizModel.listPrefetched().find((q: QuizPrefetched) => q.topic === (topic || deckModel.currentTopic));
       if (prefetched && prefetched.questions?.length) {
         quizModel.startQuiz(prefetched.questions, 'standard', prefetched.topic);
-        this.switchTab('create-quiz');
+        this.switchTab('quiz');
         this.quizView.showQuestionUI();
         this.quizView.renderQuestion(prefetched.questions[0]);
         return;
@@ -229,7 +229,7 @@ export class AppController {
         }
 
         // Show the actual quiz UI (lives under Create Quiz tab)
-        this.switchTab('create-quiz');
+        this.switchTab('quiz');
 
       } catch (error: any) {
         console.error("Quiz generation failed", error);
@@ -268,10 +268,10 @@ export class AppController {
             quiz = apiQuiz.quiz;
             // Normalize shape if backend returns questions array without ids
             if (quiz.questions) {
-            quiz.questions = quiz.questions.map((q: any, idx: number) => ({
-              id: q.id || q.cardId || `${quiz.id}-q-${idx}`,
-              question: q.question,
-              options: q.options || [],
+              quiz.questions = quiz.questions.map((q: any, idx: number) => ({
+                id: q.id || q.cardId || `${quiz.id}-q-${idx}`,
+                question: q.question,
+                options: q.options || [],
                 correctAnswer: q.correctAnswer || q.answer || q.expected,
                 explanation: q.explanation
               }));
@@ -294,7 +294,7 @@ export class AppController {
       if (quiz && quiz.questions?.length) {
         console.log('[Quiz] starting quiz', { topic: quiz.topic, questionCount: quiz.questions.length });
         quizModel.startQuiz(quiz.questions, 'standard', quiz.topic || 'Quiz');
-        this.switchTab('create-quiz');
+        this.switchTab('quiz');
         this.quizView.showQuestionUI();
         this.quizView.renderQuestion(quiz.questions[0]);
       } else {
@@ -305,14 +305,42 @@ export class AppController {
 
     // Handle harder quiz request
     eventBus.on('quiz:harder', async () => {
-      // Generate new quiz with same cards but request harder questions
-      // For now, we'll just trigger a new generation which will use the updated backend logic
-      // Ideally we'd pass a "difficulty" flag, but our backend prompt already asks for mixed difficulty.
-      // Let's just regenerate for now.
-      const count = quizModel.questions.length;
-      const topic = deckModel.currentTopic;
+      console.log('[AppController] quiz:harder event received');
 
-      eventBus.emit('quiz:request-start', { count, topic });
+      try {
+        // Get the previous quiz results
+        const previousResults = {
+          topic: deckModel.currentTopic || 'General Knowledge',
+          questions: quizModel.questions,
+          userAnswers: quizModel.answers,
+          correctAnswers: quizModel.questions.map(q => q.correctAnswer)
+        };
+
+        console.log('[AppController] Previous results:', JSON.stringify(previousResults, null, 2));
+        console.log('[AppController] Calling apiService.post with /quiz/generate-advanced');
+
+        const response = await apiService.post('/quiz/generate-advanced', {
+          previousResults,
+          mode: 'harder'
+        });
+
+        console.log('[AppController] Received response from API');
+        console.log('[AppController] Response:', JSON.stringify(response, null, 2));
+
+        if (response?.quiz) {
+          console.log('[AppController] Quiz received, emitting quiz:loaded event');
+          eventBus.emit('quiz:loaded', response.quiz);
+          console.log('[AppController] quiz:loaded event emitted successfully');
+        } else {
+          console.error('[AppController] No quiz in response');
+          alert('Failed to generate harder quiz.');
+        }
+      } catch (error) {
+        console.error('[AppController] Error in quiz:harder handler:', error);
+        console.error('[AppController] Error details:', error instanceof Error ? error.message : 'Unknown error');
+        console.error('[AppController] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        alert('Failed to generate harder quiz. Check console for details.');
+      }
     });
 
     // Handle revise flashcards request
@@ -361,12 +389,12 @@ export class AppController {
 
       try {
         console.log('Generating harder flashcards for:', enhancedTopic);
-          const data = await apiService.generateFlashcards({
-            topic: difficulty === 'deep-dive' ? topic : enhancedTopic,
-            count: 10,
-            mode: difficulty === 'deep-dive' ? 'deep-dive' : 'standard',
-            parentTopic: (window as any).currentParentTopic
-          });
+        const data = await apiService.generateFlashcards({
+          topic: difficulty === 'deep-dive' ? topic : enhancedTopic,
+          count: 10,
+          mode: difficulty === 'deep-dive' ? 'deep-dive' : 'standard',
+          parentTopic: (window as any).currentParentTopic
+        });
 
         let cards = data.cards;
         let recommendedTopics = data.recommendedTopics;
@@ -459,7 +487,39 @@ export class AppController {
       }
     });
 
+    // Handle harder quiz request
+    eventBus.on('quiz:requestHarder', async (data: any) => {
+      console.log('[AppController] quiz:requestHarder event received');
+      console.log('[AppController] Event data:', JSON.stringify(data, null, 2));
 
+      try {
+        console.log('[AppController] Calling apiService.post with /quiz/generate-advanced');
+        console.log('[AppController] Previous results:', data.previousResults);
+        console.log('[AppController] Mode:', data.mode);
+
+        const response = await apiService.post('/quiz/generate-advanced', {
+          previousResults: data.previousResults,
+          mode: data.mode
+        });
+
+        console.log('[AppController] Received response from API');
+        console.log('[AppController] Response:', JSON.stringify(response, null, 2));
+
+        if (response?.quiz) {
+          console.log('[AppController] Quiz received, emitting quiz:loaded event');
+          eventBus.emit('quiz:loaded', response.quiz);
+          console.log('[AppController] quiz:loaded event emitted successfully');
+        } else {
+          console.error('[AppController] No quiz in response');
+          alert('Failed to generate harder quiz.');
+        }
+      } catch (error) {
+        console.error('[AppController] Error in quiz:requestHarder handler:', error);
+        console.error('[AppController] Error details:', error instanceof Error ? error.message : 'Unknown error');
+        console.error('[AppController] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        alert('Failed to generate harder quiz. Check console for details.');
+      }
+    });
 
     // Handle review request
     eventBus.on('deck:review', () => {
