@@ -10,8 +10,17 @@ import type { AIServicePort } from '../../../core/ports/interfaces.js';
 import type { Flashcard, QuizQuestion } from '../../../core/domain/models.js';
 import type { CacheService } from '../../../core/services/CacheService.js';
 import type { WebLLMService } from '../../../core/services/WebLLMService.js';
+import type { LLMAdapter } from '../../../core/services/AdapterManager.js';
 
-export class WebLLMAdapter implements AIServicePort {
+export class WebLLMAdapter implements AIServicePort, LLMAdapter {
+    readonly name = 'webllm';
+
+    async isAvailable(): Promise<boolean> {
+        // WebLLM is always "available" as it runs client-side in the browser
+        // Actual availability is determined at runtime by the frontend
+        return true;
+    }
+
     private cache?: CacheService<any>;
     // private _webllmService?: WebLLMService;
 
