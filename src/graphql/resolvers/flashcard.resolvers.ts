@@ -38,18 +38,27 @@ export const flashcardResolvers = {
                 throw new Error('Authentication required for flashcard generation');
             }
 
+            let jobId: string | null = null;
+
             // If queue service is available, offload to background job
             if (context.queueService) {
-                const jobId = await context.queueService.addGenerateJob({
-                    topic: input.topic,
-                    count: input.count || 10,
-                    mode: input.mode || 'standard',
-                    knowledgeSource: input.knowledgeSource || 'ai-web',
-                    runtime: 'ollama', // Default to ollama for now
-                    parentTopic: input.parentTopic,
-                    userId: context.user.id
-                });
+                try {
+                    jobId = await context.queueService.addGenerateJob({
+                        topic: input.topic,
+                        count: input.count || 10,
+                        mode: input.mode || 'standard',
+                        knowledgeSource: input.knowledgeSource || 'ai-web',
+                        runtime: 'ollama', // Default to ollama for now
+                        parentTopic: input.parentTopic,
+                        userId: context.user.id
+                    });
+                } catch (error: unknown) {
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    console.warn('[GraphQL] queue unavailable, falling back to sync generation', { message });
+                }
+            }
 
+            if (jobId) {
                 return {
                     cards: null,
                     jobId,

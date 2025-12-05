@@ -36,6 +36,7 @@ export class ExpressServer {
   private app: express.Application;
   private httpServer: http.Server;
   private wss: WebSocketServer | null = null;
+  private queueAvailable = true;
   private upload: multer.Multer;
   private authService: AuthService;
   private quizStorage: QuizStorageService;
@@ -364,77 +365,9 @@ export class ExpressServer {
     );
 
     // Flashcards (Protected - Async via Queue)
-    this.app.post('/api/generate', apiRateLimiter, authMiddleware, async (req, res) => {
-      try {
-        const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
-        if (!isValidGenerateBody(req.body)) {
-          res.status(400).json({ error: 'topic is required' });
-          return;
-        }
-        const desiredCount = Math.max(1, parseInt(count || '10', 10));
-
-        // Check cache first
-        if (this.flashcardCache) {
-          const cachedResult = this.flashcardCache.get(
-            topic,
-            desiredCount,
-            mode,
-            knowledgeSource
-          );
-
-          if (cachedResult) {
-            res.json({
-              success: true,
-              cached: true,
-              ...cachedResult
-            });
-            return;
-          }
-        }
-
-        // If queue is available, offload to background job
-        if (this.queueService) {
-          const jobId = await this.queueService.addGenerateJob({
-            topic,
-            count: desiredCount,
-            mode,
-            knowledgeSource: knowledgeSource || 'ai-web',
-            runtime: runtime || 'ollama',
-            parentTopic,
-            userId: (req as { user?: { id?: string } }).user?.id
-          });
-
-          res.status(202).json({
-            success: true,
-            jobId,
-            message: 'Job queued for processing',
-            statusUrl: `/api/jobs/${jobId}`
-          });
-        } else {
-          // Fallback to synchronous processing if queue not available
-          const result = await this.studyService.generateFlashcards(
-            topic,
-            desiredCount,
-            mode,
-            knowledgeSource || 'ai-web',
-            runtime || 'ollama',
-            parentTopic
-          );
-          res.json({
-            success: true,
-            cards: result.cards,
-            recommendedTopics: result.recommendedTopics,
-            metadata: {
-              runtime: runtime || 'ollama',
-              knowledgeSource: knowledgeSource || 'ai-web',
-              timestamp: Date.now()
-            }
-          });
-        }
-      } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
-      }
-    });
+    this.app.post('/api/generate', apiRateLimiter, authMiddleware, (req, res) =>
+      this.handleGenerate(req, res)
+    );
 
     // Job Status Endpoint
     // Job status endpoint (requires auth; frontend handles 401 by prompting re-login)
@@ -1015,6 +948,90 @@ export class ExpressServer {
         next();
       }
     });
+  }
+
+  private async handleGenerate(req: express.Request, res: express.Response) {
+    try {
+      const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
+      if (!isValidGenerateBody(req.body)) {
+        res.status(400).json({ error: 'topic is required' });
+        return;
+      }
+      const desiredCount = Math.max(1, parseInt(count || '10', 10));
+
+      // Check cache first
+      if (this.flashcardCache) {
+        const cachedResult = this.flashcardCache.get(
+          topic,
+          desiredCount,
+          mode,
+          knowledgeSource
+        );
+
+        if (cachedResult) {
+          res.json({
+            success: true,
+            cached: true,
+            ...cachedResult
+          });
+          return;
+        }
+      }
+
+      let jobId: string | null = null;
+
+      // If queue is available, try to offload to background job
+      if (this.queueService && this.queueAvailable) {
+        try {
+          jobId = await this.queueService.addGenerateJob({
+            topic,
+            count: desiredCount,
+            mode,
+            knowledgeSource: knowledgeSource || 'ai-web',
+            runtime: runtime || 'ollama',
+            parentTopic,
+            userId: (req as { user?: { id?: string } }).user?.id
+          });
+        } catch (error: unknown) {
+          // Mark queue as unavailable for subsequent requests and fall back to inline generation
+          this.queueAvailable = false;
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.warn('[Queue] enqueue failed, falling back to sync generation', { message });
+        }
+      }
+
+      if (jobId) {
+        res.status(202).json({
+          success: true,
+          jobId,
+          message: 'Job queued for processing',
+          statusUrl: `/api/jobs/${jobId}`
+        });
+        return;
+      }
+
+      // Fallback to synchronous processing if queue is not configured or fails
+      const result = await this.studyService.generateFlashcards(
+        topic,
+        desiredCount,
+        mode,
+        knowledgeSource || 'ai-web',
+        runtime || 'ollama',
+        parentTopic
+      );
+      res.json({
+        success: true,
+        cards: result.cards,
+        recommendedTopics: result.recommendedTopics,
+        metadata: {
+          runtime: runtime || 'ollama',
+          knowledgeSource: knowledgeSource || 'ai-web',
+          timestamp: Date.now()
+        }
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
   }
 
   public getApp(): express.Application {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1764829415779" clover="3.2.0">
-  <project timestamp="1764829415779" name="All files">
+<coverage generated="1764893347387" clover="3.2.0">
+  <project timestamp="1764893347387" name="All files">
     <metrics statements="16" coveredstatements="16" conditionals="4" coveredconditionals="4" methods="8" coveredmethods="8" elements="28" coveredelements="28" complexity="0" loc="16" ncloc="16" packages="1" files="1" classes="1"/>
     <file name="CacheService.ts" path="/Users/nileshchakraborty/workspace/flash-card-study-helper-ai/src/core/services/CacheService.ts">
       <metrics statements="16" coveredstatements="16" conditionals="4" coveredconditionals="4" methods="8" coveredmethods="8"/>
@@ -17,9 +17,9 @@
       <line num="42" count="4" type="stmt"/>
       <line num="46" count="1" type="stmt"/>
       <line num="47" count="1" type="stmt"/>
-      <line num="54" count="3" type="stmt"/>
-      <line num="55" count="5" type="cond" truecount="2" falsecount="0"/>
-      <line num="58" count="3" type="stmt"/>
+      <line num="54" count="2" type="stmt"/>
+      <line num="55" count="4" type="cond" truecount="2" falsecount="0"/>
+      <line num="58" count="2" type="stmt"/>
     </file>
   </project>
 </coverage>
