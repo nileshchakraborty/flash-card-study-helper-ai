@@ -83,36 +83,33 @@ export class ExpressServer {
 
 
   private setupPassport() {
-    const deriveCallbackUrl = (req: express.Request) => {
-      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-      // Vercel sets x-forwarded-proto, but also check for production domains
-      let proto = req.headers['x-forwarded-proto'] as string;
+    // Use environment variable if set, otherwise derive from request
+    // This allows preview deployments to work correctly
+    const configuredCallbackURL = process.env.OAUTH_CALLBACK_URL;
 
-      // Force HTTPS for production/Vercel domains
-      if (!proto && typeof host === 'string' && (host.includes('vercel.app') || host.includes('mindflipai'))) {
-        proto = 'https';
-      }
-
-      // Fallback to http for local development
-      proto = proto || req.protocol || 'http';
-
-      return `${proto}://${host}/api/auth/google/callback`;
-    };
+    if (configuredCallbackURL) {
+      console.log('[Passport] Using configured callback URL:', configuredCallbackURL);
+    } else {
+      console.log('[Passport] Using dynamic callback URL (derived from request)');
+    }
 
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
-      callbackURL: '/api/auth/google/callback',
-      passReqToCallback: true
-    }, (req, _accessToken, _refreshToken, profile, done) => {
-      // Ensure callbackURL is correct in serverless by overriding per-request
-      // (passport caches it per strategy instance, so we just rely on relative path + host/proto headers)
-      (req as any)._callbackURL = deriveCallbackUrl(req);
+      callbackURL: configuredCallbackURL || '/api/auth/google/callback',
+      passReqToCallback: false
+    }, (_accessToken, _refreshToken, profile, done) => {
+      // If using relative path, passport will derive full URL from request
+      // This allows preview deployments to work with their own domains
       return done(null, profile);
     }));
   }
 
   private setupMiddleware() {
+    // Trust proxy headers (X-Forwarded-Proto, X-Forwarded-Host) from Vercel/reverse proxies
+    // This is critical for OAuth to work behind TLS proxies
+    this.app.set('trust proxy', true);
+
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use(passport.initialize());
