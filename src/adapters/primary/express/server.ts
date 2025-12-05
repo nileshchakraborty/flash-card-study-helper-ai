@@ -106,6 +106,10 @@ export class ExpressServer {
   }
 
   private setupMiddleware() {
+    // Trust proxy headers (X-Forwarded-Proto, X-Forwarded-Host) from Vercel/reverse proxies
+    // This is critical for OAuth to work behind TLS proxies
+    this.app.set('trust proxy', true);
+
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use(passport.initialize());
