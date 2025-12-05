@@ -16,9 +16,11 @@ export class WebLLMAdapter implements AIServicePort, LLMAdapter {
     readonly name = 'webllm';
 
     async isAvailable(): Promise<boolean> {
-        // WebLLM is always "available" as it runs client-side in the browser
-        // Actual availability is determined at runtime by the frontend
-        return true;
+        // WebLLM is CLIENT-SIDE ONLY and requires a WebSocket session established from the browser.
+        // This backend adapter is just a coordination layer and CANNOT serve requests independently.
+        // Always return false so AdapterManager doesn't select this for backend generation.
+        // WebLLM should only be used explicitly by the frontend, not via automatic adapter selection.
+        return false;
     }
 
     private cache?: CacheService<any>;
