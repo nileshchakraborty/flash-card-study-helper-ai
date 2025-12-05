@@ -178,6 +178,8 @@ Content-Type: application/json
 
 ### Generate Advanced Quiz
 
+Generate a harder or remedial quiz based on previous results. **Phase 5** enhancement includes web context integration for "harder" mode.
+
 ```http
 POST /api/quiz/generate-advanced
 Content-Type: application/json
@@ -186,10 +188,36 @@ Content-Type: application/json
 **Request Body**:
 ```json
 {
-  "previousResults": [...],
-  "mode": "adaptive"
+  "previousResults": {
+    "topic": "JavaScript",
+    "questions": [...],
+    "userAnswers": [...],
+    "correctAnswers": [...]
+  },
+  "mode": "harder"
 }
 ```
+
+**Parameters**:
+- `previousResults` (object, required): Previous quiz data
+- `mode` (string, required): "harder" or "remedial"
+
+**Response**:
+```json
+{
+  "success": true,
+  "quiz": [
+    {
+      "id": "q1",
+      "question": "Advanced question with web context...",
+      "options": [...],
+      "correctAnswer": "..."
+    }
+  ]
+}
+```
+
+**Note**: In "harder" mode, the system performs cache-first web search to enhance questions with real-world context.
 
 ### Quiz History
 
@@ -248,6 +276,63 @@ Content-Type: application/json
   "cards": [...]
 }
 ```
+
+## Recommendations System (Phase 5)
+
+### Get Recommendations for Topic
+
+Retrieve AI-generated quiz topics and learning paths related to a subject.
+
+```http
+GET /api/recommendations/:topic
+```
+
+**Response (Pending)**:
+```json
+{
+  "success": true,
+  "topic": "JavaScript",
+  "recommendedQuizzes": [],
+  "recommendedLearning": [],
+  "pending": true
+}
+```
+
+**Response (Ready)**:
+```json
+{
+  "success": true,
+  "topic": "JavaScript",
+  "recommendedQuizzes": [
+    "JavaScript Closures Deep Dive",
+    "Async/Await Patterns",
+    "ES6 Features"
+  ],
+  "recommendedLearning": [
+    "Advanced Functions",
+    "Promises and Async Programming",
+    "Modern JavaScript Ecosystem"
+  ]
+}
+```
+
+### Refresh Recommendations
+
+Trigger fresh generation of recommendations for a topic.
+
+```http
+POST /api/recommendations/refresh/:topic
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Recommendation generation triggered"
+}
+```
+
+**Note**: Recommendations are generated asynchronously in the background. Poll the GET endpoint to retrieve results.
 
 ## Client-Side AI Support
 

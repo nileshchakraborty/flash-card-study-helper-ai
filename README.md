@@ -184,10 +184,12 @@ curl -X POST /graphql -d '{
 
 ### Performance & Resilience
 - ⚡ **In-Memory Caching** for instant repeated queries (1 hour TTL)
+- 🌐 **Cache-First Web Search** - 24hr cache for web content (Phase 5)
 - 🔄 **Background Queue** with retry and Dead Letter Queue (BullMQ)
 - 🔌 **Circuit Breakers** preventing cascading failures (Opossum)
 - 📊 **Structured Logging** for observability (Winston)
 - 🎯 **Proactive Deep Dive** - auto-generates related topics in background
+- 🎓 **Async Recommendations** - background generation of quiz topics & learning paths (Phase 5)
 
 ### MCP Integration (Optional)
 - 🌐 **Model Context Protocol** server for external service calls
@@ -197,9 +199,10 @@ curl -X POST /graphql -d '{
 
 ### AI & Search
 - 🤖 Multiple LLM runtimes (Ollama, WebLLM)
-- 🔍 Web search integration (Serper)
+- 🔍 Web search integration (Serper) with cache-first strategy
 - 📄 PDF/Image processing for flashcard generation
 - 🎓 Quiz generation from flashcards
+- 💪 **Advanced Quiz Mode** - "Try Harder Quiz" with web-enhanced context (Phase 5)
 - ✅ Validation & Self-Repair: Generated flashcards are validated for strict JSON/question-answer shape; if invalid/insufficient, the system re-prompts the runtime to repair before returning.
 - 📏 Count Enforcement: Returned flashcards are trimmed/padded to match the requested count; client-side generation auto-falls back to backend if underfilled.
 - 🛡️ Runtime fallback ladder: Preferred runtime (configurable) → alternate runtime → local quiz fallback to prevent failures when an LLM is unavailable
