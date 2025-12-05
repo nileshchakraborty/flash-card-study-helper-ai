@@ -20,37 +20,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  const app = new AppController();
-  (window as any).app = app;
+  const landingPage = document.getElementById('landing-page');
+  const appContent = document.getElementById('app-content');
 
-  // Initialize LLM Orchestrator
-  const orchestrator = new LLMOrchestrator();
-  await orchestrator.initialize();
-  (window as any).llmOrchestrator = orchestrator;
+  if (apiService.isAuthenticated()) {
+    landingPage?.classList.add('hidden');
+    appContent?.classList.remove('hidden');
 
-  // Model Manager is opt-in
-  let modelManager: ModelManagerUI | null = null;
-  let modelManagerInitialized = false;
-  const ensureModelManager = () => {
-    if (!modelManagerInitialized) {
-      modelManager = new ModelManagerUI(orchestrator);
-      modelManager.initialize();
-      modelManagerInitialized = true;
+    const app = new AppController();
+    (window as any).app = app;
+
+    // Initialize LLM Orchestrator
+    const orchestrator = new LLMOrchestrator();
+    await orchestrator.initialize();
+    (window as any).llmOrchestrator = orchestrator;
+
+    // Model Manager is opt-in
+    let modelManager: ModelManagerUI | null = null;
+    let modelManagerInitialized = false;
+    const ensureModelManager = () => {
+      if (!modelManagerInitialized) {
+        modelManager = new ModelManagerUI(orchestrator);
+        modelManager.initialize();
+        modelManagerInitialized = true;
+      }
+    };
+
+    // Auto-enable model manager if user previously opted in
+    if (settingsService.getModelManagerEnabled()) {
+      ensureModelManager();
     }
-  };
 
-  // Setup login/logout button state
+    // Setup Settings Modal Logic (only needed if logged in)
+    setupSettingsModal(ensureModelManager);
+
+  } else {
+    landingPage?.classList.remove('hidden');
+    appContent?.classList.add('hidden');
+    // Don't initialize app controllers if not logged in
+  }
+
+  // Setup login/logout button state (for both views if needed, but mainly app view)
   const authBtn = document.getElementById('auth-btn');
   const labelEl = document.getElementById('auth-btn-label');
-  const settingsBtn = document.getElementById('settings-btn');
-  const settingsModal = document.getElementById('settings-modal');
-  const settingsClose = document.getElementById('settings-close');
-  const settingsCancel = document.getElementById('settings-cancel');
-  const settingsSave = document.getElementById('settings-save');
-  const runtimeRadios = Array.from(document.querySelectorAll('.runtime-radio')) as HTMLInputElement[];
-  const modelManagerToggle = document.getElementById('model-manager-enabled') as HTMLInputElement | null;
-  const navToggle = document.getElementById('nav-toggle');
-  const navLinks = document.getElementById('nav-links');
 
   const renderAuthState = () => {
     if (!authBtn || !labelEl) return;
@@ -60,7 +72,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isAuthed) {
         localStorage.removeItem('authToken');
         graphqlService.updateHeaders();
-        // Simple refresh to reset app state and buttons
         window.location.reload();
       } else {
         window.location.href = '/api/auth/google';
@@ -69,6 +80,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   renderAuthState();
+
+  // Hamburger toggle
+  const navToggle = document.getElementById('nav-toggle');
+  const navLinks = document.getElementById('nav-links');
+  navToggle?.addEventListener('click', () => {
+    navLinks?.classList.toggle('hidden');
+    navLinks?.classList.toggle('flex');
+    navLinks?.classList.toggle('flex-col');
+  });
+
+  // Expose eventBus for inline handlers (legacy refresh button)
+  (window as any).eventBus = eventBus;
+});
+
+function setupSettingsModal(ensureModelManager: () => void) {
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsClose = document.getElementById('settings-close');
+  const settingsCancel = document.getElementById('settings-cancel');
+  const settingsSave = document.getElementById('settings-save');
+  const runtimeRadios = Array.from(document.querySelectorAll('.runtime-radio')) as HTMLInputElement[];
+  const modelManagerToggle = document.getElementById('model-manager-enabled') as HTMLInputElement | null;
 
   const openSettings = () => {
     const pref = settingsService.getPreferredRuntime();
@@ -95,19 +128,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     closeSettings();
   });
-
-  // Auto-enable model manager if user previously opted in
-  if (settingsService.getModelManagerEnabled()) {
-    ensureModelManager();
-  }
-
-  // Hamburger toggle
-  navToggle?.addEventListener('click', () => {
-    navLinks?.classList.toggle('hidden');
-    navLinks?.classList.toggle('flex');
-    navLinks?.classList.toggle('flex-col');
-  });
-
-  // Expose eventBus for inline handlers (legacy refresh button)
-  (window as any).eventBus = eventBus;
-});
+}

@@ -7,7 +7,7 @@ import { apiService } from '../services/api.service.js';
 export class QuizView extends BaseView {
   constructor() {
     super();
-    this.DOM = {
+    this.elements = {
       setup: document.getElementById('quiz-setup'),
       questions: document.getElementById('quiz-questions'),
       results: document.getElementById('quiz-results'),
@@ -37,6 +37,10 @@ export class QuizView extends BaseView {
       quizTopicTimer: document.getElementById('quiz-topic-timer') as HTMLSelectElement,
       cancelTopicQuiz: document.getElementById('cancel-topic-quiz'),
       availableQuizzesList: document.getElementById('available-quizzes-list'),
+      statsSection: document.getElementById('quiz-stats-section'),
+      statsTotal: document.getElementById('stats-total-quizzes'),
+      statsAvg: document.getElementById('stats-avg-score'),
+      statsPerfect: document.getElementById('stats-perfect-scores'),
       flashcardModal: document.getElementById('flashcard-selection-modal'),
       flashcardList: document.getElementById('flashcard-list'),
       selectedFlashcardCount: document.getElementById('selected-flashcard-count'),
@@ -92,10 +96,10 @@ export class QuizView extends BaseView {
    * Render flashcard selection modal
    */
   renderFlashcardSelectionModal(flashcards: any[], selectedIds: Set<string> = new Set()) {
-    if (!this.DOM.flashcardList || !this.DOM.flashcardModal) return;
+    if (!this.elements.flashcardList || !this.elements.flashcardModal) return;
 
     if (!flashcards || flashcards.length === 0) {
-      this.DOM.flashcardList.innerHTML = `
+      this.elements.flashcardList.innerHTML = `
         <div class="col-span-2 text-center text-gray-500 py-8">
           <span class="material-icons text-5xl mb-2 opacity-50">inbox</span>
           <p>No flashcards available.</p>
@@ -105,7 +109,7 @@ export class QuizView extends BaseView {
       return;
     }
 
-    this.DOM.flashcardList.innerHTML = flashcards.map(fc => `
+    this.elements.flashcardList.innerHTML = flashcards.map(fc => `
       <div 
         class="flashcard-item p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-lg ${selectedIds.has(fc.id)
         ? 'border-purple-500 bg-purple-50'
@@ -128,25 +132,25 @@ export class QuizView extends BaseView {
     `).join('');
 
     // Update count
-    if (this.DOM.selectedFlashcardCount) {
-      this.DOM.selectedFlashcardCount.textContent = `${selectedIds.size} selected`;
+    if (this.elements.selectedFlashcardCount) {
+      this.elements.selectedFlashcardCount.textContent = `${selectedIds.size} selected`;
     }
 
     // Update button state
-    if (this.DOM.confirmFlashcardSelection) {
-      this.DOM.confirmFlashcardSelection.disabled = selectedIds.size === 0;
+    if (this.elements.confirmFlashcardSelection) {
+      this.elements.confirmFlashcardSelection.disabled = selectedIds.size === 0;
     }
 
     // Show modal
-    this.DOM.flashcardModal.classList.remove('hidden');
+    this.elements.flashcardModal.classList.remove('hidden');
   }
 
   /**
    * Hide flashcard selection modal
    */
   hideFlashcardSelectionModal() {
-    if (this.DOM.flashcardModal) {
-      this.DOM.flashcardModal.classList.add('hidden');
+    if (this.elements.flashcardModal) {
+      this.elements.flashcardModal.classList.add('hidden');
     }
   }
 
@@ -154,10 +158,10 @@ export class QuizView extends BaseView {
    * Render available quizzes list
    */
   renderAvailableQuizzes(quizzes: any[]) {
-    if (!this.DOM.availableQuizzesList) return;
+    if (!this.elements.availableQuizzesList) return;
 
     if (!quizzes || quizzes.length === 0) {
-      this.DOM.availableQuizzesList.innerHTML = `
+      this.elements.availableQuizzesList.innerHTML = `
         <div class="text-gray-500 text-sm italic flex items-center justify-between">
           <span>No quizzes created yet.</span>
           <button class="text-indigo-600 hover:text-indigo-800 font-semibold" id="available-create-btn">Create Quiz</button>
@@ -171,7 +175,7 @@ export class QuizView extends BaseView {
       return;
     }
 
-    this.DOM.availableQuizzesList.innerHTML = quizzes.map(quiz => `
+    this.elements.availableQuizzesList.innerHTML = quizzes.map(quiz => `
       <button type="button"
         class="quiz-item w-full text-left p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/70 transition-all cursor-pointer group flex items-center justify-between"
         data-quiz-id="${quiz.id}">
@@ -190,7 +194,7 @@ export class QuizView extends BaseView {
     `).join('');
 
     // Delegate click handling to the container to avoid missing bindings
-    this.DOM.availableQuizzesList.onclick = (e: Event) => {
+    this.elements.availableQuizzesList.onclick = (e: Event) => {
       const target = (e.target as HTMLElement);
       const container = target.closest('.quiz-item') as HTMLElement | null;
       const quizId = container?.dataset.quizId;
@@ -210,8 +214,8 @@ export class QuizView extends BaseView {
    * Show topic quiz form
    */
   showTopicQuizForm() {
-    if (this.DOM.topicQuizForm) {
-      this.DOM.topicQuizForm.classList.remove('hidden');
+    if (this.elements.topicQuizForm) {
+      this.elements.topicQuizForm.classList.remove('hidden');
     }
   }
 
@@ -219,11 +223,11 @@ export class QuizView extends BaseView {
    * Hide topic quiz form
    */
   hideTopicQuizForm() {
-    if (this.DOM.topicQuizForm) {
-      this.DOM.topicQuizForm.classList.add('hidden');
+    if (this.elements.topicQuizForm) {
+      this.elements.topicQuizForm.classList.add('hidden');
       // Reset form
-      if (this.DOM.createQuizTopicForm) {
-        (this.DOM.createQuizTopicForm as HTMLFormElement).reset();
+      if (this.elements.createQuizTopicForm) {
+        (this.elements.createQuizTopicForm as HTMLFormElement).reset();
       }
     }
   }
@@ -254,7 +258,7 @@ export class QuizView extends BaseView {
 
   bindEvents() {
     // Quiz form submission
-    const quizForm = this.DOM.quizForm; // Changed from this.getElement('#quiz-form')
+    const quizForm = this.elements.quizForm; // Changed from this.getElement('#quiz-form')
     if (quizForm) {
       this.bind(quizForm, 'submit', async (e) => {
         e.preventDefault();
@@ -331,9 +335,17 @@ export class QuizView extends BaseView {
   }
 
   showQuestionUI() {
-    this.hide(this.elements.setup);
+    console.log('[QuizView] showQuestionUI called');
+    console.log('[QuizView] setup element:', this.elements.setup);
+    console.log('[QuizView] questions element:', this.elements.questions);
+
+    // Setup is in a different tab, so we don't need to hide it explicitly.
+    // Tab switching handles visibility.
     this.hide(this.elements.results);
     this.show(this.elements.questions);
+
+    console.log('[QuizView] setup classes:', this.elements.setup?.className);
+    console.log('[QuizView] questions classes:', this.elements.questions?.className);
   }
 
   showResultsUI(result) {
@@ -398,8 +410,8 @@ export class QuizView extends BaseView {
           const btn = document.createElement('button');
           const isSelected = quizModel.answers[question.id] === option;
           btn.className = `w-full text-left p-4 rounded-lg border-2 transition-all ${isSelected
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-gray-200 hover:border-gray-300 bg-white'
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-gray-200 hover:border-gray-300 bg-white'
             }`;
           btn.textContent = option;
           btn.onclick = () => {
@@ -438,22 +450,66 @@ export class QuizView extends BaseView {
   renderHistory(history) {
     if (!this.elements.historyList) return;
 
+    // Render Stats
+    this.renderStats(history);
+
     if (history.length === 0) {
       this.elements.historyList.innerHTML = '<div class="text-gray-500 text-sm italic">No quiz history found.</div>';
       return;
     }
 
-    this.elements.historyList.innerHTML = history.map(quiz => `
-      <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex justify-between items-center">
-        <div>
-          <h4 class="font-semibold text-gray-800">${quiz.topic}</h4>
-          <p class="text-xs text-gray-500">${new Date(quiz.timestamp).toLocaleDateString()} • Score: ${quiz.score}/${quiz.total}</p>
+    this.elements.historyList.innerHTML = history.map((quiz, index) => `
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
+        <div class="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50" onclick="document.getElementById('history-details-${index}').classList.toggle('hidden')">
+          <div>
+            <h4 class="font-semibold text-gray-800">${quiz.topic}</h4>
+            <p class="text-xs text-gray-500">${new Date(quiz.timestamp).toLocaleDateString()} • ${new Date(quiz.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+          <div class="flex items-center gap-4">
+             <div class="text-right">
+                <div class="text-sm font-medium text-gray-900">Score: ${quiz.score}/${quiz.total}</div>
+                <div class="text-xs font-bold ${quiz.score / quiz.total >= 0.7 ? 'text-green-600' : 'text-orange-500'}">
+                  ${Math.round((quiz.score / quiz.total) * 100)}%
+                </div>
+             </div>
+             <span class="material-icons text-gray-400">expand_more</span>
+          </div>
         </div>
-        <div class="text-lg font-bold ${quiz.score / quiz.total >= 0.7 ? 'text-green-600' : 'text-orange-500'}">
-          ${Math.round((quiz.score / quiz.total) * 100)}%
+        <div id="history-details-${index}" class="hidden border-t border-gray-100 bg-gray-50 p-4 space-y-3">
+            ${quiz.results.map((r, i) => `
+                <div class="text-sm">
+                    <div class="font-medium text-gray-900 mb-1">${i + 1}. ${r.question}</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="${r.correct ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'} p-2 rounded border ${r.correct ? 'border-green-200' : 'border-red-200'}">
+                            <span class="font-semibold">Your Answer:</span> ${r.userAnswer || 'Skipped'}
+                        </div>
+                        <div class="text-gray-700 bg-white p-2 rounded border border-gray-200">
+                            <span class="font-semibold">Correct Answer:</span> ${r.expected || r.correctAnswer}
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
         </div>
       </div>
     `).join('');
+  }
+
+  renderStats(history) {
+    if (!this.elements.statsSection || history.length === 0) {
+      if (this.elements.statsSection) this.hide(this.elements.statsSection);
+      return;
+    }
+
+    this.show(this.elements.statsSection);
+
+    const totalQuizzes = history.length;
+    const totalScore = history.reduce((acc, curr) => acc + (curr.score / curr.total), 0);
+    const avgScore = Math.round((totalScore / totalQuizzes) * 100);
+    const perfectScores = history.filter(q => q.score === q.total).length;
+
+    if (this.elements.statsTotal) this.elements.statsTotal.textContent = totalQuizzes.toString();
+    if (this.elements.statsAvg) this.elements.statsAvg.textContent = `${avgScore}%`;
+    if (this.elements.statsPerfect) this.elements.statsPerfect.textContent = perfectScores.toString();
   }
 
   showPopup(result) {
@@ -511,7 +567,7 @@ export class QuizView extends BaseView {
     if (!actionsContainer) {
       actionsContainer = document.createElement('div');
       actionsContainer.className = 'quiz-actions mt-6';
-      this.elements.popup.querySelector('.bg-white').appendChild(actionsContainer);
+      this.elements.popup.firstElementChild.appendChild(actionsContainer);
     }
     actionsContainer.innerHTML = actionButtons;
 

@@ -225,21 +225,24 @@ Create ${count} flashcards now:`;
     return result;
   }
 
-  async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
+  async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial', context?: string): Promise<QuizQuestion[]> {
     const { topic, wrongAnswers } = previousResults;
     let systemPrompt = '';
     let prompt = '';
 
     if (mode === 'harder') {
-      systemPrompt = `You are an expert examiner.Create a challenging quiz about: ${topic}.`;
-      prompt = `Create 5 advanced multiple - choice questions.Return ONLY a JSON array with "id", "question", "options"(array), "correctAnswer", "explanation".`;
+      systemPrompt = `You are an expert examiner. Create a challenging quiz about: ${topic}.`;
+      prompt = `Create 5 advanced multiple-choice questions.${context ? `\n\nUse this context for inspiration:\n${context.substring(0, 2000)}` : ''}\n\nReturn ONLY a JSON array with "id", "question", "options"(array), "correctAnswer", "explanation".`;
     } else {
-      systemPrompt = `You are a patient tutor.Create a remedial quiz.`;
-      prompt = `Student missed: ${wrongAnswers.join(', ')}. Create 5 questions to reinforce these concepts.Return ONLY a JSON array with "id", "question", "options"(array), "correctAnswer", "explanation".`;
+      systemPrompt = `You are a patient tutor. Create a remedial quiz.`;
+      prompt = `Student missed: ${wrongAnswers.join(', ')}. Create 5 questions to reinforce these concepts. Return ONLY a JSON array with "id", "question", "options"(array), "correctAnswer", "explanation".`;
     }
 
     const response = await this.callOllama(prompt, systemPrompt);
-    return this.extractJSON(response);
+    const result = this.extractJSON(response);
+
+    // Ensure option count for advanced quizzes too
+    return this.ensureOptionCount(result);
   }
 
   async generateQuizFromFlashcards(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]> {
@@ -267,13 +270,23 @@ Create ${count} flashcards now:`;
         1. Each question MUST have exactly 4 options: 1 correct answer + 3 plausible wrong answers (distractors)
         2. For True/False questions, use only 2 options: ["True", "False"]
         3. The "correctAnswer" MUST be one of the "options" array
-        4. Make distractors plausible but clearly wrong to someone who studied the material
+        4. DISTRACTOR RULES:
+           - MUST be related to the topic (e.g., if asking about Python lists, distractors should be about other Python data structures or list methods, not about cooking or history).
+           - MUST be clearly incorrect for the specific question.
+           - AVOID "All of the above" or "None of the above".
+           - HARD MODE: Distractors should be plausible misconceptions or semantically similar to the correct answer. For example, if the answer is "ArrayList", distractors could be "LinkedList", "Vector", "Array" (related concepts), NOT "String" or "Integer" (too easy).
         5. Mix difficulty: Easy (direct recall), Medium (application), Hard (synthesis)
         6. Questions should test understanding, not just memorization
+        7. STRICT VARIETY RULE: You MUST generate UNIQUE options for every single question. Do NOT copy-paste the same set of options. If Question 1 has options [A, B, C, D], Question 2 MUST have completely different options [E, F, G, H].
+        8. NEGATIVE CONSTRAINT: Never use "Option A", "Option B" etc. as placeholders. Use real content.
+        
+        9. CONCISENESS RULE: Keep options short and punchy (max 10-15 words). Do NOT use long paragraphs as options.
+        10. HOMOGENEITY RULE: All options must be grammatically and structurally similar. If the correct answer is a verb phrase, all distractors must be verb phrases.
+        11. NO HINTS RULE: Do NOT repeat keywords from the question in the correct answer if they are not present in the distractors. If the question asks "What is the primary benefit...", do NOT start the answer with "The primary benefit is...". Just state the benefit.
         
         DETECTION RULES:
-        - If a question is inherently binary (yes/no, true/false, exists/doesn't exist), use only 2 options
-        - For all other questions, provide 4 options
+        - If a question is inherently binary (yes/no, true/false), use only 2 options.
+        - FOR ALL OTHER QUESTIONS, YOU MUST PROVIDE EXACTLY 4 OPTIONS. NO EXCEPTIONS.
         
         JSON Format (return ONLY valid JSON, no markdown):
         [
@@ -301,12 +314,115 @@ Create ${count} flashcards now:`;
     const response = await this.callOllama(prompt, systemPrompt);
     const result = this.extractJSON(response);
 
-    // Store in cache
-    if (this.cache && result.length > 0) {
-      this.cache.set(cacheKey, result);
+    // Verification Stage
+    if (result.length > 0) {
+      console.log(`Verifying quiz generation for ${result.length} questions...`);
+      const topic = flashcards[0]?.topic || 'General Knowledge';
+      const verified = await this.verifyAndRefineQuiz(result, topic);
+      return this.ensureOptionCount(verified);
     }
 
-    return result;
+    return this.ensureOptionCount(result);
+  }
+
+  async verifyAndRefineQuiz(quiz: QuizQuestion[], topic: string): Promise<QuizQuestion[]> {
+    const systemPrompt = "You are a strict quality control editor for educational content.";
+    let prompt = `
+      Review the following multiple-choice quiz about "${topic}":
+      ${JSON.stringify(quiz, null, 2)}
+
+      TASK:
+      1. Check if "correctAnswer" is actually correct.
+      2. Check if distractors (wrong options) are RELATED to the topic but CLEARLY WRONG.
+      3. If a distractor is completely unrelated (e.g., "Banana" for a coding question), REPLACE it with a plausible technical term that is related to the topic.
+      4. Ensure there are no duplicate options within a question.
+      5. Ensure DIVERSITY: Check that different questions do not share the exact same set of options. If they do, change the distractors for one of them to be unique.
+      6. Ensure COUNT: Each question MUST have exactly 4 options (unless it's True/False). If a question has fewer than 4 options, GENERATE MISSING DISTRACTORS to reach exactly 4.
+      7. Ensure QUALITY: Distractors should be "close" to the correct answer. If the answer is a specific function name, distractors should be other similar function names.
+      8. Ensure CONCISENESS: If options are too long (sentences/paragraphs), shorten them to key phrases.
+      9. FIX HOMOGENEITY: If one option stands out (e.g. much longer/shorter or different grammatical structure), REWRITE it to match the style of the others.
+      10. REMOVE HINTS: If the correct answer repeats keywords from the question, REPHRASE it to use synonyms so it's not a dead giveaway.
+
+      Return the CORRECTED JSON array. If no changes are needed, return the original JSON.
+      `;
+
+    let currentQuiz = quiz;
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // 1. Run AI Verification
+        const response = await this.callOllama(prompt, systemPrompt);
+        const verified = this.extractJSON(response);
+
+        if (verified && verified.length > 0) {
+          currentQuiz = this.ensureOptionCount(verified);
+        }
+
+        // 2. Code-level Diversity Check
+        const allOptions = new Set<string>();
+        let hasDuplicates = false;
+
+        for (const q of currentQuiz) {
+          const optionsStr = [...q.options].sort().join('|');
+          if (allOptions.has(optionsStr)) {
+            hasDuplicates = true;
+            break;
+          }
+          allOptions.add(optionsStr);
+        }
+
+        if (!hasDuplicates) {
+          console.log(`Quiz verification passed on attempt ${attempt}.`);
+          return currentQuiz;
+        }
+
+        console.warn(`Attempt ${attempt}: Found duplicate options across questions. Retrying...`);
+        prompt += `\n\nCRITICAL ERROR: You generated questions with IDENTICAL options. This is forbidden. REWRITE the options for questions that share the same choices so they are unique.`;
+
+      } catch (e) {
+        console.warn(`Quiz verification attempt ${attempt} failed:`, e);
+      }
+    }
+
+    console.warn('Max retries reached. Returning best effort.');
+    return this.ensureOptionCount(currentQuiz);
+  }
+
+  private ensureOptionCount(quiz: QuizQuestion[]): QuizQuestion[] {
+    return quiz.map(q => {
+      // Skip True/False questions
+      const isBoolean = q.options.length === 2 &&
+        q.options.some(o => o.toLowerCase() === 'true') &&
+        q.options.some(o => o.toLowerCase() === 'false');
+
+      if (isBoolean) return q;
+
+      // Enforce 4 options for everything else
+      if (q.options.length < 4) {
+        const questionId = q.id || 'unknown';
+        console.warn(`Question "${questionId}" has only ${q.options.length} options. Adding fallbacks.`);
+        const newOptions = [...q.options];
+
+        const fallbacks = [
+          "None of the above",
+          "All of the above",
+          "Not applicable in this context",
+          "Depends on the implementation"
+        ];
+
+        let added = 0;
+        while (newOptions.length < 4 && added < fallbacks.length) {
+          const fallback = fallbacks[added];
+          if (fallback && !newOptions.includes(fallback)) {
+            newOptions.push(fallback);
+          }
+          added++;
+        }
+        return { ...q, options: newOptions };
+      }
+      return q;
+    });
   }
 
   /**
@@ -315,7 +431,7 @@ Create ${count} flashcards now:`;
   async generateQuizFromTopic(topic: string, count: number, context?: string): Promise<QuizQuestion[]> {
     // Check cache
     const contextHash = context ? CacheServiceClass.hashKey(context.substring(0, 1000)) : '';
-    const cacheKey = `ollama:quiz:topic:${topic}:${count}:${contextHash}`;
+    const cacheKey = `ollama: quiz: topic:${topic}:${count}:${contextHash} `;
 
     if (this.cache) {
       const cached = this.cache.get(cacheKey);
@@ -325,43 +441,43 @@ Create ${count} flashcards now:`;
     const systemPrompt = "You are an expert quiz designer creating educational multiple-choice tests.";
 
     const prompt = `
-        Create ${count} multiple-choice quiz questions about: "${topic}"
+        Create ${count} multiple - choice quiz questions about: "${topic}"
         ${context ? `\n\nContext/Background Information:\n${context}\n` : ''}
         
         CRITICAL REQUIREMENTS:
-        1. Each question MUST have exactly 4 options: 1 correct answer + 3 plausible wrong answers (distractors)
-        2. For True/False questions, use only 2 options: ["True", "False"]
-        3. The "correctAnswer" MUST be one of the "options" array
-        4. Make distractors challenging but clearly wrong to someone who knows the topic
-        5. Mix difficulty levels: Easy, Medium, Hard
-        6. Questions should test understanding and application, not just definitions
+    1. Each question MUST have exactly 4 options: 1 correct answer + 3 plausible wrong answers(distractors)
+    2. For True / False questions, use only 2 options: ["True", "False"]
+    3. The "correctAnswer" MUST be one of the "options" array
+    4. Make distractors challenging but clearly wrong to someone who knows the topic
+    5. Mix difficulty levels: Easy, Medium, Hard
+    6. Questions should test understanding and application, not just definitions
         
         DETECTION RULES:
-        - If a question is inherently binary (yes/no, true/false, did X happen, is X true), use only 2 options
-        - For all other questions (what, how, which one, identify, etc.), provide 4 options
+    - If a question is inherently binary(yes / no, true / false, did X happen, is X true), use only 2 options
+      - For all other questions(what, how, which one, identify, etc.), provide 4 options
         
-        JSON Format (return ONLY valid JSON, no markdown, no code blocks):
-        [
-          {
-            "id": "q1",
-            "question": "What is the primary purpose of X?",
-            "options": ["Option A (correct)", "Option B (plausible)", "Option C (plausible)", "Option D (plausible)"],
-            "correctAnswer": "Option A (correct)",
-            "explanation": "Brief explanation why this is correct and others are wrong",
-            "difficulty": "medium"
-          },
-          {
-            "id": "q2",
-            "question": "Is statement Y true?",
-            "options": ["True", "False"],
-            "correctAnswer": "False",
-            "explanation": "Explanation of why it's false",
-            "difficulty": "easy"
-          }
-        ]
+        JSON Format(return ONLY valid JSON, no markdown, no code blocks):
+    [
+      {
+        "id": "q1",
+        "question": "What is the primary purpose of X?",
+        "options": ["Option A (correct)", "Option B (plausible)", "Option C (plausible)", "Option D (plausible)"],
+        "correctAnswer": "Option A (correct)",
+        "explanation": "Brief explanation why this is correct and others are wrong",
+        "difficulty": "medium"
+      },
+      {
+        "id": "q2",
+        "question": "Is statement Y true?",
+        "options": ["True", "False"],
+        "correctAnswer": "False",
+        "explanation": "Explanation of why it's false",
+        "difficulty": "easy"
+      }
+    ]
         
         Create ${count} questions now:
-        `;
+    `;
 
     const response = await this.callOllama(prompt, systemPrompt);
     const result = this.extractJSON(response);
@@ -395,7 +511,7 @@ Create ${count} flashcards now:`;
 
   private extractJSON(text: string): any {
     // 1. Clean the text
-    let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    let cleaned = text.replace(/```json\s * /g, '').replace(/```\s*/g, '').trim();
 
     // Fix common JSON issues before parsing
     // Replace real newlines in strings with \n

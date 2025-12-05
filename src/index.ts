@@ -44,14 +44,88 @@ console.log('🗂️  Cache initialized:', {
     llm: { ttl: `${process.env.CACHE_LLM_TTL_SECONDS || '86400'}s`, max: process.env.CACHE_LLM_MAX_ENTRIES || '500' }
 });
 
-// 1. Initialize Storage Services
-const quizStorage = new QuizStorageService();
+// 1. Initialize Logger and Core Services
+const logger = new LoggerService();
+const queueService = new QueueService();
+const flashcardCache = new FlashcardCacheService(3600); // 1 hour TTL
+
+logger.info('🛡️  Resilience services initialized');
+logger.info('🌐 WebLLM service initialized');
+
+// 2. Initialize Storage Services (Local DB first for persistence)
+const isVercelDeployment = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+const useLocalDb = process.env.USE_LOCAL_DB === 'true' || process.env.USE_SQLITE === 'true';
+const useLocalVector = process.env.USE_LOCAL_VECTOR === 'true';
+
+let redisService: RedisService | null = null;
+let supabaseService: SupabaseService | LocalDbService | null = null;
+let vectorService: UpstashVectorService | InMemoryVectorService | null = null;
+let blobService: BlobStorageService | null = null;
+
+// Initialize Persistence Layer
+if (isVercelDeployment && !useLocalDb && !useLocalVector) {
+    logger.info('🔌 Initializing external services (Vercel deployment detected)...');
+
+    // Redis for distributed caching
+    if (process.env.REDIS_URL) {
+        try {
+            redisService = new RedisService();
+            await redisService.connect(process.env.REDIS_URL);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            logger.warn('Redis initialization failed, using in-memory cache:', message);
+        }
+    } else {
+        logger.info('REDIS_URL not set, using in-memory cache only');
+    }
+
+    // Supabase for persistent storage
+    if (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        supabaseService = new SupabaseService();
+        await supabaseService.initialize();
+    } else {
+        logger.info('Supabase credentials not set, using in-memory storage only');
+    }
+
+    // Upstash Vector for semantic search
+    if (process.env.UPSTASH_VECTOR_REST_URL) {
+        vectorService = new UpstashVectorService();
+        await vectorService.initialize();
+    } else {
+        logger.info('Upstash Vector credentials not set, semantic search disabled');
+    }
+
+    // Vercel Blob for file storage
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+        blobService = new BlobStorageService(process.env.BLOB_READ_WRITE_TOKEN);
+    } else {
+        logger.info('Blob storage token not set, file uploads disabled');
+    }
+
+    logger.info('✅ External services initialized');
+} else {
+    logger.info('💻 Local/dev mode overrides enabled - using lightweight services');
+
+    // Local DB (SQLite or in-memory)
+    if (useLocalDb || !isVercelDeployment) {
+        supabaseService = new LocalDbService();
+        await (supabaseService as LocalDbService).initialize();
+    }
+
+    // Local vector search
+    if (useLocalVector || !isVercelDeployment) {
+        vectorService = new InMemoryVectorService();
+        await vectorService.initialize();
+    }
+}
+
+// Initialize Domain Services with Persistence
+// Inject LocalDbService (if available) into QuizStorageService
+const localDb = (supabaseService instanceof LocalDbService) ? supabaseService : undefined;
+const quizStorage = new QuizStorageService(localDb);
 const flashcardStorage = new FlashcardStorageService();
 
 console.log('💾 Storage services initialized');
-
-
-// 2. Initialize MCP Client (Optional with Feature Flag)
 async function initializeMCP(): Promise<MCPClientWrapper | null> {
     const useMCP = process.env.USE_MCP_SERVER === 'true';
 
@@ -108,16 +182,18 @@ const serperAdapter = new HybridSerperAdapter(mcpClient, directSerperAdapter, us
 const fsAdapter = new FileSystemAdapter();
 
 // 5. Initialize Resilience and Queue Services
-const logger = new LoggerService();
-// const resilienceService = new ResilienceService();
-const queueService = new QueueService();
-const flashcardCache = new FlashcardCacheService(3600); // 1 hour TTL
+// logger, queueService, flashcardCache already initialized at top
 
-logger.info('🛡️  Resilience services initialized');
-logger.info('🌐 WebLLM service initialized');
+// Create web context cache (24hr TTL for web scraping results)
+const webContextCache = new CacheService<string>({
+    ttlSeconds: 86400, // 24 hours
+    maxEntries: 100
+});
+console.log('🌐 Web context cache initialized (24hr TTL)');
 
 // 5. Initialize Core Service with Multiple Adapters and Metrics
-const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metricsService);
+const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metricsService, webContextCache);
+console.log('🎓 Study service initialized with cache-first web search');
 
 // 6. Initialize Queue Worker
 queueService.initWorker(async (job) => {
@@ -178,73 +254,7 @@ queueService.initWorker(async (job) => {
 
 logger.info('⚙️  Queue worker initialized');
 
-// Initialize external services (graceful fallbacks if not available)
-// Only initialize on Vercel deployment, skip for local development
-const isVercelDeployment = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
-const useLocalDb = process.env.USE_LOCAL_DB === 'true' || process.env.USE_SQLITE === 'true';
-const useLocalVector = process.env.USE_LOCAL_VECTOR === 'true';
-
-// Declare external service variables before the conditional block
-let redisService: RedisService | null = null;
-let supabaseService: SupabaseService | LocalDbService | null = null;
-let vectorService: UpstashVectorService | InMemoryVectorService | null = null;
-let blobService: BlobStorageService | null = null;
-
-if (isVercelDeployment && !useLocalDb && !useLocalVector) {
-    logger.info('🔌 Initializing external services (Vercel deployment detected)...');
-
-    // Redis for distributed caching
-    if (process.env.REDIS_URL) {
-        try {
-            redisService = new RedisService();
-            await redisService.connect(process.env.REDIS_URL);
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            logger.warn('Redis initialization failed, using in-memory cache:', message);
-        }
-    } else {
-        logger.info('REDIS_URL not set, using in-memory cache only');
-    }
-
-    // Supabase for persistent storage
-    if (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        supabaseService = new SupabaseService();
-        await supabaseService.initialize();
-    } else {
-        logger.info('Supabase credentials not set, using in-memory storage only');
-    }
-
-    // Upstash Vector for semantic search
-    if (process.env.UPSTASH_VECTOR_REST_URL) {
-        vectorService = new UpstashVectorService();
-        await vectorService.initialize();
-    } else {
-        logger.info('Upstash Vector credentials not set, semantic search disabled');
-    }
-
-    // Vercel Blob for file storage
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-        blobService = new BlobStorageService(process.env.BLOB_READ_WRITE_TOKEN);
-    } else {
-        logger.info('Blob storage token not set, file uploads disabled');
-    }
-
-    logger.info('✅ External services initialized');
-} else {
-    logger.info('💻 Local/dev mode overrides enabled - using lightweight services');
-
-    // Local DB (SQLite or in-memory)
-    if (useLocalDb || !isVercelDeployment) {
-        supabaseService = new LocalDbService();
-        await (supabaseService as LocalDbService).initialize();
-    }
-
-    // Local vector search
-    if (useLocalVector || !isVercelDeployment) {
-        vectorService = new InMemoryVectorService();
-        await vectorService.initialize();
-    }
-}
+// External services already initialized above
 
 // Create Express server with all services
 const server = new ExpressServer(

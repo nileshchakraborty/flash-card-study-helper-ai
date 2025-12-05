@@ -1,4 +1,5 @@
 import { LoggerService } from './LoggerService.js';
+import type { LocalDbService } from './LocalDbService.js';
 
 const logger = new LoggerService();
 
@@ -38,11 +39,47 @@ export interface QuizAttempt {
 export class QuizStorageService {
     private quizzes: Map<string, Quiz>;
     private attempts: Map<string, QuizAttempt[]>;
+    private dbService?: LocalDbService;
 
-    constructor() {
+    constructor(dbService?: LocalDbService) {
         this.quizzes = new Map();
         this.attempts = new Map();
-        logger.info('QuizStorageService initialized');
+        this.dbService = dbService;
+        logger.info('QuizStorageService initialized' + (dbService ? ' with persistence' : ''));
+
+        // Load initial data if DB is available
+        if (this.dbService) {
+            this.loadFromDb();
+        }
+    }
+
+    private async loadFromDb() {
+        if (!this.dbService) return;
+
+        try {
+            const quizzes = await this.dbService.getQuizzes();
+            if (quizzes.data) {
+                quizzes.data.forEach(q => {
+                    try {
+                        const parsedQuiz: Quiz = {
+                            id: q.id,
+                            topic: q.topic || 'Unknown',
+                            questions: typeof q.questions_json === 'string' ? JSON.parse(q.questions_json) : (q.questions || []),
+                            source: 'topic', // Default
+                            createdAt: q.created_at || Date.now()
+                        };
+                        this.quizzes.set(parsedQuiz.id, parsedQuiz);
+                    } catch (e) {
+                        logger.warn('Failed to parse quiz from DB', { id: q.id });
+                    }
+                });
+                logger.info(`Loaded ${this.quizzes.size} quizzes from DB`);
+            }
+
+            // Load attempts similarly if needed, but for now we focus on quizzes
+        } catch (e) {
+            logger.warn('Failed to load initial data from DB', e);
+        }
     }
 
     /**
@@ -50,6 +87,17 @@ export class QuizStorageService {
      */
     storeQuiz(quiz: Quiz): void {
         this.quizzes.set(quiz.id, quiz);
+
+        if (this.dbService) {
+            this.dbService.createQuiz({
+                id: quiz.id,
+                topic: quiz.topic,
+                questions_json: JSON.stringify(quiz.questions),
+                created_at: quiz.createdAt,
+                score: 0 // Default
+            }).catch(e => logger.warn('Failed to persist quiz', e));
+        }
+
         logger.info('Quiz stored', { id: quiz.id, topic: quiz.topic, questionCount: quiz.questions.length });
     }
 
@@ -114,6 +162,16 @@ export class QuizStorageService {
         const quizAttempts = this.attempts.get(attempt.quizId) || [];
         quizAttempts.push(attempt);
         this.attempts.set(attempt.quizId, quizAttempts);
+
+        if (this.dbService) {
+            this.dbService.createQuizAttempt({
+                id: attempt.id,
+                quiz_id: attempt.quizId,
+                result_json: JSON.stringify(attempt),
+                created_at: attempt.timestamp
+            }).catch(e => logger.warn('Failed to persist attempt', e));
+        }
+
         logger.info('Quiz attempt stored', {
             attemptId: attempt.id,
             quizId: attempt.quizId,
