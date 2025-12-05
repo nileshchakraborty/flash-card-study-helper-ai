@@ -83,23 +83,24 @@ export class ExpressServer {
 
 
   private setupPassport() {
-    // Determine callback URL based on environment
-    const isProduction = process.env.NODE_ENV === 'production' ||
-      process.env.VERCEL === '1' ||
-      process.env.VERCEL_ENV === 'production';
+    // Use environment variable if set, otherwise derive from request
+    // This allows preview deployments to work correctly
+    const configuredCallbackURL = process.env.OAUTH_CALLBACK_URL;
 
-    const callbackURL = isProduction
-      ? 'https://mindflipai.vercel.app/api/auth/google/callback'
-      : 'http://localhost:3000/api/auth/google/callback';
-
-    console.log('[Passport] Using callback URL:', callbackURL);
+    if (configuredCallbackURL) {
+      console.log('[Passport] Using configured callback URL:', configuredCallbackURL);
+    } else {
+      console.log('[Passport] Using dynamic callback URL (derived from request)');
+    }
 
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
-      callbackURL: callbackURL,
+      callbackURL: configuredCallbackURL || '/api/auth/google/callback',
       passReqToCallback: false
     }, (_accessToken, _refreshToken, profile, done) => {
+      // If using relative path, passport will derive full URL from request
+      // This allows preview deployments to work with their own domains
       return done(null, profile);
     }));
   }
