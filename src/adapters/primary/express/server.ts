@@ -1,6 +1,8 @@
 import express from 'express';
 import * as http from 'http';
 import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
 import multer from 'multer';
 import path from 'path';
 import swaggerUi from 'swagger-ui-express';
@@ -31,6 +33,7 @@ import type { LocalDbService } from '../../../core/services/LocalDbService.js';
 import type { UpstashVectorService } from '../../../core/services/UpstashVectorService.js';
 import type { InMemoryVectorService } from '../../../core/services/InMemoryVectorService.js';
 import type { BlobStorageService } from '../../../core/services/BlobStorageService.js';
+import { logger } from '../../../core/services/LoggerService.js';
 
 export class ExpressServer {
   private app: express.Application;
@@ -62,7 +65,12 @@ export class ExpressServer {
   ) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
-    this.upload = multer({ storage: multer.memoryStorage() });
+    this.upload = multer({
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+      }
+    });
     this.authService = AuthService.getInstance();
     this.quizStorage = quizStorage;
     this.flashcardStorage = flashcardStorage;
@@ -88,9 +96,9 @@ export class ExpressServer {
     const configuredCallbackURL = process.env.OAUTH_CALLBACK_URL;
 
     if (configuredCallbackURL) {
-      console.log('[Passport] Using configured callback URL:', configuredCallbackURL);
+      logger.info('[Passport] Using configured callback URL:', configuredCallbackURL);
     } else {
-      console.log('[Passport] Using dynamic callback URL (derived from request)');
+      logger.info('[Passport] Using dynamic callback URL (derived from request)');
     }
 
     passport.use(new GoogleStrategy({
@@ -110,7 +118,23 @@ export class ExpressServer {
     // This is critical for OAuth to work behind TLS proxies
     this.app.set('trust proxy', true);
 
-    this.app.use(cors());
+    // Security Headers
+    this.app.use(helmet({
+      contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false, // Disable strict CSP in dev for Swagger UI/GraphQL Playground
+      crossOriginEmbedderPolicy: false // Allow resources to be loaded from other domains (e.g. images)
+    }));
+
+    // Parameter Pollution Prevention
+    this.app.use(hpp());
+
+    // CORS Configuration
+    this.app.use(cors({
+      origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+
     this.app.use(express.json());
     this.app.use(passport.initialize());
     this.app.use(express.static('public'));
@@ -256,16 +280,16 @@ export class ExpressServer {
           };
         },
         onConnect: (_ctx) => {
-          console.log('🔌 WebSocket connected');
+          logger.info('🔌 WebSocket connected');
         },
         onDisconnect: (_ctx) => {
-          console.log('[GraphQL WS] Client disconnected');
+          logger.info('[GraphQL WS] Client disconnected');
         },
       });
 
       // Handle WebSocket connections
       graphqlWsServer.on('connection', (socket, request) => {
-        console.log('[GraphQL WS] WebSocket connection established for /subscriptions');
+        logger.info('[GraphQL WS] WebSocket connection established for /subscriptions');
 
         const closed = subscriptionServer.opened(
           {
@@ -291,12 +315,12 @@ export class ExpressServer {
         });
       });
 
-      console.log('🚀 GraphQL endpoint available at /graphql');
-      console.log('📡 GraphQL subscriptions available via WebSocket at /subscriptions');
+      logger.info('🚀 GraphQL endpoint available at /graphql');
+      logger.info('📡 GraphQL subscriptions available via WebSocket at /subscriptions');
     } else {
-      console.log('🚀 GraphQL endpoint available at /graphql');
+      logger.info('🚀 GraphQL endpoint available at /graphql');
       if (skipWebSocket) {
-        console.log('⏭️  GraphQL WebSocket server skipped (test mode)');
+        logger.info('⏭️  GraphQL WebSocket server skipped (test mode)');
       }
     }
   }
@@ -922,15 +946,15 @@ export class ExpressServer {
     });
 
     this.app.post('/api/quiz/generate-advanced', async (req, res) => {
-      console.log('[Server] POST /api/quiz/generate-advanced received');
-      console.log('[Server] Body:', JSON.stringify(req.body, null, 2));
+      logger.info('[Server] POST /api/quiz/generate-advanced received');
+      logger.info('[Server] Body:', JSON.stringify(req.body, null, 2));
 
       try {
         const { previousResults, mode } = req.body;
-        console.log(`[Server] Generating advanced quiz - mode: ${mode}, topic: ${previousResults?.topic}`);
+        logger.info(`[Server] Generating advanced quiz - mode: ${mode}, topic: ${previousResults?.topic}`);
 
         const quiz = await this.studyService.generateAdvancedQuiz(previousResults, mode);
-        console.log(`[Server] Advanced quiz generated: ${quiz.length} questions`);
+        logger.info(`[Server] Advanced quiz generated: ${quiz.length} questions`);
 
         res.json({ success: true, quiz });
       } catch (error: any) {
@@ -1145,9 +1169,9 @@ export class ExpressServer {
     });
 
     this.httpServer.listen(port, () => {
-      console.log(`Server running on port ${port}`);
+      logger.info(`Server running on port ${port}`);
       if (this.wss) {
-        console.log(`WebSocket server ready at ws://localhost:${port}/api/webllm/ws`);
+        logger.info(`WebSocket server ready at ws://localhost:${port}/api/webllm/ws`);
       }
     });
   }

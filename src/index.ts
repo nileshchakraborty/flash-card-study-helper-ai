@@ -28,7 +28,10 @@ import { HybridSerperAdapter } from './adapters/secondary/serper/HybridSerperAda
 // Load environment variables (.env locally, Vercel env in production)
 dotenv.config();
 
-// 0. Initialize Cache Services
+// 1. Initialize Logger (Must be first)
+const logger = new LoggerService();
+
+// 2. Initialize Cache Services
 const serperCache = new CacheService({
     ttlSeconds: parseInt(process.env.CACHE_SERPER_TTL_SECONDS || '3600'),
     maxEntries: parseInt(process.env.CACHE_SERPER_MAX_ENTRIES || '100')
@@ -39,13 +42,11 @@ const llmCache = new CacheService({
     maxEntries: parseInt(process.env.CACHE_LLM_MAX_ENTRIES || '500')
 });
 
-console.log('🗂️  Cache initialized:', {
+logger.info('🗂️  Cache initialized:', {
     serper: { ttl: `${process.env.CACHE_SERPER_TTL_SECONDS || '3600'}s`, max: process.env.CACHE_SERPER_MAX_ENTRIES || '100' },
     llm: { ttl: `${process.env.CACHE_LLM_TTL_SECONDS || '86400'}s`, max: process.env.CACHE_LLM_MAX_ENTRIES || '500' }
 });
 
-// 1. Initialize Logger and Core Services
-const logger = new LoggerService();
 const queueService = new QueueService();
 const flashcardCache = new FlashcardCacheService(3600); // 1 hour TTL
 
@@ -125,12 +126,12 @@ const localDb = (supabaseService instanceof LocalDbService) ? supabaseService : 
 const quizStorage = new QuizStorageService(localDb);
 const flashcardStorage = new FlashcardStorageService();
 
-console.log('💾 Storage services initialized');
+logger.info('💾 Storage services initialized');
 async function initializeMCP(): Promise<MCPClientWrapper | null> {
     const useMCP = process.env.USE_MCP_SERVER === 'true';
 
     if (!useMCP) {
-        console.log('🔌 MCP disabled (USE_MCP_SERVER=false)');
+        logger.info('🔌 MCP disabled (USE_MCP_SERVER=false)');
         return null;
     }
 
@@ -144,11 +145,11 @@ async function initializeMCP(): Promise<MCPClientWrapper | null> {
             return null;
         }
 
-        console.log('✅ MCP client connected and healthy');
+        logger.info('✅ MCP client connected and healthy');
         return mcpClient;
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('❌ MCP initialization failed, using direct adapters:', message);
+        logger.error('❌ MCP initialization failed, using direct adapters:', { error: message });
         return null;
     }
 }
@@ -158,7 +159,7 @@ const useMCP = mcpClient !== null;
 
 // 3. Initialize Metrics Service
 const metricsService = new MetricsService('.metrics');
-console.log('📊 Metrics service initialized');
+logger.info('📊 Metrics service initialized');
 
 // 4. Initialize AI Adapters (Hybrid with MCP fallback)
 const directOllamaAdapter = new OllamaAdapter(llmCache);
@@ -174,7 +175,7 @@ const aiAdapters = {
     webllm: webllmAdapter
 };
 
-console.log(`🤖 AI adapters initialized (MCP: ${useMCP ? 'enabled' : 'disabled'}):`, Object.keys(aiAdapters).join(', '));
+logger.info(`🤖 AI adapters initialized (MCP: ${useMCP ? 'enabled' : 'disabled'}): ${Object.keys(aiAdapters).join(', ')}`);
 
 // 5. Initialize Other Adapters (Hybrid with MCP fallback)
 const directSerperAdapter = new SerperAdapter(serperCache);
@@ -189,11 +190,11 @@ const webContextCache = new CacheService<string>({
     ttlSeconds: 86400, // 24 hours
     maxEntries: 100
 });
-console.log('🌐 Web context cache initialized (24hr TTL)');
+logger.info('🌐 Web context cache initialized (24hr TTL)');
 
 // 5. Initialize Core Service with Multiple Adapters and Metrics
 const studyService = new StudyService(aiAdapters, serperAdapter, fsAdapter, metricsService, webContextCache);
-console.log('🎓 Study service initialized with cache-first web search');
+logger.info('🎓 Study service initialized with cache-first web search');
 
 // 6. Initialize Queue Worker
 queueService.initWorker(async (job) => {

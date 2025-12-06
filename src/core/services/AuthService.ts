@@ -23,6 +23,9 @@ export class AuthService {
             }
         }
 
+        if (!process.env.JWE_SECRET_KEY) {
+            console.warn('⚠️  WARNING: JWE_SECRET_KEY not set. Using random key. Sessions will be invalidated on restart.');
+        }
         console.log('[AuthService] Initialized with', process.env.JWE_SECRET_KEY ? 'env secret' : 'generated secret');
     }
 
