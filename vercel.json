@@ -2,18 +2,10 @@
     "version": 2,
     "buildCommand": "npm run build:all",
     "outputDirectory": "public",
-    "framework": null,
-    "installCommand": "npm install",
-    "builds": [
-        {
-            "src": "dist/index.js",
-            "use": "@vercel/node"
-        }
-    ],
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "/dist/index.js"
+            "destination": "/api"
         }
     ],
     "headers": [
