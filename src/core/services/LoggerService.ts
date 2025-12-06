@@ -21,8 +21,13 @@ const enableFileLogs =
     !isServerless &&
     process.env.NODE_ENV !== 'production';
 
+const isVercelProduction =
+    process.env.VERCEL === '1' &&
+    process.env.NODE_ENV === 'production';
+
 const transports: winston.transport[] = [
     new winston.transports.Console({
+        silent: isVercelProduction, // Silent in Vercel Production
         format: combine(
             colorize(),
             timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
