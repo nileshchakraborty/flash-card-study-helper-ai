@@ -10,21 +10,11 @@
             "use": "@vercel/node"
         }
     ],
-    "routes": [
+    "rewrites": [
         {
-            "src": "/api/(.*)",
-            "dest": "/dist/index.js"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/public/$1"
+            "source": "/api/(.*)",
+            "destination": "/dist/index.js"
         }
-    ],
-    "env": {
-        "NODE_ENV": "production"
-    },
-    "regions": [
-        "iad1"
     ],
     "headers": [
         {
