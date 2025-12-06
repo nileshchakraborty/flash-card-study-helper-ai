@@ -1,6 +1,13 @@
-# MindFlip AI
+<div align="center">
+  <img src="public/assets/icons/logo-512.jpg" alt="MindFlip AI Logo" width="120" height="120" style="border-radius: 20px;">
+  
+  # MindFlip AI
 
-**A backend-focused service for AI-powered flashcard generation and study assistance.**
+  ### Don't Just Study. MindFlip.
+  
+  **A backend-focused service for AI-powered flashcard generation and study assistance.**
+</div>
+
 
 This project implements a **Clean Architecture** API that leverages LLMs (WebLLM-first with quality gate and Ollama fallback) plus optional web search (Serper) to generate high-quality educational content. Frontend is a reference SPA that now supports PDF-only generation/quiz, prefetched quizzes, and settings-driven runtime selection.
 
