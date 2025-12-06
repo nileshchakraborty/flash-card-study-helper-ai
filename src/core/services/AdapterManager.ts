@@ -103,17 +103,37 @@ export class AdapterManager {
             }
         }
 
-        // Fallback to default adapter (last resort)
+        // Fallback to default adapter (last resort) - CHECK AVAILABILITY FIRST!
         const defaultAdapterInstance = this.adapters.get(this.defaultAdapter);
         if (defaultAdapterInstance) {
-            console.warn(`[AdapterManager] All priority adapters unavailable, using default: ${this.defaultAdapter}`);
-            return { adapter: defaultAdapterInstance, name: this.defaultAdapter };
+            try {
+                const available = await defaultAdapterInstance.isAvailable();
+                if (available) {
+                    console.warn(`[AdapterManager] All priority adapters unavailable, using default: ${this.defaultAdapter}`);
+                    return { adapter: defaultAdapterInstance, name: this.defaultAdapter };
+                } else {
+                    console.warn(`[AdapterManager] Default adapter ${this.defaultAdapter} is also not available`);
+                }
+            } catch (error) {
+                console.warn(`[AdapterManager] Default adapter ${this.defaultAdapter} availability check failed:`, error);
+            }
         }
 
-        // No adapters available
+        // No adapters available - throw descriptive error
+        const availableAdapters = Array.from(this.adapters.keys()).join(', ');
+        const triedAdapters = this.priority.join(', ');
+
         throw new Error(
-            `No LLM adapters available. Tried: ${this.priority.join(', ')}. ` +
-            `Registered: ${Array.from(this.adapters.keys()).join(', ')}`
+            `No LLM adapters available. ` +
+            `Tried (in order): ${triedAdapters}. ` +
+            `Default adapter (${this.defaultAdapter}) also unavailable. ` +
+            `Registered adapters: ${availableAdapters}. ` +
+            `\n\nTo fix this:\n` +
+            `1. For Ollama: Ensure Ollama is running and OLLAMA_BASE_URL is correct\n` +
+            `2. For Anthropic: Set ANTHROPIC_API_KEY in environment variables\n` +
+            `3. For Google: Set GOOGLE_API_KEY in environment variables\n` +
+            `4. For Custom LLM: Set CUSTOM_LLM_URL and CUSTOM_LLM_API_KEY\n` +
+            `5. For WebLLM: This is client-side only and cannot be used for backend generation`
         );
     }
 
