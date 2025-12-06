@@ -37,7 +37,6 @@ export interface LLMAdapter extends AIServicePort {
 export class AdapterManager {
     private adapters: Map<string, LLMAdapter> = new Map();
     private priority: string[];
-    private defaultAdapter: string;
 
     constructor(
         adapters: Record<string, LLMAdapter>,
@@ -49,11 +48,8 @@ export class AdapterManager {
         });
 
         // Parse priority from config or environment
-        const priorityStr = config?.priority || process.env.LLM_PRIORITY || 'webllm,ollama';
+        const priorityStr = config?.priority || process.env.LLM_PRIORITY || 'ollama';
         this.priority = priorityStr.split(',').map(s => s.trim().toLowerCase());
-
-        // Set default adapter
-        this.defaultAdapter = (config?.defaultAdapter || process.env.LLM_DEFAULT_PROVIDER || 'webllm').toLowerCase();
     }
 
     /**
@@ -103,17 +99,21 @@ export class AdapterManager {
             }
         }
 
-        // Fallback to default adapter (last resort)
-        const defaultAdapterInstance = this.adapters.get(this.defaultAdapter);
-        if (defaultAdapterInstance) {
-            console.warn(`[AdapterManager] All priority adapters unavailable, using default: ${this.defaultAdapter}`);
-            return { adapter: defaultAdapterInstance, name: this.defaultAdapter };
-        }
+        // No adapters available - throw descriptive error
+        const availableAdapters = Array.from(this.adapters.keys()).join(', ');
+        const triedAdapters = this.priority.join(', ');
 
-        // No adapters available
         throw new Error(
-            `No LLM adapters available. Tried: ${this.priority.join(', ')}. ` +
-            `Registered: ${Array.from(this.adapters.keys()).join(', ')}`
+            `No LLM adapters available. ` +
+            `Tried (in order): ${triedAdapters}. ` +
+            `All adapters failed availability checks. ` +
+            `Registered adapters: ${availableAdapters}. ` +
+            `\n\nTo fix this:\n` +
+            `1. For Ollama: Ensure Ollama is running and OLLAMA_BASE_URL is correct\n` +
+            `2. For Anthropic: Set ANTHROPIC_API_KEY in environment variables\n` +
+            `3. For Google: Set GOOGLE_API_KEY in environment variables\n` +
+            `4. For Custom LLM: Set CUSTOM_LLM_URL and CUSTOM_LLM_API_KEY\n` +
+            `5. For WebLLM: This is client-side only and cannot be used for backend generation`
         );
     }
 
