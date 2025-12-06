@@ -26,12 +26,6 @@
     "regions": [
         "iad1"
     ],
-    "functions": {
-        "dist/index.js": {
-            "maxDuration": 60,
-            "memory": 1024
-        }
-    },
     "headers": [
         {
             "source": "/(.*)",
