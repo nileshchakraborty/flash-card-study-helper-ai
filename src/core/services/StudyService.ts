@@ -22,59 +22,82 @@ import xlsx from 'xlsx';
 
 export class StudyService implements StudyUseCase {
   async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
+    const supportedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp'
+    ];
+
+    // Basic type guard
+    if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
+      throw new Error('Unsupported file type');
+    }
+
     let text = '';
 
-    if (mimeType === 'application/pdf') {
-      const data = await pdfParse(file);
-      text = data.text;
-    } else if (mimeType.startsWith('image/')) {
-      const result = await Tesseract.recognize(file);
-      text = result.data.text;
-    } else if (
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      filename.endsWith('.docx')
-    ) {
-      try {
+    try {
+      if (mimeType === 'application/pdf') {
+        const data = await pdfParse(file);
+        text = data.text;
+      } else if (mimeType.startsWith('image/')) {
+        const result = await Tesseract.recognize(file);
+        text = result.data.text;
+      } else if (
+        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        mimeType === 'application/msword' ||
+        filename.endsWith('.doc') ||
+        filename.endsWith('.docx')
+      ) {
         const result = await mammoth.extractRawText({ buffer: file });
         text = result.value;
-        const messages = result.messages; // Warnings
-        if (messages.length > 0) {
-          console.warn('[StudyService] Mammoth warnings:', messages);
+        if (result.messages.length > 0) {
+          console.warn('[StudyService] Mammoth warnings:', result.messages);
         }
-      } catch (e) {
-        console.error('Failed to parse docx:', e);
-        throw new Error('Failed to parse Word document');
-      }
-    } else if (
-      mimeType === 'application/vnd.ms-excel' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      filename.endsWith('.xls') ||
-      filename.endsWith('.xlsx')
-    ) {
-      try {
+      } else if (
+        mimeType === 'application/vnd.ms-excel' ||
+        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        filename.endsWith('.xls') ||
+        filename.endsWith('.xlsx')
+      ) {
         const workbook = xlsx.read(file, { type: 'buffer' });
-        let combinedText = '';
+        const sheets: string[] = [];
 
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
           if (!sheet) return;
-          // Convert sheet to text (tab-separated)
-          const sheetText = xlsx.utils.sheet_to_txt(sheet);
+          const sheetText = xlsx.utils.sheet_to_txt(sheet, { blankrows: false });
           if (sheetText.trim()) {
-            combinedText += `SHEET: ${sheetName}\n${sheetText}\n---\n`;
+            sheets.push(`SHEET: ${sheetName}\n${sheetText}`);
           }
         });
 
-        text = combinedText;
-      } catch (e) {
-        console.error('Failed to parse Excel file:', e);
-        throw new Error('Failed to parse Excel document');
+        text = sheets.join('\n\n---\n\n');
+      } else if (mimeType === 'text/plain') {
+        text = file.toString('utf-8');
+      } else {
+        // Fallback: treat as utf-8 text
+        text = file.toString('utf-8');
       }
-    } else {
-      text = file.toString('utf-8');
-    }
 
-    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+      if (!text || text.trim().length < 10) {
+        throw new Error('Unable to extract meaningful text');
+      }
+
+      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
+      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
+      throw new Error(message);
+    }
   }
 
   // @ts-ignore - Will be used when graph is wired into generation flow
@@ -463,80 +486,6 @@ export class StudyService implements StudyUseCase {
     if (!content) throw new Error('Failed to scrape content from provided URLs');
 
     return this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
-    try {
-      // Validate file type
-      const supportedTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
-        'application/msword', // DOC (legacy)
-        'application/vnd.ms-excel', // XLS
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
-        'text/plain',
-        'image/png',
-        'image/jpeg',
-        'image/jpg',
-        'image/gif',
-        'image/webp'
-      ];
-
-      if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
-        throw new Error(`Unsupported file type: ${mimeType}. Supported types: PDF, DOCX, XLS, XLSX, TXT, and images.`);
-      }
-
-      // Process based on mime type
-      if (mimeType === 'application/pdf') {
-        // PDF processing
-        const data = await pdfParse(file);
-        text = data.text;
-      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        mimeType === 'application/msword') {
-        // DOCX/DOC processing using mammoth
-        const result = await mammoth.extractRawText({ buffer: file });
-        text = result.value;
-        if (result.messages.length > 0) {
-          console.warn('[StudyService] Mammoth warnings:', result.messages);
-        }
-      } else if (mimeType === 'application/vnd.ms-excel' ||
-        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-        // XLS/XLSX processing using xlsx
-        const workbook = xlsx.read(file, { type: 'buffer' });
-        const sheets: string[] = [];
-
-        workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          if (!worksheet) return; // Skip if worksheet is undefined
-          const sheetText = xlsx.utils.sheet_to_txt(worksheet, { blankrows: false });
-          if (sheetText.trim()) {
-            sheets.push(`Sheet: ${sheetName}\n${sheetText}`);
-          }
-        });
-
-        text = sheets.join('\n\n---\n\n');
-      } else if (mimeType.startsWith('image/')) {
-        // Image OCR processing using Tesseract
-        const result = await Tesseract.recognize(file);
-        text = result.data.text;
-      } else if (mimeType === 'text/plain') {
-        // Plain text
-        text = file.toString('utf-8');
-      } else {
-        // Fallback: try to read as UTF-8 text
-        text = file.toString('utf-8');
-      }
-
-      // Validate extracted text
-      if (!text || text.trim().length < 10) {
-        throw new Error(`Unable to extract meaningful text from file. Extracted: ${text.length} characters.`);
-      }
-
-      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
-
-      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
-    } catch (error: any) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
-      throw new Error(`Failed to process file: ${message}`);
-    }
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
