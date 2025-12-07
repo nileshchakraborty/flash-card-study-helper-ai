@@ -14,7 +14,7 @@ export class FlashcardCacheService {
     private redis?: RedisService;
     private ttlMs: number;
     private ttlSeconds: number;
-    private cleanupInterval: NodeJS.Timeout;
+    private cleanupInterval: ReturnType<typeof setInterval>;
 
     constructor(ttlSeconds: number = 3600, redis?: RedisService) {
         this.localCache = new Map();
@@ -22,8 +22,11 @@ export class FlashcardCacheService {
         this.ttlSeconds = ttlSeconds;
         this.ttlMs = ttlSeconds * 1000;
 
-        // Periodic cleanup of expired entries (local only)
+        // Periodic cleanup of expired entries (local only). `unref` so tests/app exit cleanly
         this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
+        if (typeof (this.cleanupInterval as any).unref === 'function') {
+            (this.cleanupInterval as any).unref();
+        }
 
         logger.info('FlashcardCacheService initialized', { ttl: `${ttlSeconds}s`, redis: !!redis });
     }

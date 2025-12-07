@@ -47,6 +47,7 @@ export class WebLLMService extends EventEmitter {
   private logger: LoggerService;
   private cache?: CacheService<any>;
   private sessionTimeout: number = 30 * 60 * 1000; // 30 minutes
+  private cleanupTimer?: ReturnType<typeof setInterval>;
 
   constructor(cache?: CacheService<any>) {
     super();
@@ -74,11 +75,14 @@ export class WebLLMService extends EventEmitter {
     this.logger.info('WebLLM session created', { sessionId, modelId, userId });
 
     // Auto-cleanup after timeout
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (this.sessions.has(sessionId)) {
         this.closeSession(sessionId);
       }
     }, this.sessionTimeout);
+    if (typeof (timeout as any).unref === 'function') {
+      (timeout as any).unref();
+    }
 
     return session;
   }
@@ -344,7 +348,7 @@ export class WebLLMService extends EventEmitter {
    * Start session cleanup timer
    */
   private startSessionCleanup(): void {
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       const now = Date.now();
       for (const [sessionId, session] of this.sessions.entries()) {
         if (now - session.lastActivity > this.sessionTimeout) {
@@ -353,6 +357,10 @@ export class WebLLMService extends EventEmitter {
         }
       }
     }, 5 * 60 * 1000); // Check every 5 minutes
+
+    if (typeof (this.cleanupTimer as any).unref === 'function') {
+      (this.cleanupTimer as any).unref();
+    }
   }
 
   /**
@@ -384,4 +392,3 @@ export class WebLLMService extends EventEmitter {
     };
   }
 }
-
