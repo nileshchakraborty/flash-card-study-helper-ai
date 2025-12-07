@@ -708,6 +708,10 @@ Respond in JSON format:
       );
 
       // Parse the AI response
+      if (!response || typeof response !== 'string') {
+        console.warn('[StudyService] Invalid response from AI for recommendations');
+        return;
+      }
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const recommendations = JSON.parse(jsonMatch[0]);
