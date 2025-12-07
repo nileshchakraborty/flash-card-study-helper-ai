@@ -568,11 +568,15 @@ export class ExpressServer {
 
     // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
+      const requestId = (req as any).requestId;
+
       try {
         const { topic, numQuestions, count, flashcardIds, cards } = req.body;
         if (!isValidQuizBody(req.body)) {
-          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
-          return;
+          return sendError(res, 400, 'Either topic or flashcardIds is required', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
         }
         const desiredCount = numQuestions ?? count;
 
@@ -594,18 +598,22 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          res.json({ questions, quizId: quiz.id, quiz });
+          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
         } else if (flashcardIds && Array.isArray(flashcardIds)) {
           // Create quiz from flashcards
           if (flashcardIds.length === 0) {
-            res.status(400).json({ error: 'flashcardIds array cannot be empty' });
-            return;
+            return sendError(res, 400, 'flashcardIds array cannot be empty', {
+              requestId,
+              code: ErrorCodes.VALIDATION_ERROR
+            });
           }
 
           const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
           if (flashcards.length === 0) {
-            res.status(404).json({ error: 'No flashcards found with provided IDs' });
-            return;
+            return sendError(res, 404, 'No flashcards found with provided IDs', {
+              requestId,
+              code: ErrorCodes.NOT_FOUND
+            });
           }
 
           const formattedCards = flashcards.map(fc => ({
@@ -632,7 +640,7 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          res.json({ questions, quizId: quiz.id, quiz });
+          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
         } else if (topic) {
           // Create quiz from topic
           // let context = '';
