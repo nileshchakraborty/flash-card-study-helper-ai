@@ -2,6 +2,7 @@ import { AppController } from './controllers/app.controller.js';
 import { LLMOrchestrator } from './services/llm/LLMOrchestrator';
 import { ModelManagerUI } from './controllers/ModelManagerUI';
 import { injectSpeedInsights } from '@vercel/speed-insights';
+import { inject } from '@vercel/analytics';
 import { apiService } from './services/api.service.js';
 import { graphqlService } from './services/graphql.service.js';
 import { settingsService } from './services/settings.service.js';
@@ -10,6 +11,9 @@ import { eventBus } from './utils/event-bus.js';
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Speed Insights
   injectSpeedInsights();
+
+  // Initialize Vercel Web Analytics
+  inject();
 
   // Capture token from OAuth redirect (?token=...) before anything else
   const urlParams = new URLSearchParams(window.location.search);
