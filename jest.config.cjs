@@ -21,7 +21,7 @@ module.exports = {
         },
     },
     moduleNameMapper: {
-        '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^(\\.+/.*)\\.js$': '$1',
         '^@mlc-ai/web-llm$': '<rootDir>/tests/mocks/web-llm.js',
         '^msgpackr$': '<rootDir>/node_modules/msgpackr/dist/node.cjs',
         '^ws$': '<rootDir>/tests/mocks/ws.js',

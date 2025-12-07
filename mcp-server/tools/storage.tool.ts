@@ -3,7 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const StorageInputSchema = z.object({
-    operation: z.enum(["read", "write", "list"]).describe("Operation to perform"),
+    operation: z.enum(["read", "write", "list", "delete"]).describe("Operation to perform"),
     path: z.string().describe("Relative path to file or directory"),
     content: z.string().optional().describe("Content to write (for write operation)"),
 });
@@ -14,7 +14,7 @@ export const storageTool = {
     inputSchema: {
         type: "object",
         properties: {
-            operation: { type: "string", enum: ["read", "write", "list"], description: "Operation to perform" },
+            operation: { type: "string", enum: ["read", "write", "list", "delete"], description: "Operation to perform" },
             path: { type: "string", description: "Relative path to file or directory" },
             content: { type: "string", description: "Content to write (for write operation)" }
         },
@@ -50,6 +50,13 @@ export const storageTool = {
                 try {
                     const files = await fs.readdir(safePath);
                     return { success: true, files };
+                } catch (error: any) {
+                    return { success: false, error: error.message };
+                }
+            case "delete":
+                try {
+                    await fs.rm(safePath, { recursive: true, force: true });
+                    return { success: true };
                 } catch (error: any) {
                     return { success: false, error: error.message };
                 }
