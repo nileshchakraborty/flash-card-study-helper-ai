@@ -1046,6 +1046,20 @@ export class ExpressServer {
       }
     });
 
+    this.app.get('/api/decks/:id', async (req, res) => {
+      try {
+        const deck = await this.studyService.getDeck(req.params.id);
+        if (!deck) {
+          res.status(404).json({ error: 'Deck not found' });
+          return;
+        }
+        res.json(deck);
+      } catch (error: any) {
+        console.warn('[API] Failed to get deck:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     this.app.post('/api/decks', async (req, res) => {
       try {
         const deck = req.body;

@@ -547,6 +547,10 @@ export class StudyService implements StudyUseCase {
   async getDeckHistory(): Promise<Deck[]> {
     return this.storageAdapter.getDeckHistory();
   }
+
+  async getDeck(id: string): Promise<Deck | null> {
+    return this.storageAdapter.getDeck(id);
+  }
   /**
    * Local fallback: build simple MCQs from flashcards without LLM.
    */

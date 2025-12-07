@@ -33,6 +33,7 @@ export interface StoragePort {
   getQuizHistory(): Promise<QuizResult[]>;
   saveDeck(deck: Deck): Promise<void>;
   getDeckHistory(): Promise<Deck[]>;
+  getDeck(id: string): Promise<Deck | null>;
 }
 
 // Input Ports (Driving)
@@ -48,4 +49,5 @@ export interface StudyUseCase {
   getQuizHistory(): Promise<QuizResult[]>;
   saveDeck(deck: Deck): Promise<void>;
   getDeckHistory(): Promise<Deck[]>;
+  getDeck(id: string): Promise<Deck | null>;
 }
