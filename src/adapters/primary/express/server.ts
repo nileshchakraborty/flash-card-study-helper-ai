@@ -17,6 +17,8 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
+import { requestIdMiddleware, requestLoggingMiddleware } from './middleware/logging.js';
+import { sendError, sendSuccess, ErrorCodes } from './response-helpers.js';
 import { isValidGenerateBody, isValidQuizBody } from './validators.js';
 import { typeDefs } from '../../../graphql/schema.js';
 import { resolvers } from '../../../graphql/resolvers/index.js';
@@ -134,6 +136,12 @@ export class ExpressServer {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
+
+    // Request ID and Logging (only in non-production for now)
+    if (process.env.NODE_ENV !== 'production') {
+      this.app.use(requestIdMiddleware);
+      this.app.use(requestLoggingMiddleware);
+    }
 
     this.app.use(express.json());
     this.app.use(passport.initialize());
@@ -454,16 +462,52 @@ export class ExpressServer {
     });
 
     this.app.post('/api/upload', apiRateLimiter, authMiddleware, this.upload.single('file'), async (req, res) => {
+      const requestId = (req as any).requestId;
+
       try {
         const file = req.file;
         const topic = req.body.topic || 'General';
-        if (!file) throw new Error('No file uploaded');
+
+        // Input validation
+        if (!file) {
+          return sendError(res, 400, 'No file uploaded. Please select a file to upload.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+
+        // Validate file size (10MB max)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+          return sendError(res, 400,
+            `File too large. Maximum size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
+            {
+              requestId,
+              code: ErrorCodes.FILE_TOO_LARGE
+            }
+          );
+        }
+
+        // Validate topic
+        if (typeof topic !== 'string' || topic.trim().length === 0) {
+          return sendError(res, 400, 'Topic is required and must be a non-empty string.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+
+        if (topic.length > 200) {
+          return sendError(res, 400, 'Topic is too long. Maximum length is 200 characters.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
 
         const cards = await this.studyService.processFile(
           file.buffer,
           file.originalname,
           file.mimetype,
-          topic
+          topic.trim()
         );
 
         // Persist uploaded cards for later quiz generation
@@ -471,9 +515,32 @@ export class ExpressServer {
           this.flashcardStorage.storeFlashcards(cards as any);
         }
 
-        res.json({ success: true, cards });
+        return sendSuccess(res, { cards }, { requestId });
       } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+
+        // Determine error type and code
+        const isUnsupportedType = message.includes('Unsupported file type');
+        const isExtractionError = message.includes('Unable to extract');
+
+        if (isUnsupportedType) {
+          return sendError(res, 400, message, {
+            requestId,
+            code: ErrorCodes.UNSUPPORTED_FILE_TYPE
+          });
+        }
+
+        if (isExtractionError) {
+          return sendError(res, 400, message, {
+            requestId,
+            code: ErrorCodes.PROCESSING_ERROR
+          });
+        }
+
+        return sendError(res, 500, message, {
+          requestId,
+          code: ErrorCodes.INTERNAL_ERROR
+        });
       }
     });
 
@@ -1034,11 +1101,66 @@ export class ExpressServer {
     });
 
     // Health check
-    this.app.get('/api/health', (_req, res) => {
-      res.json({
-        ollama: true, // In a real app, check connection
-        serper: true  // In a real app, check connection
-      });
+    this.app.get('/api/health', async (_req, res) => {
+      const startTime = Date.now();
+
+      try {
+        // Check file processing libraries
+        const libraryChecks = {
+          pdfParse: await this.checkLibrary('pdf-parse'),
+          mammoth: await this.checkLibrary('mammoth'),
+          xlsx: await this.checkLibrary('xlsx'),
+          tesseract: await this.checkLibrary('tesseract.js')
+        };
+
+        // Supported file formats
+        const supportedFormats = {
+          documents: ['PDF', 'DOCX', 'DOC', 'TXT'],
+          spreadsheets: ['XLS', 'XLSX'],
+          images: ['PNG', 'JPEG', 'JPG', 'GIF', 'WEBP']
+        };
+
+        // Service status
+        const services = {
+          studyService: !!this.studyService,
+          queueService: !!this.queueService && this.queueAvailable,
+          flashcardCache: !!this.flashcardCache,
+          flashcardStorage: !!this.flashcardStorage,
+          quizStorage: !!this.quizStorage,
+          webLLMService: !!this.webllmService
+        };
+
+        // Environment info
+        const environment = {
+          nodeEnv: process.env.NODE_ENV || 'development',
+          nodeVersion: process.version,
+          platform: process.platform,
+          uptime: process.uptime()
+        };
+
+        const responseTime = Date.now() - startTime;
+
+        res.json({
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          responseTime: `${responseTime}ms`,
+          version: process.env.npm_package_version || '1.0.0',
+          services,
+          fileProcessing: {
+            libraries: libraryChecks,
+            supportedFormats
+          },
+          environment
+        });
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        res.status(503).json({
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          responseTime: `${responseTime}ms`,
+          error: error instanceof Error ? error.message : 'Health check failed'
+        });
+      }
     });
 
     // Serve index.html for all other routes (SPA)
@@ -1061,6 +1183,18 @@ export class ExpressServer {
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
       });
     });
+  }
+
+  /**
+   * Check if a library is available
+   */
+  private async checkLibrary(libraryName: string): Promise<boolean> {
+    try {
+      await import(libraryName);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async handleGenerate(req: express.Request, res: express.Response) {

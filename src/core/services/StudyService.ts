@@ -7,6 +7,8 @@ import { CacheService } from './CacheService.js';
 import pdfParse from 'pdf-parse';
 // @ts-ignore
 import Tesseract from 'tesseract.js';
+import mammoth from 'mammoth';
+import xlsx from 'xlsx';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import http from 'http';
@@ -378,17 +380,80 @@ export class StudyService implements StudyUseCase {
   async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
     let text = '';
 
-    if (mimeType === 'application/pdf') {
-      const data = await pdfParse(file);
-      text = data.text;
-    } else if (mimeType.startsWith('image/')) {
-      const result = await Tesseract.recognize(file);
-      text = result.data.text;
-    } else {
-      text = file.toString('utf-8');
-    }
+    try {
+      // Validate file type
+      const supportedTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+        'application/msword', // DOC (legacy)
+        'application/vnd.ms-excel', // XLS
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
+        'text/plain',
+        'image/png',
+        'image/jpeg',
+        'image/jpg',
+        'image/gif',
+        'image/webp'
+      ];
 
-    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+      if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
+        throw new Error(`Unsupported file type: ${mimeType}. Supported types: PDF, DOCX, XLS, XLSX, TXT, and images.`);
+      }
+
+      // Process based on mime type
+      if (mimeType === 'application/pdf') {
+        // PDF processing
+        const data = await pdfParse(file);
+        text = data.text;
+      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        mimeType === 'application/msword') {
+        // DOCX/DOC processing using mammoth
+        const result = await mammoth.extractRawText({ buffer: file });
+        text = result.value;
+        if (result.messages.length > 0) {
+          console.warn('[StudyService] Mammoth warnings:', result.messages);
+        }
+      } else if (mimeType === 'application/vnd.ms-excel' ||
+        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        // XLS/XLSX processing using xlsx
+        const workbook = xlsx.read(file, { type: 'buffer' });
+        const sheets: string[] = [];
+
+        workbook.SheetNames.forEach(sheetName => {
+          const worksheet = workbook.Sheets[sheetName];
+          if (!worksheet) return; // Skip if worksheet is undefined
+          const sheetText = xlsx.utils.sheet_to_txt(worksheet, { blankrows: false });
+          if (sheetText.trim()) {
+            sheets.push(`Sheet: ${sheetName}\n${sheetText}`);
+          }
+        });
+
+        text = sheets.join('\n\n---\n\n');
+      } else if (mimeType.startsWith('image/')) {
+        // Image OCR processing using Tesseract
+        const result = await Tesseract.recognize(file);
+        text = result.data.text;
+      } else if (mimeType === 'text/plain') {
+        // Plain text
+        text = file.toString('utf-8');
+      } else {
+        // Fallback: try to read as UTF-8 text
+        text = file.toString('utf-8');
+      }
+
+      // Validate extracted text
+      if (!text || text.trim().length < 10) {
+        throw new Error(`Unable to extract meaningful text from file. Extracted: ${text.length} characters.`);
+      }
+
+      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
+
+      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
+      throw new Error(`Failed to process file: ${message}`);
+    }
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
