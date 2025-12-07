@@ -51,7 +51,10 @@ describe.skip('StudyService', () => {
         service = new StudyService(
             { ollama: mockOllamaAdapter as any },
             mockSearchAdapter as any,
-            mockStorageAdapter as any
+            mockStorageAdapter as any,
+            undefined, // metricsService
+            undefined, // webContextCache
+            true // disableAsyncRecommendations - prevent background tasks in tests
         );
     });
 

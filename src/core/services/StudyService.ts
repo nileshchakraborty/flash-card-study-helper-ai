@@ -75,6 +75,7 @@ export class StudyService implements StudyUseCase {
 
   // @ts-ignore - Will be used when graph is wired into generation flow
   private flashcardGraph: FlashcardGenerationGraph;
+  private disableAsyncRecommendations: boolean;
 
   private getAdapter(runtime: string): any {
     // If aiAdapters is a map keyed by runtime, return that entry.
@@ -101,8 +102,10 @@ export class StudyService implements StudyUseCase {
     private searchAdapter: SearchServicePort,
     private storageAdapter: StoragePort,
     private metricsService?: MetricsService,
-    private webContextCache?: CacheService<string>
+    private webContextCache?: CacheService<string>,
+    disableAsyncRecommendations: boolean = process.env.NODE_ENV === 'test'
   ) {
+    this.disableAsyncRecommendations = disableAsyncRecommendations;
     // Initialize FlashcardGenerationGraph with Ollama adapter for resilient generation
     this.flashcardGraph = new FlashcardGenerationGraph(
       this.getAdapter('ollama') as any // Cast as adapter type flexibility
@@ -146,10 +149,16 @@ export class StudyService implements StudyUseCase {
         });
       }
 
-      // Trigger async recommendations generation (fire-and-forget)
-      this.generateRecommendationsAsync(topic).catch(err => {
-        console.warn('[StudyService] Failed to generate recommendations:', err);
-      });
+      // Trigger async recommendations generation (fire-and-forget) — skip in tests
+      if (!this.disableAsyncRecommendations) {
+        const t = setTimeout(() => {
+          void this.generateRecommendationsAsync(topic).catch(err => {
+            console.warn('[StudyService] Failed to generate recommendations:', err);
+          });
+        }, 0);
+        // Ensure this timer won't keep the process alive if everything else is done
+        if (typeof t.unref === 'function') t.unref();
+      }
 
       return { ...result, cards: adjustedCards };
     } catch (error: any) {
