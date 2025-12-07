@@ -78,10 +78,22 @@ export class StudyService implements StudyUseCase {
 
   private getAdapter(runtime: string): any {
     // If aiAdapters is a map keyed by runtime, return that entry.
-    // Otherwise, assume aiAdapters itself is the adapter (e.g., in tests).
     const possible = (this.aiAdapters as any)[runtime];
     if (possible) return possible;
-    return this.aiAdapters;
+
+    // Fallback: If the requested runtime doesn't exist, try 'ollama' as default
+    const ollamaFallback = (this.aiAdapters as any)['ollama'];
+    if (ollamaFallback) {
+      console.warn(`[StudyService] Adapter '${runtime}' not found, falling back to 'ollama'`);
+      return ollamaFallback;
+    }
+
+    // Last resort: For tests, assume aiAdapters itself is the adapter
+    if (typeof (this.aiAdapters as any).generateSummary === 'function') {
+      return this.aiAdapters;
+    }
+
+    throw new Error(`No AI adapter found for runtime '${runtime}' and no fallback available`);
   }
 
   constructor(
