@@ -467,6 +467,15 @@ export class QuizView extends BaseView {
     this.hide(this.elements.questions);
     this.show(this.elements.results);
 
+    // Show stats and history when results are shown
+    if (this.elements.statsSection) this.show(this.elements.statsSection);
+    if (this.elements.historySection) this.show(this.elements.historySection);
+
+    // Refresh the stats content since we just finished a quiz
+    // We can assume the model has reloaded history or we need to trigger it
+    // But renderStats is called by 'quiz:history-updated'. 
+    // Usually model.submitQuiz() triggers history reload/update.
+
     const percentage = Math.round((result.score / result.total) * 100);
     const resultsHTML = `
       <div class="text-center mb-6">
@@ -614,7 +623,7 @@ export class QuizView extends BaseView {
       return;
     }
 
-    this.show(this.elements.statsSection);
+    // this.show(this.elements.statsSection); // Do not show automatically on load
 
     const totalQuizzes = history.length;
     const totalScore = history.reduce((acc, curr) => acc + (curr.score / curr.total), 0);
@@ -637,6 +646,10 @@ export class QuizView extends BaseView {
     if (percentage === 100) {
       message = "Perfect score! You're a master of this topic.";
       actionButtons = `
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
                 <button id="btn-quiz-harder" class="btn-primary w-full px-6 py-3 rounded-lg hover:shadow-lg transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">psychology</span>
                     Try Harder Questions Quiz
@@ -649,6 +662,10 @@ export class QuizView extends BaseView {
     } else if (percentage < 80) {
       message = "Keep practicing! Review the flashcards to improve.";
       actionButtons = `
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
                 <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-indigo-600 hover:text-indigo-600 transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
                     Retry Quiz
@@ -662,6 +679,10 @@ export class QuizView extends BaseView {
       // 80-99%
       message = "Great job! You're doing well.";
       actionButtons = `
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
                 <button id="btn-quiz-harder" class="btn-primary w-full px-6 py-3 rounded-lg hover:shadow-lg transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">psychology</span>
                     Try Harder Questions Quiz
@@ -689,6 +710,14 @@ export class QuizView extends BaseView {
     const retryBtn = actionsContainer.querySelector('#btn-quiz-retry');
     const harderBtn = actionsContainer.querySelector('#btn-quiz-harder');
     const reviseBtn = actionsContainer.querySelector('#btn-quiz-revise');
+    const reviewBtn = actionsContainer.querySelector('#btn-quiz-review');
+
+    if (reviewBtn) {
+      reviewBtn.addEventListener('click', () => {
+        this.hide(this.elements.popup);
+        // Results UI is already shown by showResultsUI
+      });
+    }
 
     if (retryBtn) {
       retryBtn.addEventListener('click', () => {
@@ -739,8 +768,8 @@ export class QuizView extends BaseView {
     const parts = [];
     if (typeof progress === 'number') {
       const pct = Math.max(0, Math.min(100, Math.round(progress)));
-      parts.push(`Progress: ${pct}%`);
-      if (progressBar) progressBar.style.width = `${pct}%`;
+      parts.push(`Progress: ${pct}% `);
+      if (progressBar) progressBar.style.width = `${pct}% `;
     }
     if (message) parts.push(message);
     if (progressEl) progressEl.textContent = parts.join(' • ') || 'Working...';

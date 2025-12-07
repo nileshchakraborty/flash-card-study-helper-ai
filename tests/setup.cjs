@@ -56,3 +56,23 @@ if (typeof global.File === 'undefined') {
   }
   global.File = FilePolyfill;
 }
+// Mock IndexedDB for JSDOM
+if (typeof global.indexedDB === 'undefined') {
+  global.indexedDB = {
+    open: () => ({
+      result: {
+        createObjectStore: () => { },
+        transaction: () => ({
+          objectStore: () => ({
+            get: () => ({ result: null }),
+            put: () => { },
+            getAllKeys: () => ({ result: [] }),
+            delete: () => { }
+          })
+        })
+      },
+      onupgradeneeded: null,
+      onsuccess: null,
+    }),
+  };
+}
