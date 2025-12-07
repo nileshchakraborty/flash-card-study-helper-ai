@@ -8,10 +8,71 @@ import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.
 import pdfParse from 'pdf-parse';
 // @ts-ignore
 import Tesseract from 'tesseract.js';
+// @ts-ignore
+import mammoth from 'mammoth';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import xlsx from 'xlsx';
+
+// ... existing imports ...
 
 export class StudyService implements StudyUseCase {
+  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
+    let text = '';
+
+    if (mimeType === 'application/pdf') {
+      const data = await pdfParse(file);
+      text = data.text;
+    } else if (mimeType.startsWith('image/')) {
+      const result = await Tesseract.recognize(file);
+      text = result.data.text;
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      filename.endsWith('.docx')
+    ) {
+      try {
+        const result = await mammoth.extractRawText({ buffer: file });
+        text = result.value;
+        const messages = result.messages; // Warnings
+        if (messages.length > 0) {
+          console.warn('[StudyService] Mammoth warnings:', messages);
+        }
+      } catch (e) {
+        console.error('Failed to parse docx:', e);
+        throw new Error('Failed to parse Word document');
+      }
+    } else if (
+      mimeType === 'application/vnd.ms-excel' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      filename.endsWith('.xls') ||
+      filename.endsWith('.xlsx')
+    ) {
+      try {
+        const workbook = xlsx.read(file, { type: 'buffer' });
+        let combinedText = '';
+
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          if (!sheet) return;
+          // Convert sheet to text (tab-separated)
+          const sheetText = xlsx.utils.sheet_to_txt(sheet);
+          if (sheetText.trim()) {
+            combinedText += `SHEET: ${sheetName}\n${sheetText}\n---\n`;
+          }
+        });
+
+        text = combinedText;
+      } catch (e) {
+        console.error('Failed to parse Excel file:', e);
+        throw new Error('Failed to parse Excel document');
+      }
+    } else {
+      text = file.toString('utf-8');
+    }
+
+    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+  }
+
   // @ts-ignore - Will be used when graph is wired into generation flow
   private flashcardGraph: FlashcardGenerationGraph;
 
@@ -299,7 +360,7 @@ export class StudyService implements StudyUseCase {
 
     //Check cache first
     if (this.webContextCache) {
-      const cached = this.webContextCache.get(cacheKey);
+      const cached = await this.webContextCache.get(cacheKey);
       if (cached) {
         console.log(`[Cache Hit] Using cached web context for: ${topic}`);
         return cached;
@@ -350,26 +411,26 @@ export class StudyService implements StudyUseCase {
 
     // Store in cache
     if (this.webContextCache && webContext) {
-      this.webContextCache.set(cacheKey, webContext);
+      await this.webContextCache.set(cacheKey, webContext);
     }
 
     return webContext;
   }
 
-  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
-    let text = '';
+  async processRawText(text: string, topic: string): Promise<Flashcard[]> {
+    if (!text || text.trim().length === 0) return [];
+    // Limit text length if needed? 
+    // For now, let adapter handle it or chunk it. Adapter usually handles 10-15k chars.
+    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
+  }
 
-    if (mimeType === 'application/pdf') {
-      const data = await pdfParse(file);
-      text = data.text;
-    } else if (mimeType.startsWith('image/')) {
-      const result = await Tesseract.recognize(file);
-      text = result.data.text;
-    } else {
-      text = file.toString('utf-8');
-    }
+  async processUrls(urls: string[], topic: string): Promise<Flashcard[]> {
+    if (!urls || urls.length === 0) return [];
 
-    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+    const content = await this.scrapeMultipleSources(urls);
+    if (!content) throw new Error('Failed to scrape content from provided URLs');
+
+    return this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
@@ -649,7 +710,7 @@ Respond in JSON format:
 
         // Store in cache
         if (this.webContextCache) {
-          this.webContextCache.set(
+          await this.webContextCache.set(
             `recommendations:${topic}`,
             JSON.stringify(recommendations)
           );

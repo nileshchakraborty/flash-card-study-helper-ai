@@ -496,6 +496,30 @@ export class ExpressServer {
       }
     });
 
+    // Endpoint for generating from raw content (Text or URLs)
+    this.app.post('/api/generate/from-content', apiRateLimiter, authMiddleware, async (req, res) => {
+      try {
+        const { type, content, topic } = req.body;
+        let cards: any[] = [];
+
+        if (type === 'text' && typeof content === 'string') {
+          cards = await this.studyService.processRawText(content, topic || 'Text Content');
+        } else if (type === 'url' && Array.isArray(content)) {
+          cards = await this.studyService.processUrls(content, topic || 'Web Content');
+        } else {
+          throw new Error('Invalid content type or format');
+        }
+
+        if (this.flashcardStorage && Array.isArray(cards)) {
+          this.flashcardStorage.storeFlashcards(cards as any);
+        }
+
+        res.json({ success: true, cards });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
     this.app.post('/api/brief-answer', async (req, res) => {
       try {
         const { question, context } = req.body;
@@ -1093,7 +1117,7 @@ export class ExpressServer {
 
       // Check cache first
       if (this.flashcardCache) {
-        const cachedResult = this.flashcardCache.get(
+        const cachedResult = await this.flashcardCache.get(
           topic,
           desiredCount,
           mode,

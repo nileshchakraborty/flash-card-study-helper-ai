@@ -5,7 +5,7 @@ import { jest, beforeAll, afterAll, afterEach, describe, it, expect } from '@jes
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
-import { QueueService } from '../../src/core/services/QueueService.js';
+
 import { invoke } from '../utils/invoke.js';
 
 const SKIP_SANDBOX = process.env.SANDBOX !== 'false';
@@ -101,7 +101,7 @@ describeOrSkip('Cache-Queue Integration', () => {
                 cards: [{ id: 'cached', front: 'Cached Q', back: 'Cached A', topic: 'React' }],
                 recommendedTopics: ['Cached Topic']
             };
-            flashcardCache.set('JavaScript', 5, cachedData, 'standard', 'ai-web');
+            await flashcardCache.set('JavaScript', 5, cachedData, 'standard', 'ai-web');
 
             const response = await invoke(app, 'POST', '/api/generate', {
                 headers: { Authorization: `Bearer ${mockToken}` },
@@ -163,10 +163,10 @@ describeOrSkip('Cache-Queue Integration', () => {
     describe('Cache TTL', () => {
         it('should not return expired cached entries', async () => {
             const shortLivedCache = new FlashcardCacheService(1); // 1 second TTL
-            shortLivedCache.set('expiretest', 5, { cards: [] }, 'standard', 'ai-web');
+            await shortLivedCache.set('expiretest', 5, { cards: [] }, 'standard', 'ai-web');
 
             await new Promise(resolve => setTimeout(resolve, 1100));
-            const result = shortLivedCache.get('expiretest', 5, 'standard', 'ai-web');
+            const result = await shortLivedCache.get('expiretest', 5, 'standard', 'ai-web');
             expect(result).toBeNull();
             shortLivedCache.dispose();
         });

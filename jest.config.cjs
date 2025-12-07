@@ -8,6 +8,7 @@ module.exports = {
     collectCoverageFrom: [
         'src/**/*.ts',
         'public/js/**/*.ts',
+        'mcp-server/**/*.ts',
         '!src/index.ts',
         '!src/types/**/*.ts',
         '!**/*.d.ts'
@@ -37,6 +38,6 @@ module.exports = {
         ],
     },
     transformIgnorePatterns: [
-        'node_modules/(?!(uuid|@apollo)/)'
+        'node_modules/(?!(uuid|@apollo|@modelcontextprotocol)/)'
     ],
 };

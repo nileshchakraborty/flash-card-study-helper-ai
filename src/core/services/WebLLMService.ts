@@ -195,7 +195,7 @@ export class WebLLMService extends EventEmitter {
     // Check cache
     const cacheKey = `webllm:flashcards:${topic}:${count}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached) {
         this.sendToClient(sessionId, {
           type: 'result',
@@ -228,7 +228,7 @@ export class WebLLMService extends EventEmitter {
     const cacheKey = `webllm:summary:${prompt.substring(0, 50)}`;
 
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached) {
         this.sendToClient(sessionId, {
           type: 'result',
@@ -256,7 +256,7 @@ export class WebLLMService extends EventEmitter {
     const cacheKey = `webllm:query:${prompt}`;
 
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached) {
         this.sendToClient(sessionId, {
           type: 'result',
@@ -293,7 +293,7 @@ export class WebLLMService extends EventEmitter {
   /**
    * Handle client response (results from WebLLM)
    */
-  handleClientResponse(sessionId: string, response: any): void {
+  async handleClientResponse(sessionId: string, response: any): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 

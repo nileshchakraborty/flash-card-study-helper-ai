@@ -1,5 +1,10 @@
 // Polyfill TextEncoder/TextDecoder for Node.js environment
 const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('util');
+const { ReadableStream } = require('stream/web');
+
+if (typeof global.ReadableStream === 'undefined') {
+  global.ReadableStream = ReadableStream;
+}
 
 if (typeof global.TextEncoder === 'undefined') {
   global.TextEncoder = class TextEncoder extends NodeTextEncoder {

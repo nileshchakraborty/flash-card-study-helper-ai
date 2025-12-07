@@ -39,6 +39,8 @@ export interface StoragePort {
 export interface StudyUseCase {
   generateFlashcards(topic: string, count: number, mode?: 'standard' | 'deep-dive', knowledgeSource?: KnowledgeSource, runtime?: Runtime, parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }>;
   processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]>;
+  processRawText(text: string, topic: string): Promise<Flashcard[]>;
+  processUrls(urls: string[], topic: string): Promise<Flashcard[]>;
   getBriefAnswer(question: string, context: string): Promise<string>;
   generateQuiz(topic: string, count: number, flashcards?: Flashcard[], preferredRuntime?: Runtime): Promise<QuizQuestion[]>;
   generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]>;

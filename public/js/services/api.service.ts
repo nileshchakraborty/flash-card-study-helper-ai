@@ -164,6 +164,50 @@ export class ApiService {
     });
   }
 
+  /**
+   * Upload configuration file or document
+   */
+  async uploadFile(file: File, topic: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('topic', topic);
+
+    // Auth token
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      let errorMsg = 'Upload failed';
+      try {
+        const err = await response.json();
+        errorMsg = err.error || errorMsg;
+      } catch (e) { }
+      throw new Error(errorMsg);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Generate from raw content (text or URLs)
+   */
+  async generateFromContent(payload: { type: 'text' | 'url', content: string | string[], topic: string }) {
+    return this.post('/generate/from-content', payload);
+  }
+
+  async saveDeck(deck: any) {
+    return this.post('/decks', deck);
+  }
+
   // Hybrid methods with GraphQL support
 
   /**
