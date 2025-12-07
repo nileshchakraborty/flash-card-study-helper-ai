@@ -17,6 +17,9 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
+import { requestIdMiddleware, requestLoggingMiddleware } from './middleware/logging.js';
+import { asyncHandler } from './middleware/async-handler.js';
+import { sendError, sendSuccess, ErrorCodes } from './response-helpers.js';
 import { isValidGenerateBody, isValidQuizBody } from './validators.js';
 import { typeDefs } from '../../../graphql/schema.js';
 import { resolvers } from '../../../graphql/resolvers/index.js';
@@ -134,6 +137,12 @@ export class ExpressServer {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
+
+    // Request ID and Logging (only in non-production for now)
+    if (process.env.NODE_ENV !== 'production') {
+      this.app.use(requestIdMiddleware);
+      this.app.use(requestLoggingMiddleware);
+    }
 
     this.app.use(express.json());
     this.app.use(passport.initialize());
@@ -438,34 +447,34 @@ export class ExpressServer {
 
     // Job Status Endpoint
     // Job status endpoint (requires auth; frontend handles 401 by prompting re-login)
-    this.app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
-      try {
-        if (!this.queueService) {
-          res.status(404).json({ error: 'Queue service not available' });
-          return;
-        }
+    this.app.get('/api/jobs/:id', authMiddleware, asyncHandler(async (req, res) => {
+      const requestId = (req as any).requestId;
 
-        const status = await this.queueService.getJobStatus(req.params.id || '');
-        res.json(status);
-      } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      if (!this.queueService) {
+        return sendError(res, 404, 'Queue service not available', {
+          requestId,
+          code: ErrorCodes.NOT_FOUND
+        });
       }
-    });
+
+      const status = await this.queueService.getJobStatus(req.params.id || '');
+      return sendSuccess(res, status, { requestId });
+    }));
 
     // Queue Statistics (Admin)
-    this.app.get('/api/queue/stats', authMiddleware, async (_req, res) => {
-      try {
-        if (!this.queueService) {
-          res.status(404).json({ error: 'Queue service not available' });
-          return;
-        }
+    this.app.get('/api/queue/stats', authMiddleware, asyncHandler(async (req, res) => {
+      const requestId = (req as any).requestId;
 
-        const stats = await this.queueService.getQueueStats();
-        res.json(stats);
-      } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      if (!this.queueService) {
+        return sendError(res, 404, 'Queue service not available', {
+          requestId,
+          code: ErrorCodes.NOT_FOUND
+        });
       }
-    });
+
+      const stats = await this.queueService.getQueueStats();
+      return sendSuccess(res, stats, { requestId });
+    }));
 
     // Search endpoint for WebLLM (client-side)
     this.app.post('/api/search', async (req, res) => {
@@ -490,16 +499,52 @@ export class ExpressServer {
     });
 
     this.app.post('/api/upload', apiRateLimiter, authMiddleware, this.upload.single('file'), async (req, res) => {
+      const requestId = (req as any).requestId;
+
       try {
         const file = req.file;
         const topic = req.body.topic || 'General';
-        if (!file) throw new Error('No file uploaded');
+
+        // Input validation
+        if (!file) {
+          return sendError(res, 400, 'No file uploaded. Please select a file to upload.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+
+        // Validate file size (10MB max)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+          return sendError(res, 400,
+            `File too large. Maximum size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
+            {
+              requestId,
+              code: ErrorCodes.FILE_TOO_LARGE
+            }
+          );
+        }
+
+        // Validate topic
+        if (typeof topic !== 'string' || topic.trim().length === 0) {
+          return sendError(res, 400, 'Topic is required and must be a non-empty string.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+
+        if (topic.length > 200) {
+          return sendError(res, 400, 'Topic is too long. Maximum length is 200 characters.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
 
         const cards = await this.studyService.processFile(
           file.buffer,
           file.originalname,
           file.mimetype,
-          topic
+          topic.trim()
         );
 
         // Persist uploaded cards for later quiz generation
@@ -507,9 +552,32 @@ export class ExpressServer {
           this.flashcardStorage.storeFlashcards(cards as any);
         }
 
-        res.json({ success: true, cards });
+        return sendSuccess(res, { cards }, { requestId });
       } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+
+        // Determine error type and code
+        const isUnsupportedType = message.includes('Unsupported file type');
+        const isExtractionError = message.includes('Unable to extract');
+
+        if (isUnsupportedType) {
+          return sendError(res, 400, message, {
+            requestId,
+            code: ErrorCodes.UNSUPPORTED_FILE_TYPE
+          });
+        }
+
+        if (isExtractionError) {
+          return sendError(res, 400, message, {
+            requestId,
+            code: ErrorCodes.PROCESSING_ERROR
+          });
+        }
+
+        return sendError(res, 500, message, {
+          requestId,
+          code: ErrorCodes.INTERNAL_ERROR
+        });
       }
     });
 
@@ -561,11 +629,15 @@ export class ExpressServer {
 
     // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
+      const requestId = (req as any).requestId;
+
       try {
         const { topic, numQuestions, count, flashcardIds, cards } = req.body;
         if (!isValidQuizBody(req.body)) {
-          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
-          return;
+          return sendError(res, 400, 'Either topic or flashcardIds is required', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
         }
         const desiredCount = numQuestions ?? count;
 
@@ -587,18 +659,22 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          res.json({ questions, quizId: quiz.id, quiz });
+          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
         } else if (flashcardIds && Array.isArray(flashcardIds)) {
           // Create quiz from flashcards
           if (flashcardIds.length === 0) {
-            res.status(400).json({ error: 'flashcardIds array cannot be empty' });
-            return;
+            return sendError(res, 400, 'flashcardIds array cannot be empty', {
+              requestId,
+              code: ErrorCodes.VALIDATION_ERROR
+            });
           }
 
           const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
           if (flashcards.length === 0) {
-            res.status(404).json({ error: 'No flashcards found with provided IDs' });
-            return;
+            return sendError(res, 404, 'No flashcards found with provided IDs', {
+              requestId,
+              code: ErrorCodes.NOT_FOUND
+            });
           }
 
           const formattedCards = flashcards.map(fc => ({
@@ -625,7 +701,7 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          res.json({ questions, quizId: quiz.id, quiz });
+          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
         } else if (topic) {
           // Create quiz from topic
           // let context = '';
@@ -1108,11 +1184,66 @@ export class ExpressServer {
     });
 
     // Health check
-    this.app.get('/api/health', (_req, res) => {
-      res.json({
-        ollama: true, // In a real app, check connection
-        serper: true  // In a real app, check connection
-      });
+    this.app.get('/api/health', async (_req, res) => {
+      const startTime = Date.now();
+
+      try {
+        // Check file processing libraries
+        const libraryChecks = {
+          pdfParse: await this.checkLibrary('pdf-parse'),
+          mammoth: await this.checkLibrary('mammoth'),
+          xlsx: await this.checkLibrary('xlsx'),
+          tesseract: await this.checkLibrary('tesseract.js')
+        };
+
+        // Supported file formats
+        const supportedFormats = {
+          documents: ['PDF', 'DOCX', 'DOC', 'TXT'],
+          spreadsheets: ['XLS', 'XLSX'],
+          images: ['PNG', 'JPEG', 'JPG', 'GIF', 'WEBP']
+        };
+
+        // Service status
+        const services = {
+          studyService: !!this.studyService,
+          queueService: !!this.queueService && this.queueAvailable,
+          flashcardCache: !!this.flashcardCache,
+          flashcardStorage: !!this.flashcardStorage,
+          quizStorage: !!this.quizStorage,
+          webLLMService: !!this.webllmService
+        };
+
+        // Environment info
+        const environment = {
+          nodeEnv: process.env.NODE_ENV || 'development',
+          nodeVersion: process.version,
+          platform: process.platform,
+          uptime: process.uptime()
+        };
+
+        const responseTime = Date.now() - startTime;
+
+        res.json({
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          responseTime: `${responseTime}ms`,
+          version: process.env.npm_package_version || '1.0.0',
+          services,
+          fileProcessing: {
+            libraries: libraryChecks,
+            supportedFormats
+          },
+          environment
+        });
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        res.status(503).json({
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          responseTime: `${responseTime}ms`,
+          error: error instanceof Error ? error.message : 'Health check failed'
+        });
+      }
     });
 
     // Serve index.html for all other routes (SPA)
@@ -1137,12 +1268,28 @@ export class ExpressServer {
     });
   }
 
+  /**
+   * Check if a library is available
+   */
+  private async checkLibrary(libraryName: string): Promise<boolean> {
+    try {
+      await import(libraryName);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async handleGenerate(req: express.Request, res: express.Response) {
+    const requestId = (req as any).requestId;
+
     try {
       const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
       if (!isValidGenerateBody(req.body)) {
-        res.status(400).json({ error: 'topic is required' });
-        return;
+        return sendError(res, 400, 'topic is required', {
+          requestId,
+          code: ErrorCodes.VALIDATION_ERROR
+        });
       }
       const desiredCount = Math.max(1, parseInt(count || '10', 10));
 
@@ -1156,12 +1303,11 @@ export class ExpressServer {
         );
 
         if (cachedResult) {
-          res.json({
+          return res.json({
             success: true,
             cached: true,
             ...cachedResult
           });
-          return;
         }
       }
 
@@ -1179,25 +1325,17 @@ export class ExpressServer {
             parentTopic,
             userId: (req as { user?: { id?: string } }).user?.id
           });
+
+          res.status(202).json({ jobId, status: 'queued' });
+          return;
         } catch (error: unknown) {
-          // Mark queue as unavailable for subsequent requests and fall back to inline generation
           this.queueAvailable = false;
           const message = error instanceof Error ? error.message : 'Unknown error';
           console.warn('[Queue] enqueue failed, falling back to sync generation', { message });
         }
       }
 
-      if (jobId) {
-        res.status(202).json({
-          success: true,
-          jobId,
-          message: 'Job queued for processing',
-          statusUrl: `/api/jobs/${jobId}`
-        });
-        return;
-      }
-
-      // Fallback to synchronous processing if queue is not configured or fails
+      // Fallback to synchronous generation
       const result = await this.studyService.generateFlashcards(
         topic,
         desiredCount,
@@ -1206,7 +1344,8 @@ export class ExpressServer {
         runtime || 'ollama',
         parentTopic
       );
-      res.json({
+
+      return res.json({
         success: true,
         cards: result.cards,
         recommendedTopics: result.recommendedTopics,
@@ -1217,7 +1356,11 @@ export class ExpressServer {
         }
       });
     } catch (error: unknown) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return sendError(res, 500, message, {
+        requestId,
+        code: ErrorCodes.INTERNAL_ERROR
+      });
     }
   }
 
