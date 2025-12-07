@@ -484,22 +484,41 @@ export class StudyService implements StudyUseCase {
 
       // Try primary
       const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (primaryResult) return primaryResult;
+      if (primaryResult && primaryResult.length > 0) {
+        console.log(`[StudyService] Primary quiz generation succeeded: ${primaryResult.length} questions`);
+        return primaryResult;
+      }
+      if (primaryResult === null || primaryResult.length === 0) {
+        console.warn('[StudyService] Primary quiz generation returned empty/null result');
+      }
 
       // Quality failed or generation failed; try secondary for validation
       const secondaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (secondaryResult) return secondaryResult;
+      if (secondaryResult && secondaryResult.length > 0) {
+        console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
+        return secondaryResult;
+      }
 
       console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
       return this.generateQuizFallbackFromFlashcards(flashcards, count);
     }
 
     // 2) Topic-based quiz
+    console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
     const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (primaryResult) return primaryResult;
+    if (primaryResult && primaryResult.length > 0) {
+      console.log(`[StudyService] Primary topic quiz generation succeeded: ${primaryResult.length} questions`);
+      return primaryResult;
+    }
+    if (primaryResult === null || primaryResult.length === 0) {
+      console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
+    }
 
     const secondaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (secondaryResult) return secondaryResult;
+    if (secondaryResult && secondaryResult.length > 0) {
+      console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
+      return secondaryResult;
+    }
 
     console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
     return this.generateQuizFallbackFromTopic(topic, count);

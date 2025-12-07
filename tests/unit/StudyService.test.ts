@@ -55,6 +55,15 @@ describe.skip('StudyService', () => {
         );
     });
 
+    afterAll(() => {
+        // Clean up any resources that might cause open handles
+        // For example, if StudyService starts any timers or connections:
+        // service.cleanup(); // If such a method exists
+
+        // Force Jest to clean up any pending timers
+        jest.clearAllTimers();
+    });
+
     it('should process Excel files (.xlsx) correctly', async () => {
         // Arrange
         const mockFileBuffer = Buffer.from('mock-excel-content');
