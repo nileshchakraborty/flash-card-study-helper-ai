@@ -141,10 +141,27 @@ export class ExpressServer {
 
     // Swagger UI - handle gracefully if swagger.yaml doesn't exist
     try {
-      const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
-      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+      const swaggerPath = path.join(process.cwd(), 'swagger.yaml');
+      let swaggerDocument;
+      try {
+        swaggerDocument = YAML.load(swaggerPath);
+      } catch (e) {
+        // Fallback to json if yaml fails or doesn't exist
+        try {
+          swaggerDocument = require(path.join(process.cwd(), 'swagger.json'));
+        } catch (jsonErr) {
+          // Both failed
+        }
+      }
+
+      if (swaggerDocument) {
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+        logger.info('📖 Swagger documentation available at /api-docs');
+      } else {
+        logger.warn('⚠️ Swagger documentation not found (swagger.yaml or swagger.json), /api-docs will be unavailable.');
+      }
     } catch (error) {
-      console.warn('Swagger documentation not available');
+      console.warn('Swagger documentation setup failed:', error);
     }
   }
 

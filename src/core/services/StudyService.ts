@@ -243,9 +243,12 @@ export class StudyService implements StudyUseCase {
     if (combinedContext) {
       // Use the text-based generation with our rich context
       cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, topic, count);
-    } else {
-      // Fallback if absolutely no context (unlikely)
-      console.log('   No context available, falling back to basic generation.');
+    }
+
+    // Fallback or Initial Attempt if no context:
+    // If context generation failed OR yielded 0 cards, try basic generation
+    if (!cards || cards.length === 0) {
+      console.log('   Context-based generation returned empty/null, falling back to basic generation.');
       cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
     }
 
