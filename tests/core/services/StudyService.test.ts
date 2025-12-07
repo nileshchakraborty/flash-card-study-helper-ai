@@ -30,7 +30,23 @@ describe('StudyService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    studyService = new StudyService({ ollama: mockAiAdapter }, mockSearchAdapter, mockStorageAdapter);
+    studyService = new StudyService(
+      { ollama: mockAiAdapter },
+      mockSearchAdapter,
+      mockStorageAdapter,
+      undefined, // metricsService
+      undefined, // webContextCache
+      true // disableAsyncRecommendations - prevent background tasks in tests
+    );
+  });
+
+  afterAll(async () => {
+    // Clean up StudyService resources
+    if (studyService && typeof studyService.shutdown === 'function') {
+      await studyService.shutdown();
+    }
+    // Force Jest to clean up any pending timers
+    jest.clearAllTimers();
   });
 
   describe('generateFlashcards', () => {
