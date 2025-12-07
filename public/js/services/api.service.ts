@@ -1,4 +1,5 @@
 import { graphqlService } from './graphql.service';
+import { cacheService } from './cache.service';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 type RequestOptions = {
@@ -50,6 +51,7 @@ type CreateQuizParams = {
   count?: number;
   flashcardIds?: string[];
   flashcards?: Array<{ id: string; front: string; back: string; topic?: string }>;
+  preferredRuntime?: string;
 };
 
 export class ApiService {
@@ -122,12 +124,12 @@ export class ApiService {
           ...options,
         });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Unauthorized: Session expired, please log in again');
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Unauthorized: Session expired, please log in again');
+          }
+          throw new Error(`API Error: ${response.statusText}`);
         }
-        throw new Error(`API Error: ${response.statusText}`);
-      }
 
         return await response.json();
       } catch (error: unknown) {
@@ -168,77 +170,122 @@ export class ApiService {
    * Get all decks - supports both REST and GraphQL
    */
   async getDecks(): Promise<DeckResponse[]> {
+    const cacheKey = 'decks-list';
+    const cached = await cacheService.get<DeckResponse[]>(cacheKey);
+    if (cached) return cached;
+
+    let result: any;
     if (this.useGraphQL) {
       try {
-        return await graphqlService.getDecks();
+        result = await graphqlService.getDecks();
       } catch (error) {
         console.warn('[API] GraphQL getDecks failed, falling back to REST', error);
-        return this.get('/decks') as Promise<DeckResponse[]>;
+        result = await this.get('/decks');
       }
+    } else {
+      result = await this.get('/decks');
     }
-    return this.get('/decks') as Promise<DeckResponse[]>;
+
+    if (result && result.history) {
+      result = result.history;
+    }
+
+    await cacheService.set(cacheKey, result);
+    return result as DeckResponse[];
   }
 
   /**
    * Create a deck - supports both REST and GraphQL
    */
   async createDeck(deck: DeckPayload): Promise<DeckResponse> {
+    let result: DeckResponse;
     if (this.useGraphQL) {
       try {
-        return await graphqlService.createDeck(deck);
+        result = await graphqlService.createDeck(deck);
       } catch (error) {
         console.warn('[API] GraphQL createDeck failed, falling back to REST', error);
-        return this.post('/decks', deck) as Promise<DeckResponse>;
+        result = await this.post('/decks', deck) as DeckResponse;
       }
+    } else {
+      result = await this.post('/decks', deck) as DeckResponse;
     }
-    return this.post('/decks', deck) as Promise<DeckResponse>;
+
+    await cacheService.invalidatePattern('decks-list');
+    return result;
   }
 
   /**
    * Get quiz history - supports both REST and GraphQL
    */
   async getQuizHistory(): Promise<QuizHistoryEntry[]> {
+    const cacheKey = 'quiz-history';
+    const cached = await cacheService.get<QuizHistoryEntry[]>(cacheKey);
+    if (cached) return cached;
+
+    let result: QuizHistoryEntry[];
     if (this.useGraphQL) {
       try {
-        return await graphqlService.getQuizHistory();
+        result = await graphqlService.getQuizHistory();
       } catch (error) {
         console.warn('[API] GraphQL getQuizHistory failed, falling back to REST', error);
-        return this.get('/quiz/history') as Promise<QuizHistoryEntry[]>;
+        result = await this.get('/quiz/history') as QuizHistoryEntry[];
       }
+    } else {
+      result = await this.get('/quiz/history') as QuizHistoryEntry[];
     }
-    return this.get('/quiz/history') as Promise<QuizHistoryEntry[]>;
+
+    await cacheService.set(cacheKey, result);
+    return result;
   }
 
   /**
    * Get all quizzes - supports both REST and GraphQL
    */
   async getAllQuizzes(): Promise<{ success: boolean; quizzes: QuizSummary[] }> {
+    const cacheKey = 'quizzes-list';
+    const cached = await cacheService.get<{ success: boolean; quizzes: QuizSummary[] }>(cacheKey);
+    if (cached) return cached;
+
+    let result: { success: boolean; quizzes: QuizSummary[] };
     if (this.useGraphQL) {
       try {
         const quizzes = await graphqlService.getAllQuizzes();
-        return { success: true, quizzes };
+        result = { success: true, quizzes };
       } catch (error) {
         console.warn('[API] GraphQL getAllQuizzes failed, falling back to REST', error);
-        return this.get('/quiz/list/all') as Promise<{ success: boolean; quizzes: QuizSummary[] }>;
+        result = await this.get('/quiz/list/all') as { success: boolean; quizzes: QuizSummary[] };
       }
+    } else {
+      result = await this.get('/quiz/list/all') as { success: boolean; quizzes: QuizSummary[] };
     }
-    return this.get('/quiz/list/all') as Promise<{ success: boolean; quizzes: QuizSummary[] }>;
+
+    await cacheService.set(cacheKey, result);
+    return result;
   }
 
   /**
    * Get quiz by ID - supports both REST and GraphQL
    */
   async getQuiz(id: string): Promise<{ success: boolean; quiz: QuizDetail | null }> {
+    const cacheKey = `quiz-${id}`;
+    const cached = await cacheService.get<{ success: boolean; quiz: QuizDetail | null }>(cacheKey);
+    if (cached) return cached;
+
+    let result: { success: boolean; quiz: QuizDetail | null };
     if (this.useGraphQL) {
       try {
         const quiz = await graphqlService.getQuiz(id);
-        return { success: true, quiz };
+        result = { success: true, quiz };
       } catch (error) {
         console.warn('[API] GraphQL getQuiz failed, falling back to REST', error);
-        return this.get(`/quiz/${id}`) as Promise<{ success: boolean; quiz: QuizDetail | null }>;
+        result = await this.get(`/quiz/${id}`) as { success: boolean; quiz: QuizDetail | null };
       }
+    } else {
+      result = await this.get(`/quiz/${id}`) as { success: boolean; quiz: QuizDetail | null };
     }
-    return this.get(`/quiz/${id}`) as Promise<{ success: boolean; quiz: QuizDetail | null }>;
+
+    await cacheService.set(cacheKey, result);
+    return result;
   }
 
   /**
@@ -246,6 +293,12 @@ export class ApiService {
    * Unified method for topic or flashcards
    */
   async createQuiz(params: CreateQuizParams): Promise<{ success?: boolean; quiz?: QuizSummary; quizId?: string }> {
+    const result = await this._createQuizInternal(params);
+    await cacheService.invalidatePattern('quizzes-list');
+    return result;
+  }
+
+  private async _createQuizInternal(params: CreateQuizParams): Promise<{ success?: boolean; quiz?: QuizSummary; quizId?: string }> {
     if (this.useGraphQL) {
       try {
         const input = {
@@ -300,6 +353,12 @@ export class ApiService {
    * Handles the difference between server-side scoring (GraphQL) and client-side (REST legacy)
    */
   async submitQuiz(quizId: string, data: { answers?: Record<string, string> | Array<{ questionId: string; answer: string }>; results?: Array<{ cardId?: string; id?: string; userAnswer: string }> }) {
+    const result = await this._submitQuizInternal(quizId, data);
+    await cacheService.invalidatePattern('quiz-history');
+    return result;
+  }
+
+  private async _submitQuizInternal(quizId: string, data: { answers?: Record<string, string> | Array<{ questionId: string; answer: string }>; results?: Array<{ cardId?: string; id?: string; userAnswer: string }> }) {
     if (this.useGraphQL) {
       try {
         // GraphQL expects answers array: { questionId, answer }

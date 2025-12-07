@@ -3,6 +3,7 @@ import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models
 import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
 import { CacheService } from './CacheService.js';
+import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 // @ts-ignore
@@ -11,6 +12,9 @@ import * as cheerio from 'cheerio';
 import axios from 'axios';
 
 export class StudyService implements StudyUseCase {
+  // @ts-ignore - Will be used when graph is wired into generation flow
+  private flashcardGraph: FlashcardGenerationGraph;
+
   private getAdapter(runtime: string): any {
     // If aiAdapters is a map keyed by runtime, return that entry.
     // Otherwise, assume aiAdapters itself is the adapter (e.g., in tests).
@@ -18,13 +22,19 @@ export class StudyService implements StudyUseCase {
     if (possible) return possible;
     return this.aiAdapters;
   }
+
   constructor(
     private aiAdapters: Record<string, AIServicePort>,
     private searchAdapter: SearchServicePort,
     private storageAdapter: StoragePort,
     private metricsService?: MetricsService,
     private webContextCache?: CacheService<string>
-  ) { }
+  ) {
+    // Initialize FlashcardGenerationGraph with Ollama adapter for resilient generation
+    this.flashcardGraph = new FlashcardGenerationGraph(
+      this.getAdapter('ollama') as any // Cast as adapter type flexibility
+    );
+  }
 
   /**
    * Generate flashcards for a topic using the configured AI/runtime pipeline.

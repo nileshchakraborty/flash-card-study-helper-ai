@@ -9,6 +9,8 @@ import { ollamaTool } from './tools/ollama.tool.js';
 import { serperTool } from './tools/serper.tool.js';
 import { flashcardsOllamaTool } from './tools/flashcards-ollama.tool.js';
 import { searchWebTool } from './tools/search-web.tool.js';
+import { storageTool } from './tools/storage.tool.js';
+import { databaseTool } from './tools/database.tool.js';
 
 const server = new Server(
     {
@@ -28,6 +30,8 @@ const tools = [
     serperTool,
     flashcardsOllamaTool,
     searchWebTool,
+    storageTool,
+    databaseTool,
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {

@@ -381,6 +381,25 @@ export class ExpressServer {
     // Auth Routes
     this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
+    // DEV ONLY: Login endpoint for mobile/development
+    if (process.env.NODE_ENV !== 'production') {
+      this.app.post('/api/auth/dev-login', async (_req, res) => {
+        try {
+          // Create a mock user for development
+          const mockUser = {
+            id: 'dev-user-id',
+            email: 'dev@mindflip.ai',
+            name: 'Dev User'
+          };
+
+          const token = await this.authService.encryptToken(mockUser);
+          res.json({ success: true, token, user: mockUser });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+    }
+
     this.app.get('/api/auth/google/callback',
       passport.authenticate('google', { session: false, failureRedirect: '/' }),
       async (req, res) => {

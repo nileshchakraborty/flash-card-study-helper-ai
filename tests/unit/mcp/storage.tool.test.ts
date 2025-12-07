@@ -1,0 +1,116 @@
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { storageTool } from '../../mcp-server/tools/storage.tool.js';
+import fs from 'fs/promises';
+import path from 'path';
+
+describe('MCP Storage Tool', () => {
+    const testDir = path.join(process.cwd(), 'test-storage');
+    const testFile = path.join(testDir, 'test.txt');
+
+    beforeEach(async () => {
+        // Create test directory
+        await fs.mkdir(testDir, { recursive: true });
+    });
+
+    afterEach(async () => {
+        // Clean up test directory
+        try {
+            await fs.rm(testDir, { recursive: true, force: true });
+        } catch (error) {
+            // Ignore cleanup errors
+        }
+    });
+
+    describe('write_file', () => {
+        it('should write content to a file', async () => {
+            const result = await storageTool.handler({
+                operation: 'write_file',
+                path: testFile,
+                content: 'Hello World'
+            });
+
+            expect(result).toContain('successfully');
+
+            const content = await fs.readFile(testFile, 'utf-8');
+            expect(content).toBe('Hello World');
+        });
+
+        it('should create parent directories if they dont exist', async () => {
+            const nestedFile = path.join(testDir, 'nested', 'deep', 'test.txt');
+
+            const result = await storageTool.handler({
+                operation: 'write_file',
+                path: nestedFile,
+                content: 'Nested content'
+            });
+
+            expect(result).toContain('successfully');
+
+            const content = await fs.readFile(nestedFile, 'utf-8');
+            expect(content).toBe('Nested content');
+        });
+    });
+
+    describe('read_file', () => {
+        it('should read file content', async () => {
+            await fs.writeFile(testFile, 'Test content');
+
+            const result = await storageTool.handler({
+                operation: 'read_file',
+                path: testFile
+            });
+
+            expect(result).toBe('Test content');
+        });
+
+        it('should return error for non-existent file', async () => {
+            const result = await storageTool.handler({
+                operation: 'read_file',
+                path: path.join(testDir, 'missing.txt')
+            });
+
+            expect(result).toContain('Error');
+        });
+    });
+
+    describe('list_files', () => {
+        it('should list files in directory', async () => {
+            await fs.writeFile(path.join(testDir, 'file1.txt'), 'content1');
+            await fs.writeFile(path.join(testDir, 'file2.txt'), 'content2');
+            await fs.mkdir(path.join(testDir, 'subdir'));
+
+            const result = await storageTool.handler({
+                operation: 'list_files',
+                path: testDir
+            });
+
+            expect(result).toContain('file1.txt');
+            expect(result).toContain('file2.txt');
+            expect(result).toContain('subdir');
+        });
+
+        it('should return error for non-existent directory', async () => {
+            const result = await storageTool.handler({
+                operation: 'list_files',
+                path: path.join(testDir, 'missing-dir')
+            });
+
+            expect(result).toContain('Error');
+        });
+    });
+
+    describe('delete_file', () => {
+        it('should delete a file', async () => {
+            await fs.writeFile(testFile, 'to be deleted');
+
+            const result = await storageTool.handler({
+                operation: 'delete_file',
+                path: testFile
+            });
+
+            expect(result).toContain('successfully');
+
+            await expect(fs.access(testFile)).rejects.toThrow();
+        });
+    });
+});

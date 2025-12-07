@@ -7,7 +7,9 @@ export const apiRateLimiter = rateLimit({
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     message: {
         error: 'Too many requests from this IP, please try again after 15 minutes'
-    }
+    },
+    validate: { trustProxy: false },
+    keyGenerator: (_req) => 'client'
 });
 
 export const authRateLimiter = rateLimit({
@@ -17,5 +19,6 @@ export const authRateLimiter = rateLimit({
     legacyHeaders: false,
     message: {
         error: 'Too many login attempts from this IP, please try again after an hour'
-    }
+    },
+    validate: { trustProxy: false }
 });

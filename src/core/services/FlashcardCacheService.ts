@@ -11,13 +11,14 @@ interface CacheEntry {
 export class FlashcardCacheService {
     private cache: Map<string, CacheEntry>;
     private ttlMs: number;
+    private cleanupInterval: NodeJS.Timeout;
 
     constructor(ttlSeconds: number = 3600) {
         this.cache = new Map();
         this.ttlMs = ttlSeconds * 1000;
 
         // Periodic cleanup of expired entries
-        setInterval(() => this.cleanup(), 60000); // Every minute
+        this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
 
         logger.info('FlashcardCacheService initialized', { ttl: `${ttlSeconds}s` });
     }
@@ -86,17 +87,23 @@ export class FlashcardCacheService {
      */
     private cleanup(): void {
         const now = Date.now();
-        let removed = 0;
+        let expiredCount = 0;
 
         for (const [key, entry] of this.cache.entries()) {
-            if (now > entry.expiresAt) {
+            if (now - entry.timestamp > this.ttlMs) {
                 this.cache.delete(key);
-                removed++;
+                expiredCount++;
             }
         }
 
-        if (removed > 0) {
-            logger.debug('Cache cleanup', { removed, remaining: this.cache.size });
+        if (expiredCount > 0) {
+            logger.info('Cache cleared', { expiredCount, currentSize: this.cache.size });
+        }
+    }
+
+    dispose(): void {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
         }
     }
 

@@ -3,6 +3,7 @@ import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import type { Flashcard } from '../models/deck.model.js';
 import { settingsService } from '../services/settings.service.js';
+import SkeletonLoader from '../components/SkeletonLoader.js';
 
 export class GeneratorView extends BaseView {
   constructor() {
@@ -271,7 +272,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         eventBus.emit('deck:loaded', cards);
 
         // Save to history
-        await apiService.post('/decks', {
+        await apiService.createDeck({
           topic,
           cards: cards
         });
@@ -380,7 +381,7 @@ Generate the JSON array now:`;
       eventBus.emit('deck:loaded', formattedCards);
 
       // Save to history
-      await apiService.post('/decks', {
+      await apiService.createDeck({
         topic: topic,
         cards: formattedCards
       });
@@ -423,9 +424,9 @@ Generate the JSON array now:`;
 
   async loadDeckHistory() {
     try {
-      const data = await apiService.get('/decks');
-      if (data.history) {
-        this.renderDeckHistory(data.history);
+      const history = await apiService.getDecks();
+      if (history) {
+        this.renderDeckHistory(history);
       }
     } catch (error) {
       console.error('Failed to load deck history:', error);
@@ -654,10 +655,24 @@ Generate the JSON array now:`;
   showLoading() {
     this.show(this.elements.loadingOverlay);
     this.updateLoadingProgress(0, 'Starting...');
+
+    // Inject skeleton cards into the loading modal for visual feedback
+    const skeletonContainer = document.getElementById('skeleton-container');
+    if (skeletonContainer) {
+      const skeletonGrid = SkeletonLoader.createFlashcardGrid(3); // Show 3 mini previews
+      skeletonContainer.innerHTML = '';
+      skeletonContainer.appendChild(skeletonGrid);
+    }
   }
 
   hideLoading() {
     this.hide(this.elements.loadingOverlay);
+
+    // Clear skeleton from modal
+    const skeletonContainer = document.getElementById('skeleton-container');
+    if (skeletonContainer) {
+      skeletonContainer.innerHTML = '';
+    }
   }
 
   updateLoadingProgress(progress?: number, message?: string) {

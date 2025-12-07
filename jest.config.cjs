@@ -6,7 +6,11 @@ module.exports = {
     testMatch: ['**/*.test.ts', '**/*.test.tsx'],
     collectCoverage: true,
     collectCoverageFrom: [
-        'src/core/services/CacheService.ts'
+        'src/**/*.ts',
+        'public/js/**/*.ts',
+        '!src/index.ts',
+        '!src/types/**/*.ts',
+        '!**/*.d.ts'
     ],
     coverageThreshold: {
         global: {

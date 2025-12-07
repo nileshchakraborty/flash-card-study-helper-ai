@@ -128,12 +128,8 @@ const flashcardStorage = new FlashcardStorageService();
 
 logger.info('💾 Storage services initialized');
 async function initializeMCP(): Promise<MCPClientWrapper | null> {
-    const useMCP = process.env.USE_MCP_SERVER === 'true';
-
-    if (!useMCP) {
-        logger.info('🔌 MCP disabled (USE_MCP_SERVER=false)');
-        return null;
-    }
+    // Always attempt MCP initialization (graceful fallback if fails)
+    logger.info('🔌 Initializing MCP Server...');
 
     try {
         const mcpClient = new MCPClientWrapper();
@@ -141,7 +137,7 @@ async function initializeMCP(): Promise<MCPClientWrapper | null> {
 
         const healthy = await mcpClient.healthCheck();
         if (!healthy) {
-            console.warn('⚠️  MCP server unhealthy, using direct adapters');
+            logger.warn('⚠️  MCP server unhealthy, using direct adapters');
             return null;
         }
 
@@ -149,7 +145,7 @@ async function initializeMCP(): Promise<MCPClientWrapper | null> {
         return mcpClient;
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error('❌ MCP initialization failed, using direct adapters:', { error: message });
+        logger.warn('⚠️  MCP initialization failed, using direct adapters:', { error: message });
         return null;
     }
 }
@@ -161,6 +157,10 @@ const useMCP = mcpClient !== null;
 const metricsService = new MetricsService('.metrics');
 logger.info('📊 Metrics service initialized');
 
+import { MockLLMAdapter } from './adapters/secondary/mock/MockLLMAdapter.js';
+
+// ...
+
 // 4. Initialize AI Adapters (Hybrid with MCP fallback)
 const directOllamaAdapter = new OllamaAdapter(llmCache);
 const ollamaAdapter = new HybridOllamaAdapter(mcpClient, directOllamaAdapter, useMCP);
@@ -170,9 +170,16 @@ const webllmService = new WebLLMService(llmCache);
 const webllmAdapter = new WebLLMAdapter(llmCache, webllmService);
 webllmAdapter.setWebLLMService(webllmService);
 
+// Mock Adapter for fast development/testing (Requested by user)
+const mockAdapter = new MockLLMAdapter();
+// FORCE MOCK: Replacing 'ollama' with mock adapter to satisfy "use a mock for ollama backend" request
+// To revert: change useMockBackend to false or remove this override
+const useMockBackend = false;
+
 const aiAdapters = {
-    ollama: ollamaAdapter,
-    webllm: webllmAdapter
+    ollama: useMockBackend ? mockAdapter : ollamaAdapter,
+    webllm: webllmAdapter,
+    mock: mockAdapter
 };
 
 logger.info(`🤖 AI adapters initialized (MCP: ${useMCP ? 'enabled' : 'disabled'}): ${Object.keys(aiAdapters).join(', ')}`);
