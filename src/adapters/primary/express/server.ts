@@ -18,6 +18,7 @@ import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
 import { requestIdMiddleware, requestLoggingMiddleware } from './middleware/logging.js';
+import { asyncHandler } from './middleware/async-handler.js';
 import { sendError, sendSuccess, ErrorCodes } from './response-helpers.js';
 import { isValidGenerateBody, isValidQuizBody } from './validators.js';
 import { typeDefs } from '../../../graphql/schema.js';
@@ -410,34 +411,34 @@ export class ExpressServer {
 
     // Job Status Endpoint
     // Job status endpoint (requires auth; frontend handles 401 by prompting re-login)
-    this.app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
-      try {
-        if (!this.queueService) {
-          res.status(404).json({ error: 'Queue service not available' });
-          return;
-        }
+    this.app.get('/api/jobs/:id', authMiddleware, asyncHandler(async (req, res) => {
+      const requestId = (req as any).requestId;
 
-        const status = await this.queueService.getJobStatus(req.params.id || '');
-        res.json(status);
-      } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      if (!this.queueService) {
+        return sendError(res, 404, 'Queue service not available', {
+          requestId,
+          code: ErrorCodes.NOT_FOUND
+        });
       }
-    });
+
+      const status = await this.queueService.getJobStatus(req.params.id || '');
+      return sendSuccess(res, status, { requestId });
+    }));
 
     // Queue Statistics (Admin)
-    this.app.get('/api/queue/stats', authMiddleware, async (_req, res) => {
-      try {
-        if (!this.queueService) {
-          res.status(404).json({ error: 'Queue service not available' });
-          return;
-        }
+    this.app.get('/api/queue/stats', authMiddleware, asyncHandler(async (req, res) => {
+      const requestId = (req as any).requestId;
 
-        const stats = await this.queueService.getQueueStats();
-        res.json(stats);
-      } catch (error: unknown) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      if (!this.queueService) {
+        return sendError(res, 404, 'Queue service not available', {
+          requestId,
+          code: ErrorCodes.NOT_FOUND
+        });
       }
-    });
+
+      const stats = await this.queueService.getQueueStats();
+      return sendSuccess(res, stats, { requestId });
+    }));
 
     // Search endpoint for WebLLM (client-side)
     this.app.post('/api/search', async (req, res) => {
