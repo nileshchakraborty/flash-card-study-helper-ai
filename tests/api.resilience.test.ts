@@ -64,6 +64,8 @@ describe('API Resilience Tests', () => {
         if (server) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
+        // Force Jest to clean up any pending timers
+        jest.clearAllTimers();
     });
 
     const describeOrSkip = SKIP_SANDBOX ? describe.skip : describe;
