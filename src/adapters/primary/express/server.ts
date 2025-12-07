@@ -1207,11 +1207,15 @@ export class ExpressServer {
   }
 
   private async handleGenerate(req: express.Request, res: express.Response) {
+    const requestId = (req as any).requestId;
+
     try {
       const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
       if (!isValidGenerateBody(req.body)) {
-        res.status(400).json({ error: 'topic is required' });
-        return;
+        return sendError(res, 400, 'topic is required', {
+          requestId,
+          code: ErrorCodes.VALIDATION_ERROR
+        });
       }
       const desiredCount = Math.max(1, parseInt(count || '10', 10));
 
@@ -1225,12 +1229,11 @@ export class ExpressServer {
         );
 
         if (cachedResult) {
-          res.json({
+          return res.json({
             success: true,
             cached: true,
             ...cachedResult
           });
-          return;
         }
       }
 
@@ -1248,25 +1251,17 @@ export class ExpressServer {
             parentTopic,
             userId: (req as { user?: { id?: string } }).user?.id
           });
+
+          res.status(202).json({ jobId, status: 'queued' });
+          return;
         } catch (error: unknown) {
-          // Mark queue as unavailable for subsequent requests and fall back to inline generation
           this.queueAvailable = false;
           const message = error instanceof Error ? error.message : 'Unknown error';
           console.warn('[Queue] enqueue failed, falling back to sync generation', { message });
         }
       }
 
-      if (jobId) {
-        res.status(202).json({
-          success: true,
-          jobId,
-          message: 'Job queued for processing',
-          statusUrl: `/api/jobs/${jobId}`
-        });
-        return;
-      }
-
-      // Fallback to synchronous processing if queue is not configured or fails
+      // Fallback to synchronous generation
       const result = await this.studyService.generateFlashcards(
         topic,
         desiredCount,
@@ -1275,7 +1270,8 @@ export class ExpressServer {
         runtime || 'ollama',
         parentTopic
       );
-      res.json({
+
+      return res.json({
         success: true,
         cards: result.cards,
         recommendedTopics: result.recommendedTopics,
@@ -1286,7 +1282,11 @@ export class ExpressServer {
         }
       });
     } catch (error: unknown) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return sendError(res, 500, message, {
+        requestId,
+        code: ErrorCodes.INTERNAL_ERROR
+      });
     }
   }
 
