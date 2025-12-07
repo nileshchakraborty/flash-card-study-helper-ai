@@ -58,10 +58,11 @@ describe.skip('StudyService', () => {
         );
     });
 
-    afterAll(() => {
-        // Clean up any resources that might cause open handles
-        // For example, if StudyService starts any timers or connections:
-        // service.cleanup(); // If such a method exists
+    afterAll(async () => {
+        // Clean up StudyService resources
+        if (service && typeof service.shutdown === 'function') {
+            await service.shutdown();
+        }
 
         // Force Jest to clean up any pending timers
         jest.clearAllTimers();

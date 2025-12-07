@@ -12,6 +12,8 @@ import Tesseract from 'tesseract.js';
 import mammoth from 'mammoth';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 import xlsx from 'xlsx';
 
 // ... existing imports ...
@@ -76,6 +78,7 @@ export class StudyService implements StudyUseCase {
   // @ts-ignore - Will be used when graph is wired into generation flow
   private flashcardGraph: FlashcardGenerationGraph;
   private disableAsyncRecommendations: boolean;
+  private inFlightControllers = new Set<AbortController>();
 
   private getAdapter(runtime: string): any {
     // If aiAdapters is a map keyed by runtime, return that entry.
@@ -343,31 +346,34 @@ export class StudyService implements StudyUseCase {
   }
 
   private async scrapeMultipleSources(urls: string[]): Promise<string> {
+    const axiosInstance = axios.create({
+      timeout: 4000,
+      httpAgent: new http.Agent({ keepAlive: false }),
+      httpsAgent: new https.Agent({ keepAlive: false }),
+    });
+
     const scrapePromises = urls.map(async (url) => {
+      const controller = new AbortController();
+      this.inFlightControllers.add(controller);
       try {
         console.log(`   - Scraping: ${url}`);
-        const res = await axios.get(url, {
+        const res = await axiosInstance.get(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           },
-          timeout: 4000 // 4s timeout per site
+          signal: controller.signal
         });
 
         const $ = cheerio.load(res.data);
-        $('script').remove();
-        $('style').remove();
-        $('nav').remove();
-        $('footer').remove();
-        $('header').remove();
-
-        // Get text and clean it up
+        $('script, style, nav, footer, header').remove();
         let text = $('body').text().replace(/\s+/g, ' ').trim();
-
-        // Limit per site to avoid overwhelming context window
         return `SOURCE (${url}):\n${text.substring(0, 2000)}\n---\n`;
       } catch (e) {
+        // axios throws when aborted or timed out
         console.warn(`   x Failed to scrape ${url}: ${(e as any).message}`);
         return '';
+      } finally {
+        this.inFlightControllers.delete(controller);
       }
     });
 
@@ -774,5 +780,24 @@ Respond in JSON format:
     }
   }
 
+  /**
+   * Shutdown: abort in-flight network requests and allow tests to force cleanup.
+   */
+  async shutdown(): Promise<void> {
+    // Abort any pending HTTP requests we started
+    for (const c of Array.from(this.inFlightControllers)) {
+      try { c.abort(); } catch { /* ignore */ }
+      this.inFlightControllers.delete(c);
+    }
+
+    // If FlashcardGenerationGraph exposes a stop/close API, call it.
+    try {
+      if (this.flashcardGraph && typeof (this.flashcardGraph as any).shutdown === 'function') {
+        await (this.flashcardGraph as any).shutdown();
+      }
+    } catch (e) {
+      // swallow - shutdown best-effort
+    }
+  }
 
 }
