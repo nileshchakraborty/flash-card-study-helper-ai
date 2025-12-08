@@ -22,9 +22,9 @@ export class StudyView extends BaseView {
     this.bindEvents();
 
     // Listen for deck updates
-    eventBus.on('deck:updated', (stats: any) => this.updateStats(stats));
-
-    eventBus.on('card:changed', (card: any) => this.renderCard(card));
+    eventBus.on('deck:updated', (stats) => this.updateStats(stats));
+    eventBus.on('deck:updated', (stats) => this.updateStats(stats));
+    eventBus.on('card:changed', (card) => this.renderCard(card));
     eventBus.on('deck:finished', () => this.showCompletion());
   }
 
@@ -82,7 +82,7 @@ export class StudyView extends BaseView {
     });
   }
 
-  renderCard(card: any) {
+  renderCard(card) {
     if (!this.elements.stack) return;
 
     // Ensure nav buttons are visible when rendering a card
@@ -97,30 +97,36 @@ export class StudyView extends BaseView {
     this.elements.stack.innerHTML = '';
 
     if (!card) {
+      // Should be handled by showCompletion, but just in case
       this.showCompletion();
       return;
     }
 
     const cardEl = document.createElement('div');
-    // Use 'card' class to trigger new 3D styles
-    cardEl.className = 'card w-full h-96 relative';
+    // Removed 'perspective-1000' from here, it should be on the container if needed, or handled by CSS
+    // Actually, perspective should be on the parent of the 3D object.
+    // Let's put perspective on the cardEl itself.
+    cardEl.className = 'flashcard w-full h-96 relative cursor-pointer perspective-1000';
 
+    // Using specific classes for 3D transform to avoid Tailwind conflicts
     cardEl.innerHTML = `
-      <div class="card-inner w-full h-full relative">
+      <div class="flashcard-inner w-full h-full relative transform-style-3d transition-transform duration-500 shadow-xl rounded-2xl">
         
         <!-- Front (Question) -->
-        <div class="card-front flex flex-col items-center justify-center p-8">
+        <div class="flashcard-front absolute w-full h-full backface-hidden bg-white rounded-2xl p-8 flex flex-col items-center justify-center border-2 border-gray-100">
           <div class="text-xs uppercase tracking-widest text-gray-400 mb-4 font-semibold">Question</div>
-          <div class="text-3xl font-bold text-gray-800 text-center leading-tight whitespace-pre-line">${card.front}</div>
-          <div class="absolute bottom-6 text-indigo-400 text-sm flex items-center gap-2 animate-pulse-slow">
+          <div class="text-2xl font-bold text-gray-800 text-center leading-relaxed whitespace-pre-line">${card.front}</div>
+          <div class="absolute bottom-6 text-gray-400 text-sm flex items-center gap-2">
             <span class="material-icons text-sm">touch_app</span> Tap to flip
           </div>
         </div>
 
         <!-- Back (Answer) -->
-        <div class="card-back flex flex-col items-center justify-center p-8 overflow-y-auto">
-          <div class="text-xs uppercase tracking-widest text-indigo-400 mb-4 font-semibold">Answer</div>
-          <div class="text-xl font-medium text-gray-700 text-center leading-relaxed whitespace-pre-line">${card.back}</div>
+        <!-- Removed 'transform' and 'rotate-y-180' from class list to avoid Tailwind conflict. 
+             The rotation is now handled purely by the .rotate-y-180 CSS class which sets transform: rotateY(180deg) -->
+        <div class="flashcard-back absolute w-full h-full backface-hidden bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-8 flex flex-col items-center justify-center rotate-y-180">
+          <div class="text-xs uppercase tracking-widest text-gray-400 mb-4 font-semibold">Answer</div>
+          <div class="text-xl font-medium text-center leading-relaxed whitespace-pre-line">${card.back}</div>
         </div>
       </div>
     `;
@@ -130,50 +136,18 @@ export class StudyView extends BaseView {
       this.flipCard();
     });
 
-    this.setupSwipeHandlers(cardEl);
-
     this.elements.stack.appendChild(cardEl);
   }
 
   flipCard() {
-    const cardInner = document.querySelector('.card-inner');
+    const cardInner = document.querySelector('.flashcard-inner');
     if (cardInner) {
-      cardInner.classList.toggle('flipped');
+      // Toggle the 'is-flipped' class which we will define in CSS to rotate 180deg
+      cardInner.classList.toggle('is-flipped');
     }
   }
 
-  setupSwipeHandlers(cardEl: HTMLElement) {
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    cardEl.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    cardEl.addEventListener('touchend', (e) => {
-      touchEndX = e.changedTouches[0].screenX;
-      this.handleSwipe(touchStartX, touchEndX);
-    }, { passive: true });
-  }
-
-  handleSwipe(startX: number, endX: number) {
-    const minSwipeDistance = 50;
-    const swipeDistance = endX - startX;
-
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      if (swipeDistance > 0) {
-        // Right swipe (Got it)
-        deckModel.recordSwipe('right');
-        deckModel.nextCard();
-      } else {
-        // Left swipe (Review)
-        deckModel.recordSwipe('left');
-      }
-    }
-  }
-
-
-  updateStats(stats: any) {
+  updateStats(stats) {
     if (this.elements.leftCount) this.elements.leftCount.textContent = stats.left;
     if (this.elements.rightCount) this.elements.rightCount.textContent = stats.right;
     if (this.elements.remaining) this.elements.remaining.textContent = stats.remaining.toString();

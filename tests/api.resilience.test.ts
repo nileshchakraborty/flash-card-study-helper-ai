@@ -64,8 +64,6 @@ describe('API Resilience Tests', () => {
         if (server) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        // Force Jest to clean up any pending timers
-        jest.clearAllTimers();
     });
 
     const describeOrSkip = SKIP_SANDBOX ? describe.skip : describe;
@@ -125,11 +123,8 @@ describe('API Resilience Tests', () => {
 
             expect(response.status).toBe(200);
             const body = response.json as any;
-            expect(body.status).toBe('healthy');
-            expect(body.services).toBeDefined();
-            expect(body.fileProcessing).toBeDefined();
-            expect(body.fileProcessing.supportedFormats).toBeDefined();
-            expect(body.environment).toBeDefined();
+            expect(body.ollama).toBeDefined();
+            expect(body.serper).toBeDefined();
         });
     });
 

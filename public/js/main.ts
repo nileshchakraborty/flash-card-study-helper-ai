@@ -7,15 +7,6 @@ import { apiService } from './services/api.service.js';
 import { graphqlService } from './services/graphql.service.js';
 import { settingsService } from './services/settings.service.js';
 import { eventBus } from './utils/event-bus.js';
-import SkeletonLoader from './components/SkeletonLoader.js';
-
-// Basic client-side error logging
-window.addEventListener('error', (event) => {
-  console.error('[Client Error]', event.message, event.error);
-});
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('[Client Unhandled Rejection]', event.reason);
-});
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Speed Insights
@@ -105,11 +96,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Expose eventBus for inline handlers (legacy refresh button)
   (window as any).eventBus = eventBus;
-  (window as any).apiService = apiService;
-  // Expose models for E2E testing
-  import('./models/quiz.model.js').then(({ quizModel }) => {
-    (window as any).quizModel = quizModel;
-  });
 });
 
 function setupSettingsModal(ensureModelManager: () => void) {

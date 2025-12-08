@@ -46,8 +46,7 @@
   },
   "include": [
     "src/**/*",
-    "tests/**/*",
-    "mcp-server/**/*"
+    "tests/**/*"
   ],
   "exclude": [
     "public/**/*",

@@ -4,11 +4,20 @@ module.exports = {
     extensionsToTreatAsEsm: ['.ts'],
     setupFiles: ['<rootDir>/tests/setup.cjs'],
     testMatch: ['**/*.test.ts', '**/*.test.tsx'],
-    // Disable automatic coverage collection for faster local runs and to avoid failing the suite
-    // when new, uncovered files are added. Run `npm test -- --coverage` when you need a report.
-    collectCoverage: false,
+    collectCoverage: true,
+    collectCoverageFrom: [
+        'src/core/services/CacheService.ts'
+    ],
+    coverageThreshold: {
+        global: {
+            statements: 80,
+            branches: 80,
+            functions: 80,
+            lines: 80,
+        },
+    },
     moduleNameMapper: {
-        '^(\\.+/.*)\\.js$': '$1',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
         '^@mlc-ai/web-llm$': '<rootDir>/tests/mocks/web-llm.js',
         '^msgpackr$': '<rootDir>/node_modules/msgpackr/dist/node.cjs',
         '^ws$': '<rootDir>/tests/mocks/ws.js',
@@ -24,6 +33,6 @@ module.exports = {
         ],
     },
     transformIgnorePatterns: [
-        'node_modules/(?!(uuid|@apollo|@modelcontextprotocol)/)'
+        'node_modules/(?!(uuid|@apollo)/)'
     ],
 };

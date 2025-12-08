@@ -39,15 +39,6 @@ describe('Generate fallback when queue is unavailable', () => {
         );
     });
 
-    afterAll(async () => {
-        // Clean up resources
-        if (server) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        // Force Jest to clean up any pending timers
-        jest.clearAllTimers();
-    });
-
     it('falls back to synchronous generation if queuing fails', async () => {
         const req: any = {
             body: {

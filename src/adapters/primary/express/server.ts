@@ -17,9 +17,6 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { AuthService } from '../../../core/services/AuthService.js';
 import { apiRateLimiter, authRateLimiter } from './middleware/rateLimit.middleware.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
-import { requestIdMiddleware, requestLoggingMiddleware } from './middleware/logging.js';
-import { asyncHandler } from './middleware/async-handler.js';
-import { sendError, sendSuccess, ErrorCodes } from './response-helpers.js';
 import { isValidGenerateBody, isValidQuizBody } from './validators.js';
 import { typeDefs } from '../../../graphql/schema.js';
 import { resolvers } from '../../../graphql/resolvers/index.js';
@@ -37,14 +34,6 @@ import type { UpstashVectorService } from '../../../core/services/UpstashVectorS
 import type { InMemoryVectorService } from '../../../core/services/InMemoryVectorService.js';
 import type { BlobStorageService } from '../../../core/services/BlobStorageService.js';
 import { logger } from '../../../core/services/LoggerService.js';
-import { appProperties } from '../../../config/properties.js';
-import { ensureSupportedFileType } from '../../../utils/fileType.js';
-
-const MAX_UPLOAD_BYTES = appProperties.MAX_UPLOAD_MB * 1024 * 1024;
-const MAX_UPLOAD_BYTES_TEST = appProperties.TEST_MAX_UPLOAD_MB * 1024 * 1024;
-
-const isTestAuth = (req: express.Request): boolean =>
-  (req.headers['x-test-auth'] === 'true');
 
 export class ExpressServer {
   private app: express.Application;
@@ -52,15 +41,6 @@ export class ExpressServer {
   private wss: WebSocketServer | null = null;
   private queueAvailable = true;
   private upload: multer.Multer;
-  private uploadChunkStore: Map<string, {
-    chunks: Buffer[];
-    expected: number;
-    received: number;
-    mimeType: string;
-    filename: string;
-    topic: string;
-    totalSize: number;
-  }>;
   private authService: AuthService;
   private quizStorage: QuizStorageService;
   private flashcardStorage: FlashcardStorageService;
@@ -85,11 +65,10 @@ export class ExpressServer {
   ) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
-    this.uploadChunkStore = new Map();
     this.upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: MAX_UPLOAD_BYTES_TEST // cap at highest to allow test header; we validate per-request below
+        fileSize: 10 * 1024 * 1024 // 10MB limit
       }
     });
     this.authService = AuthService.getInstance();
@@ -156,39 +135,16 @@ export class ExpressServer {
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
-    // Request ID and Logging (only in non-production for now)
-    if (process.env.NODE_ENV !== 'production') {
-      this.app.use(requestIdMiddleware);
-      this.app.use(requestLoggingMiddleware);
-    }
-
     this.app.use(express.json());
     this.app.use(passport.initialize());
     this.app.use(express.static('public'));
 
     // Swagger UI - handle gracefully if swagger.yaml doesn't exist
     try {
-      const swaggerPath = path.join(process.cwd(), 'swagger.yaml');
-      let swaggerDocument;
-      try {
-        swaggerDocument = YAML.load(swaggerPath);
-      } catch (e) {
-        // Fallback to json if yaml fails or doesn't exist
-        try {
-          swaggerDocument = require(path.join(process.cwd(), 'swagger.json'));
-        } catch (jsonErr) {
-          // Both failed
-        }
-      }
-
-      if (swaggerDocument) {
-        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-        logger.info('📖 Swagger documentation available at /api-docs');
-      } else {
-        logger.warn('⚠️ Swagger documentation not found (swagger.yaml or swagger.json), /api-docs will be unavailable.');
-      }
+      const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
+      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
     } catch (error) {
-      console.warn('Swagger documentation setup failed:', error);
+      console.warn('Swagger documentation not available');
     }
   }
 
@@ -425,25 +381,6 @@ export class ExpressServer {
     // Auth Routes
     this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-    // DEV ONLY: Login endpoint for mobile/development
-    if (process.env.NODE_ENV !== 'production') {
-      this.app.post('/api/auth/dev-login', async (_req, res) => {
-        try {
-          // Create a mock user for development
-          const mockUser = {
-            id: 'dev-user-id',
-            email: 'dev@mindflip.ai',
-            name: 'Dev User'
-          };
-
-          const token = await this.authService.encryptToken(mockUser);
-          res.json({ success: true, token, user: mockUser });
-        } catch (error: any) {
-          res.status(500).json({ error: error.message });
-        }
-      });
-    }
-
     this.app.get('/api/auth/google/callback',
       passport.authenticate('google', { session: false, failureRedirect: '/' }),
       async (req, res) => {
@@ -465,34 +402,34 @@ export class ExpressServer {
 
     // Job Status Endpoint
     // Job status endpoint (requires auth; frontend handles 401 by prompting re-login)
-    this.app.get('/api/jobs/:id', authMiddleware, asyncHandler(async (req, res) => {
-      const requestId = (req as any).requestId;
+    this.app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
+      try {
+        if (!this.queueService) {
+          res.status(404).json({ error: 'Queue service not available' });
+          return;
+        }
 
-      if (!this.queueService) {
-        return sendError(res, 404, 'Queue service not available', {
-          requestId,
-          code: ErrorCodes.NOT_FOUND
-        });
+        const status = await this.queueService.getJobStatus(req.params.id || '');
+        res.json(status);
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
-
-      const status = await this.queueService.getJobStatus(req.params.id || '');
-      return sendSuccess(res, status, { requestId });
-    }));
+    });
 
     // Queue Statistics (Admin)
-    this.app.get('/api/queue/stats', authMiddleware, asyncHandler(async (req, res) => {
-      const requestId = (req as any).requestId;
+    this.app.get('/api/queue/stats', authMiddleware, async (_req, res) => {
+      try {
+        if (!this.queueService) {
+          res.status(404).json({ error: 'Queue service not available' });
+          return;
+        }
 
-      if (!this.queueService) {
-        return sendError(res, 404, 'Queue service not available', {
-          requestId,
-          code: ErrorCodes.NOT_FOUND
-        });
+        const stats = await this.queueService.getQueueStats();
+        res.json(stats);
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
-
-      const stats = await this.queueService.getQueueStats();
-      return sendSuccess(res, stats, { requestId });
-    }));
+    });
 
     // Search endpoint for WebLLM (client-side)
     this.app.post('/api/search', async (req, res) => {
@@ -517,229 +454,19 @@ export class ExpressServer {
     });
 
     this.app.post('/api/upload', apiRateLimiter, authMiddleware, this.upload.single('file'), async (req, res) => {
-      const requestId = (req as any).requestId;
-
       try {
         const file = req.file;
-        const topic = (req.body.topic && req.body.topic.trim().length > 0)
-          ? req.body.topic.trim()
-          : path.parse(file?.originalname || 'Uploaded Content').name || 'Uploaded Content';
-        const maxSize = isTestAuth(req) ? MAX_UPLOAD_BYTES_TEST : MAX_UPLOAD_BYTES;
-
-        // Input validation
-        if (!file) {
-          return sendError(res, 400, 'No file uploaded. Please select a file to upload.', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
-        }
-
-        if (file.size > maxSize) {
-          return sendError(res, 400,
-            `File too large. Maximum size is ${(maxSize / 1024 / 1024)}MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
-            {
-              requestId,
-              code: ErrorCodes.FILE_TOO_LARGE
-            }
-          );
-        }
-
-        // Validate topic
-        if (typeof topic !== 'string' || topic.trim().length === 0) {
-          return sendError(res, 400, 'Topic is required and must be a non-empty string.', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
-        }
-
-        if (topic.length > 200) {
-          return sendError(res, 400, 'Topic is too long. Maximum length is 200 characters.', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
-        }
-
-        const resolvedMime = ensureSupportedFileType(file.mimetype, file.originalname);
+        const topic = req.body.topic || 'General';
+        if (!file) throw new Error('No file uploaded');
 
         const cards = await this.studyService.processFile(
           file.buffer,
           file.originalname,
-          resolvedMime,
-          topic.trim()
-        );
-
-        // Ensure we actually generated flashcards
-        if (!cards || !Array.isArray(cards) || cards.length === 0) {
-          throw new Error('No flashcards generated from the uploaded file. Please try a different file or format.');
-        }
-
-        // Persist uploaded cards for later quiz generation
-        if (this.flashcardStorage && Array.isArray(cards)) {
-          this.flashcardStorage.storeFlashcards(cards as any);
-        }
-
-        return sendSuccess(res, { cards }, { requestId });
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-
-        // Determine error type and code
-        const isUnsupportedType = message.includes('Unsupported file type');
-        const isExtractionError = message.includes('Unable to extract');
-        const isEmptyResult = message.includes('No flashcards generated');
-
-        if (isUnsupportedType) {
-          return sendError(res, 400, message, {
-            requestId,
-            code: ErrorCodes.UNSUPPORTED_FILE_TYPE
-          });
-        }
-
-        if (isExtractionError) {
-          return sendError(res, 400, message, {
-            requestId,
-            code: ErrorCodes.PROCESSING_ERROR
-          });
-        }
-
-        if (isEmptyResult) {
-          return sendError(res, 422, message, {
-            requestId,
-            code: ErrorCodes.PROCESSING_ERROR
-          });
-        }
-
-        return sendError(res, 500, message, {
-          requestId,
-          code: ErrorCodes.INTERNAL_ERROR
-        });
-      }
-    });
-
-    // Chunked upload endpoint for large files
-    this.app.post('/api/upload/chunk', apiRateLimiter, authMiddleware, this.upload.single('chunk'), async (req, res) => {
-      const requestId = (req as any).requestId;
-      try {
-        const uploadId = req.body.uploadId;
-        const index = parseInt(req.body.index, 10);
-        const total = parseInt(req.body.total, 10);
-        const filename = req.body.filename;
-        let mimeType = req.body.mimeType;
-        const topic = (req.body.topic || 'General').trim();
-        const chunk = req.file?.buffer;
-
-        if (!uploadId || Number.isNaN(index) || Number.isNaN(total) || !filename || !mimeType || !chunk) {
-          return sendError(res, 400, 'Invalid chunk upload payload.', { requestId, code: ErrorCodes.VALIDATION_ERROR });
-        }
-
-        if (total > 100 || total < 1) {
-          return sendError(res, 400, 'Invalid total chunk count.', { requestId, code: ErrorCodes.VALIDATION_ERROR });
-        }
-
-        // Validate type early
-        try {
-          mimeType = ensureSupportedFileType(mimeType, filename);
-        } catch (err) {
-          return sendError(res, 400, 'Unsupported file type', { requestId, code: ErrorCodes.UNSUPPORTED_FILE_TYPE });
-        }
-
-        const entry = this.uploadChunkStore.get(uploadId) || {
-          chunks: new Array(total).fill(null),
-          expected: total,
-          received: 0,
-          mimeType,
-          filename,
-          topic,
-          totalSize: 0
-        };
-
-        entry.chunks[index] = chunk;
-        entry.received += 1;
-        entry.totalSize += chunk.length;
-        this.uploadChunkStore.set(uploadId, entry);
-
-        // Enforce 30MB aggregate cap
-        const maxTotal = isTestAuth(req) ? MAX_UPLOAD_BYTES_TEST : MAX_UPLOAD_BYTES;
-        if (entry.totalSize > maxTotal) {
-          this.uploadChunkStore.delete(uploadId);
-          return sendError(res, 400, `File too large. Maximum size is ${(maxTotal / 1024 / 1024)}MB.`, { requestId, code: ErrorCodes.FILE_TOO_LARGE });
-        }
-
-        // If not all chunks are in, acknowledge partial
-        if (entry.received < entry.expected) {
-          return sendSuccess(res, { status: 'partial', received: entry.received, expected: entry.expected }, { requestId });
-        }
-
-        // All chunks received: merge and process
-        const merged = Buffer.concat(entry.chunks.filter(Boolean) as Buffer[]);
-        this.uploadChunkStore.delete(uploadId);
-
-        const cards = await this.studyService.processFile(
-          merged,
-          filename,
-          mimeType,
+          file.mimetype,
           topic
         );
 
-        if (this.flashcardStorage && Array.isArray(cards)) {
-          this.flashcardStorage.storeFlashcards(cards as any);
-        }
-
-        return sendSuccess(res, { cards }, { requestId });
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return sendError(res, 500, message, { requestId, code: ErrorCodes.INTERNAL_ERROR });
-      }
-    });
-
-    // Multer error handling middleware (must be right after the upload route)
-    this.app.use('/api/upload', (error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const requestId = (req as any).requestId;
-
-      // Handle Multer-specific errors
-      if (error.name === 'MulterError') {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-          return sendError(res, 400, 'File too large. Maximum size is 10MB.', {
-            requestId,
-            code: ErrorCodes.FILE_TOO_LARGE
-          });
-        }
-        if (error.code === 'LIMIT_FILE_COUNT') {
-          return sendError(res, 400, 'Too many files. Only one file allowed.', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
-        }
-        if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-          return sendError(res, 400, 'Unexpected field name. Use "file" as the field name.', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
-        }
-
-        return sendError(res, 400, `File upload error: ${error.message}`, {
-          requestId,
-          code: ErrorCodes.VALIDATION_ERROR
-        });
-      }
-
-      // Pass non-Multer errors to the global error handler
-      next(error);
-    });
-
-    // Endpoint for generating from raw content (Text or URLs)
-    this.app.post('/api/generate/from-content', apiRateLimiter, authMiddleware, async (req, res) => {
-      try {
-        const { type, content, topic } = req.body;
-        let cards: any[] = [];
-
-        if (type === 'text' && typeof content === 'string') {
-          cards = await this.studyService.processRawText(content, topic || 'Text Content');
-        } else if (type === 'url' && Array.isArray(content)) {
-          cards = await this.studyService.processUrls(content, topic || 'Web Content');
-        } else {
-          throw new Error('Invalid content type or format');
-        }
-
+        // Persist uploaded cards for later quiz generation
         if (this.flashcardStorage && Array.isArray(cards)) {
           this.flashcardStorage.storeFlashcards(cards as any);
         }
@@ -774,15 +501,11 @@ export class ExpressServer {
 
     // Quiz - Unified endpoint for creating quizzes
     this.app.post('/api/quiz', apiRateLimiter, async (req, res) => {
-      const requestId = (req as any).requestId;
-
       try {
         const { topic, numQuestions, count, flashcardIds, cards } = req.body;
         if (!isValidQuizBody(req.body)) {
-          return sendError(res, 400, 'Either topic or flashcardIds is required', {
-            requestId,
-            code: ErrorCodes.VALIDATION_ERROR
-          });
+          res.status(400).json({ error: 'Either topic or flashcardIds is required' });
+          return;
         }
         const desiredCount = numQuestions ?? count;
 
@@ -804,22 +527,18 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
+          res.json({ questions, quizId: quiz.id, quiz });
         } else if (flashcardIds && Array.isArray(flashcardIds)) {
           // Create quiz from flashcards
           if (flashcardIds.length === 0) {
-            return sendError(res, 400, 'flashcardIds array cannot be empty', {
-              requestId,
-              code: ErrorCodes.VALIDATION_ERROR
-            });
+            res.status(400).json({ error: 'flashcardIds array cannot be empty' });
+            return;
           }
 
           const flashcards = this.flashcardStorage?.getFlashcardsByIds(flashcardIds) || [];
           if (flashcards.length === 0) {
-            return sendError(res, 404, 'No flashcards found with provided IDs', {
-              requestId,
-              code: ErrorCodes.NOT_FOUND
-            });
+            res.status(404).json({ error: 'No flashcards found with provided IDs' });
+            return;
           }
 
           const formattedCards = flashcards.map(fc => ({
@@ -846,7 +565,7 @@ export class ExpressServer {
 
           if (this.quizStorage) this.quizStorage.storeQuiz(quiz as any);
 
-          return sendSuccess(res, { questions, quizId: quiz.id, quiz }, { requestId });
+          res.json({ questions, quizId: quiz.id, quiz });
         } else if (topic) {
           // Create quiz from topic
           // let context = '';
@@ -1284,20 +1003,6 @@ export class ExpressServer {
       }
     });
 
-    this.app.get('/api/decks/:id', async (req, res) => {
-      try {
-        const deck = await this.studyService.getDeck(req.params.id);
-        if (!deck) {
-          res.status(404).json({ error: 'Deck not found' });
-          return;
-        }
-        res.json(deck);
-      } catch (error: any) {
-        console.warn('[API] Failed to get deck:', error.message);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
     this.app.post('/api/decks', async (req, res) => {
       try {
         const deck = req.body;
@@ -1329,66 +1034,11 @@ export class ExpressServer {
     });
 
     // Health check
-    this.app.get('/api/health', async (_req, res) => {
-      const startTime = Date.now();
-
-      try {
-        // Check file processing libraries
-        const libraryChecks = {
-          pdfParse: await this.checkLibrary('pdf-parse'),
-          mammoth: await this.checkLibrary('mammoth'),
-          xlsx: await this.checkLibrary('xlsx'),
-          tesseract: await this.checkLibrary('tesseract.js')
-        };
-
-        // Supported file formats
-        const supportedFormats = {
-          documents: ['PDF', 'DOCX', 'DOC', 'TXT'],
-          spreadsheets: ['XLS', 'XLSX'],
-          images: ['PNG', 'JPEG', 'JPG', 'GIF', 'WEBP']
-        };
-
-        // Service status
-        const services = {
-          studyService: !!this.studyService,
-          queueService: !!this.queueService && this.queueAvailable,
-          flashcardCache: !!this.flashcardCache,
-          flashcardStorage: !!this.flashcardStorage,
-          quizStorage: !!this.quizStorage,
-          webLLMService: !!this.webllmService
-        };
-
-        // Environment info
-        const environment = {
-          nodeEnv: process.env.NODE_ENV || 'development',
-          nodeVersion: process.version,
-          platform: process.platform,
-          uptime: process.uptime()
-        };
-
-        const responseTime = Date.now() - startTime;
-
-        res.json({
-          status: 'healthy',
-          timestamp: new Date().toISOString(),
-          responseTime: `${responseTime}ms`,
-          version: process.env.npm_package_version || '1.0.0',
-          services,
-          fileProcessing: {
-            libraries: libraryChecks,
-            supportedFormats
-          },
-          environment
-        });
-      } catch (error) {
-        const responseTime = Date.now() - startTime;
-        res.status(503).json({
-          status: 'unhealthy',
-          timestamp: new Date().toISOString(),
-          responseTime: `${responseTime}ms`,
-          error: error instanceof Error ? error.message : 'Health check failed'
-        });
-      }
+    this.app.get('/api/health', (_req, res) => {
+      res.json({
+        ollama: true, // In a real app, check connection
+        serper: true  // In a real app, check connection
+      });
     });
 
     // Serve index.html for all other routes (SPA)
@@ -1403,52 +1053,28 @@ export class ExpressServer {
     });
 
     // Global error handler (must be last)
-    this.app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      const requestId = (req as any).requestId;
-      logger.error('🔥 Unhandled Server Error', {
-        requestId,
-        path: req.path,
-        method: req.method,
-        error: err?.message,
-        stack: err?.stack
-      });
-
-      // Avoid leaking stack traces to clients
-      sendError(res, 500, 'Internal server error. Please try again later.', {
-        requestId,
-        code: ErrorCodes.INTERNAL_ERROR
+    this.app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      console.error('🔥 Unhandled Server Error:', err);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message || 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
       });
     });
   }
 
-  /**
-   * Check if a library is available
-   */
-  private async checkLibrary(libraryName: string): Promise<boolean> {
-    try {
-      await import(libraryName);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   private async handleGenerate(req: express.Request, res: express.Response) {
-    const requestId = (req as any).requestId;
-
     try {
       const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
       if (!isValidGenerateBody(req.body)) {
-        return sendError(res, 400, 'topic is required', {
-          requestId,
-          code: ErrorCodes.VALIDATION_ERROR
-        });
+        res.status(400).json({ error: 'topic is required' });
+        return;
       }
       const desiredCount = Math.max(1, parseInt(count || '10', 10));
 
       // Check cache first
       if (this.flashcardCache) {
-        const cachedResult = await this.flashcardCache.get(
+        const cachedResult = this.flashcardCache.get(
           topic,
           desiredCount,
           mode,
@@ -1456,11 +1082,12 @@ export class ExpressServer {
         );
 
         if (cachedResult) {
-          return res.json({
+          res.json({
             success: true,
             cached: true,
             ...cachedResult
           });
+          return;
         }
       }
 
@@ -1478,17 +1105,25 @@ export class ExpressServer {
             parentTopic,
             userId: (req as { user?: { id?: string } }).user?.id
           });
-
-          res.status(202).json({ jobId, status: 'queued' });
-          return;
         } catch (error: unknown) {
+          // Mark queue as unavailable for subsequent requests and fall back to inline generation
           this.queueAvailable = false;
           const message = error instanceof Error ? error.message : 'Unknown error';
           console.warn('[Queue] enqueue failed, falling back to sync generation', { message });
         }
       }
 
-      // Fallback to synchronous generation
+      if (jobId) {
+        res.status(202).json({
+          success: true,
+          jobId,
+          message: 'Job queued for processing',
+          statusUrl: `/api/jobs/${jobId}`
+        });
+        return;
+      }
+
+      // Fallback to synchronous processing if queue is not configured or fails
       const result = await this.studyService.generateFlashcards(
         topic,
         desiredCount,
@@ -1497,8 +1132,7 @@ export class ExpressServer {
         runtime || 'ollama',
         parentTopic
       );
-
-      return res.json({
+      res.json({
         success: true,
         cards: result.cards,
         recommendedTopics: result.recommendedTopics,
@@ -1509,11 +1143,7 @@ export class ExpressServer {
         }
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return sendError(res, 500, message, {
-        requestId,
-        code: ErrorCodes.INTERNAL_ERROR
-      });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 

@@ -16,5 +16,3 @@ coverage/*
 coverage/*/*
 test_output.txt
 dump.rdb
-integration_failure.txt
-test_error.out
