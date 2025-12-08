@@ -38,6 +38,7 @@ import type { InMemoryVectorService } from '../../../core/services/InMemoryVecto
 import type { BlobStorageService } from '../../../core/services/BlobStorageService.js';
 import { logger } from '../../../core/services/LoggerService.js';
 import { appProperties } from '../../../config/properties.js';
+import { ensureSupportedFileType } from '../../../utils/fileType.js';
 
 const MAX_UPLOAD_BYTES = appProperties.MAX_UPLOAD_MB * 1024 * 1024;
 const MAX_UPLOAD_BYTES_TEST = appProperties.TEST_MAX_UPLOAD_MB * 1024 * 1024;
@@ -558,10 +559,12 @@ export class ExpressServer {
           });
         }
 
+        const resolvedMime = ensureSupportedFileType(file.mimetype, file.originalname);
+
         const cards = await this.studyService.processFile(
           file.buffer,
           file.originalname,
-          file.mimetype,
+          resolvedMime,
           topic.trim()
         );
 
@@ -620,7 +623,7 @@ export class ExpressServer {
         const index = parseInt(req.body.index, 10);
         const total = parseInt(req.body.total, 10);
         const filename = req.body.filename;
-        const mimeType = req.body.mimeType;
+        let mimeType = req.body.mimeType;
         const topic = (req.body.topic || 'General').trim();
         const chunk = req.file?.buffer;
 
@@ -630,6 +633,13 @@ export class ExpressServer {
 
         if (total > 100 || total < 1) {
           return sendError(res, 400, 'Invalid total chunk count.', { requestId, code: ErrorCodes.VALIDATION_ERROR });
+        }
+
+        // Validate type early
+        try {
+          mimeType = ensureSupportedFileType(mimeType, filename);
+        } catch (err) {
+          return sendError(res, 400, 'Unsupported file type', { requestId, code: ErrorCodes.UNSUPPORTED_FILE_TYPE });
         }
 
         const entry = this.uploadChunkStore.get(uploadId) || {

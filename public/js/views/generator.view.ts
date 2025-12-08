@@ -1,6 +1,7 @@
 import { BaseView } from './base.view.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
+import { isAuthError, redirectToLoginWithAlert, alertError } from '../utils/error.util.js';
 import type { Flashcard } from '../models/deck.model.js';
 import { settingsService } from '../services/settings.service.js';
 import SkeletonLoader from '../components/SkeletonLoader.js';
@@ -451,11 +452,10 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       }
     } catch (error) {
       console.error('Generation error:', error);
-      if (error?.message?.includes('Unauthorized')) {
-        alert('Your session expired. Please log in again to generate flashcards.');
-        window.location.href = '/api/auth/google';
+      if (isAuthError(error)) {
+        redirectToLoginWithAlert('Your session expired. Please log in again to generate flashcards.');
       } else {
-        alert('Failed to generate flashcards. Please try again. Error: ' + (error.message || error));
+        alertError(error, 'Failed to generate flashcards. Please try again.');
       }
     } finally {
       this.hideLoading();
@@ -488,8 +488,12 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
           }
         } catch (err) {
           console.error(`Failed to upload ${file.name}:`, err);
-          const message = (err as any)?.message || 'Unknown error';
-          alert(`Upload failed for ${file.name}:\n${message}`);
+          if (isAuthError(err)) {
+            redirectToLoginWithAlert();
+          } else {
+            const message = (err as any)?.message || 'Unknown error';
+            alert(`Upload failed for ${file.name}:\n${message}`);
+          }
           // stop further uploads to avoid repeated errors
           throw err;
         }
@@ -524,8 +528,12 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       this.refreshFileList();
 
     } catch (error) {
-      alert('Failed to process files: ' + (error.message || 'Unknown error'));
       console.error(error);
+      if (isAuthError(error)) {
+        redirectToLoginWithAlert();
+      } else {
+        alertError(error, 'Failed to process files.');
+      }
     } finally {
       this.hideLoading();
     }

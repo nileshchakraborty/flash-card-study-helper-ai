@@ -5,6 +5,7 @@ import { MetricsService } from './MetricsService.js';
 import { appProperties } from '../../config/properties.js';
 import { CacheService } from './CacheService.js';
 import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.js';
+import { ensureSupportedFileType } from '../../utils/fileType.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 // @ts-ignore
@@ -23,50 +24,11 @@ import xlsx from 'xlsx';
 
 export class StudyService implements StudyUseCase {
   async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
-    const ext = (filename || '').toLowerCase().split('.').pop() || '';
-    const extensionMimeMap: Record<string, string> = {
-      pdf: 'application/pdf',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      doc: 'application/msword',
-      xls: 'application/vnd.ms-excel',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      txt: 'text/plain',
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      gif: 'image/gif',
-      webp: 'image/webp'
-    };
-
-    // Normalize mime type if octet-stream or missing
-    if (!mimeType || mimeType === 'application/octet-stream' || mimeType === 'binary/octet-stream') {
-      mimeType = extensionMimeMap[ext] || mimeType;
-    }
-
-    const supportedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'image/png',
-      'image/jpeg',
-      'image/jpg',
-      'image/gif',
-      'image/webp'
-    ];
+    // Normalize and validate mime type
+    mimeType = ensureSupportedFileType(mimeType, filename);
 
     // Basic type guard
-    if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
-      // Try to resolve by extension if mimeType is unrecognized but extension is mapped
-      const mapped = extensionMimeMap[ext];
-      if (mapped && (supportedTypes.includes(mapped) || mapped.startsWith('image/'))) {
-        mimeType = mapped;
-      } else {
-        throw new Error('Unsupported file type');
-      }
-    }
+    // ensureSupportedFileType throws if unsupported; no additional guard needed
 
     let text = '';
 

@@ -12,8 +12,10 @@ jest.mock('pdf-parse', () => ({ default: jest.fn().mockResolvedValue({ text: 'pd
 jest.mock('tesseract.js', () => ({ default: { recognize: jest.fn().mockResolvedValue({ data: { text: 'image text' } }) } }));
 jest.mock('mammoth', () => ({ default: { extractRawText: jest.fn().mockResolvedValue({ value: 'doc text', messages: [] }) } }));
 jest.mock('xlsx', () => ({
-  read: jest.fn().mockReturnValue({ SheetNames: [], Sheets: {} }),
-  utils: { sheet_to_txt: jest.fn() }
+  read: jest.fn().mockReturnValue({ SheetNames: ['Sheet1'], Sheets: { Sheet1: {} } }),
+  utils: {
+    sheet_to_json: jest.fn().mockReturnValue([['Population', 'Data'], ['Value', '123']])
+  }
 }));
 
 const mockCards: Flashcard[] = [{ id: '1', front: 'Q1', back: 'A1', topic: 'Topic' }];
@@ -94,6 +96,7 @@ describe('StudyService source tagging & scope', () => {
 
     // Mock xlsx parsing to return minimal text; rely on adapter call/metadata
     const textExtractor = jest.spyOn(studyServiceInstance as any, 'generateFallbackFlashcardsFromText').mockReturnValue([]);
+    const grounder = jest.spyOn(studyServiceInstance as any, 'filterGroundedCards').mockImplementation((_text, cards) => cards);
 
     const cards = await service.processFile(
       buffer,
@@ -105,5 +108,6 @@ describe('StudyService source tagging & scope', () => {
     expect(cards[0].sourceType).toBe('upload');
     expect(cards[0].sourceName).toContain('WPP2024');
     textExtractor.mockRestore();
+    grounder.mockRestore();
   });
 });
