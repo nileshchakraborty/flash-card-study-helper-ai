@@ -18,6 +18,14 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Ensure loading overlay is non-blocking on initial load
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    (overlay as HTMLElement).style.pointerEvents = 'none';
+    (overlay as HTMLElement).style.display = 'none';
+  }
+
   // Initialize Speed Insights
   injectSpeedInsights();
 
