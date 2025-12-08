@@ -2,158 +2,29 @@ import type { StudyUseCase, AIServicePort, SearchServicePort, StoragePort } from
 import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models.js';
 import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
-import { appProperties } from '../../config/properties.js';
 import { CacheService } from './CacheService.js';
-import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.js';
-import { ensureSupportedFileType } from '../../utils/fileType.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 // @ts-ignore
 import Tesseract from 'tesseract.js';
-// @ts-ignore
-import mammoth from 'mammoth';
-
-
 import * as cheerio from 'cheerio';
 import axios from 'axios';
-import http from 'http';
-import https from 'https';
-import xlsx from 'xlsx';
-
-// ... existing imports ...
 
 export class StudyService implements StudyUseCase {
-  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
-    // Normalize and validate mime type
-    mimeType = ensureSupportedFileType(mimeType, filename);
-
-    // Basic type guard
-    // ensureSupportedFileType throws if unsupported; no additional guard needed
-
-    let text = '';
-
-    try {
-      if (mimeType === 'application/pdf') {
-        const data = await pdfParse(file);
-        text = data.text;
-      } else if (mimeType.startsWith('image/')) {
-        const result = await Tesseract.recognize(file);
-        text = result.data.text;
-      } else if (
-        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        mimeType === 'application/msword' ||
-        filename.endsWith('.doc') ||
-        filename.endsWith('.docx')
-      ) {
-        const result = await mammoth.extractRawText({ buffer: file });
-        text = result.value;
-        if (result.messages.length > 0) {
-          console.warn('[StudyService] Mammoth warnings:', result.messages);
-        }
-      } else if (
-        mimeType === 'application/vnd.ms-excel' ||
-        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        filename.endsWith('.xls') ||
-        filename.endsWith('.xlsx')
-      ) {
-        const workbook = xlsx.read(file, { type: 'buffer' });
-        const sheets: string[] = [];
-
-        workbook.SheetNames.forEach(sheetName => {
-          const sheet = workbook.Sheets[sheetName];
-          if (!sheet) return;
-          // rows as arrays, coerce to text
-          const rows: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
-          const limitedRows = rows.slice(0, appProperties.XLS_MAX_ROWS_PER_SHEET); // configurable row limit
-          const lines = limitedRows
-            .map(r => r.map(c => String(c || '')).join('\t'))
-            .filter(line => line.trim().length > 0);
-          if (lines.length > 0) {
-            sheets.push(`SHEET: ${sheetName}\n` + lines.join('\n'));
-          }
-        });
-
-        text = sheets.join('\n\n---\n\n');
-        // Trim extremely large text to keep within LLM prompt budget
-        if (text.length > appProperties.MAX_EXTRACT_TEXT_CHARS) {
-          text = text.slice(0, appProperties.MAX_EXTRACT_TEXT_CHARS);
-        }
-      } else if (mimeType === 'text/plain') {
-        text = file.toString('utf-8');
-      } else {
-        // Fallback: treat as utf-8 text
-        text = file.toString('utf-8');
-      }
-
-      if (!text || text.trim().length < 10) {
-        throw new Error('Unable to extract meaningful text');
-      }
-
-      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
-
-      const sourceMeta: any = { sourceType: 'upload', sourceName: filename };
-
-      // Primary generation
-      try {
-        const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
-        const grounded = this.filterGroundedCards(text, cards || []);
-        if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
-      } catch (genErr) {
-        console.warn('[StudyService] Primary generation from text failed, attempting fallback.', genErr);
-      }
-
-      // Fallback: quick heuristic flashcards from the text itself
-      const fallback = this.generateFallbackFlashcardsFromText(text, topic, 6, sourceMeta);
-      if (fallback.length === 0) {
-        throw new Error('No flashcards generated from the uploaded file. Please try a different file or format.');
-      }
-      return fallback;
-    } catch (error: any) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
-      throw new Error(message);
-    }
-  }
-
-  // @ts-ignore - Will be used when graph is wired into generation flow
-  private flashcardGraph: FlashcardGenerationGraph;
-  private disableAsyncRecommendations: boolean;
-  private inFlightControllers = new Set<AbortController>();
-
   private getAdapter(runtime: string): any {
     // If aiAdapters is a map keyed by runtime, return that entry.
+    // Otherwise, assume aiAdapters itself is the adapter (e.g., in tests).
     const possible = (this.aiAdapters as any)[runtime];
     if (possible) return possible;
-
-    // Fallback: If the requested runtime doesn't exist, try 'ollama' as default
-    const ollamaFallback = (this.aiAdapters as any)['ollama'];
-    if (ollamaFallback) {
-      console.warn(`[StudyService] Adapter '${runtime}' not found, falling back to 'ollama'`);
-      return ollamaFallback;
-    }
-
-    // Last resort: For tests, assume aiAdapters itself is the adapter
-    if (typeof (this.aiAdapters as any).generateSummary === 'function') {
-      return this.aiAdapters;
-    }
-
-    throw new Error(`No AI adapter found for runtime '${runtime}' and no fallback available`);
+    return this.aiAdapters;
   }
-
   constructor(
     private aiAdapters: Record<string, AIServicePort>,
     private searchAdapter: SearchServicePort,
     private storageAdapter: StoragePort,
     private metricsService?: MetricsService,
-    private webContextCache?: CacheService<string>,
-    disableAsyncRecommendations: boolean = process.env.NODE_ENV === 'test'
-  ) {
-    this.disableAsyncRecommendations = disableAsyncRecommendations;
-    // Initialize FlashcardGenerationGraph with Ollama adapter for resilient generation
-    this.flashcardGraph = new FlashcardGenerationGraph(
-      this.getAdapter('ollama') as any // Cast as adapter type flexibility
-    );
-  }
+    private webContextCache?: CacheService<string>
+  ) { }
 
   /**
    * Generate flashcards for a topic using the configured AI/runtime pipeline.
@@ -192,16 +63,10 @@ export class StudyService implements StudyUseCase {
         });
       }
 
-      // Trigger async recommendations generation (fire-and-forget) — skip in tests
-      if (!this.disableAsyncRecommendations) {
-        const t = setTimeout(() => {
-          void this.generateRecommendationsAsync(topic).catch(err => {
-            console.warn('[StudyService] Failed to generate recommendations:', err);
-          });
-        }, 0);
-        // Ensure this timer won't keep the process alive if everything else is done
-        if (typeof t.unref === 'function') t.unref();
-      }
+      // Trigger async recommendations generation (fire-and-forget)
+      this.generateRecommendationsAsync(topic).catch(err => {
+        console.warn('[StudyService] Failed to generate recommendations:', err);
+      });
 
       return { ...result, cards: adjustedCards };
     } catch (error: any) {
@@ -307,12 +172,9 @@ export class StudyService implements StudyUseCase {
     if (combinedContext) {
       // Use the text-based generation with our rich context
       cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, topic, count);
-    }
-
-    // Fallback or Initial Attempt if no context:
-    // If context generation failed OR yielded 0 cards, try basic generation
-    if (!cards || cards.length === 0) {
-      console.log('   Context-based generation returned empty/null, falling back to basic generation.');
+    } else {
+      // Fallback if absolutely no context (unlikely)
+      console.log('   No context available, falling back to basic generation.');
       cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
     }
 
@@ -386,34 +248,31 @@ export class StudyService implements StudyUseCase {
   }
 
   private async scrapeMultipleSources(urls: string[]): Promise<string> {
-    const axiosInstance = axios.create({
-      timeout: 4000,
-      httpAgent: new http.Agent({ keepAlive: false }),
-      httpsAgent: new https.Agent({ keepAlive: false }),
-    });
-
     const scrapePromises = urls.map(async (url) => {
-      const controller = new AbortController();
-      this.inFlightControllers.add(controller);
       try {
         console.log(`   - Scraping: ${url}`);
-        const res = await axiosInstance.get(url, {
+        const res = await axios.get(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           },
-          signal: controller.signal
+          timeout: 4000 // 4s timeout per site
         });
 
         const $ = cheerio.load(res.data);
-        $('script, style, nav, footer, header').remove();
+        $('script').remove();
+        $('style').remove();
+        $('nav').remove();
+        $('footer').remove();
+        $('header').remove();
+
+        // Get text and clean it up
         let text = $('body').text().replace(/\s+/g, ' ').trim();
+
+        // Limit per site to avoid overwhelming context window
         return `SOURCE (${url}):\n${text.substring(0, 2000)}\n---\n`;
       } catch (e) {
-        // axios throws when aborted or timed out
         console.warn(`   x Failed to scrape ${url}: ${(e as any).message}`);
         return '';
-      } finally {
-        this.inFlightControllers.delete(controller);
       }
     });
 
@@ -430,7 +289,7 @@ export class StudyService implements StudyUseCase {
 
     //Check cache first
     if (this.webContextCache) {
-      const cached = await this.webContextCache.get(cacheKey);
+      const cached = this.webContextCache.get(cacheKey);
       if (cached) {
         console.log(`[Cache Hit] Using cached web context for: ${topic}`);
         return cached;
@@ -481,110 +340,26 @@ export class StudyService implements StudyUseCase {
 
     // Store in cache
     if (this.webContextCache && webContext) {
-      await this.webContextCache.set(cacheKey, webContext);
+      this.webContextCache.set(cacheKey, webContext);
     }
 
     return webContext;
   }
 
-  async processRawText(text: string, topic: string): Promise<Flashcard[]> {
-    if (!text || text.trim().length === 0) return [];
-    const sourceMeta: any = { sourceType: 'text' };
-    try {
-      const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
-      const grounded = this.filterGroundedCards(text, cards || []);
-      if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
-    } catch (err) {
-      console.warn('[StudyService] Primary raw-text generation failed, using fallback.', err);
-    }
-    return this.generateFallbackFlashcardsFromText(text, topic, 6, sourceMeta);
-  }
+  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
+    let text = '';
 
-  /**
-   * Very simple fallback to ensure some flashcards are returned even when the LLM fails.
-   */
-  private generateFallbackFlashcardsFromText(text: string, topic: string, count: number, meta: any = {}): Flashcard[] {
-    const sentences = text
-      .replace(/\s+/g, ' ')
-      .split(/(?<=[.!?])\s+/)
-      .filter(s => s.trim().length > 0)
-      .slice(0, Math.max(count * 2, 10)); // take more to ensure variety
-
-    const cards: Flashcard[] = [];
-    for (let i = 0; i < count; i++) {
-      const idx = i % sentences.length;
-      const sentence = sentences[idx] || `Provide one key fact about ${topic}.`;
-      cards.push({
-        id: `fallback-${Date.now()}-${i}`,
-        front: `What is a key idea related to "${topic}"?`,
-        back: sentence.length > 220 ? sentence.slice(0, 217) + '...' : sentence,
-        topic,
-        ...meta
-      } as any);
-    }
-    return cards;
-  }
-
-  /**
-   * Filter out hallucinated cards by requiring overlap with source text.
-   */
-  private filterGroundedCards(sourceText: string, cards: Flashcard[]): Flashcard[] {
-    if (!cards || cards.length === 0) return [];
-
-    const tokens = this.extractTokens(sourceText);
-    if (tokens.size === 0) return [];
-
-    const grounded: Flashcard[] = [];
-    for (const card of cards) {
-      const qTokens = this.extractTokens((card as any).question || (card as any).front || '');
-      const aTokens = this.extractTokens((card as any).answer || (card as any).back || '');
-      const qOverlap = this.countOverlap(tokens, qTokens);
-      const aOverlap = this.countOverlap(tokens, aTokens);
-      // Require both sides to have some overlap, and combined overlap to be meaningful
-      if (qOverlap >= 1 && aOverlap >= 1 && (qOverlap + aOverlap) >= 3) {
-        grounded.push(card);
-      }
-    }
-    return grounded;
-  }
-
-  private extractTokens(text: string): Set<string> {
-    const stop = new Set(['the','a','an','and','or','of','in','on','to','for','with','by','from','at','as','is','are','was','were','be','this','that','these','those','it','its','their','his','her','our','your','my','we','you','they']);
-    return new Set(
-      text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .split(/\s+/)
-        .filter(w => w.length > 2 && !stop.has(w))
-    );
-  }
-
-  private countOverlap(source: Set<string>, target: Set<string>): number {
-    let count = 0;
-    target.forEach(t => {
-      if (source.has(t)) count++;
-    });
-    return count;
-  }
-
-  async processUrls(urls: string[], topic: string): Promise<Flashcard[]> {
-    if (!urls || urls.length === 0) return [];
-
-    const content = await this.scrapeMultipleSources(urls);
-    if (!content) throw new Error('Failed to scrape content from provided URLs');
-
-    const sourceMeta: any = { sourceType: 'urls', sourceUrls: urls };
-    try {
-      const cards = await this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
-      const grounded = this.filterGroundedCards(content, cards || []);
-      if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
-    } catch (err) {
-      console.warn('[StudyService] URL-based generation failed, using fallback.', err);
+    if (mimeType === 'application/pdf') {
+      const data = await pdfParse(file);
+      text = data.text;
+    } else if (mimeType.startsWith('image/')) {
+      const result = await Tesseract.recognize(file);
+      text = result.data.text;
+    } else {
+      text = file.toString('utf-8');
     }
 
-    const fallback = this.generateFallbackFlashcardsFromText(content, topic, 6, sourceMeta);
-    if (fallback.length === 0) throw new Error('No flashcards generated from provided URLs.');
-    return fallback;
+    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
@@ -635,41 +410,22 @@ export class StudyService implements StudyUseCase {
 
       // Try primary
       const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (primaryResult && primaryResult.length > 0) {
-        console.log(`[StudyService] Primary quiz generation succeeded: ${primaryResult.length} questions`);
-        return primaryResult;
-      }
-      if (primaryResult === null || primaryResult.length === 0) {
-        console.warn('[StudyService] Primary quiz generation returned empty/null result');
-      }
+      if (primaryResult) return primaryResult;
 
       // Quality failed or generation failed; try secondary for validation
       const secondaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (secondaryResult && secondaryResult.length > 0) {
-        console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
-        return secondaryResult;
-      }
+      if (secondaryResult) return secondaryResult;
 
       console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
       return this.generateQuizFallbackFromFlashcards(flashcards, count);
     }
 
     // 2) Topic-based quiz
-    console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
     const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (primaryResult && primaryResult.length > 0) {
-      console.log(`[StudyService] Primary topic quiz generation succeeded: ${primaryResult.length} questions`);
-      return primaryResult;
-    }
-    if (primaryResult === null || primaryResult.length === 0) {
-      console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
-    }
+    if (primaryResult) return primaryResult;
 
     const secondaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (secondaryResult && secondaryResult.length > 0) {
-      console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
-      return secondaryResult;
-    }
+    if (secondaryResult) return secondaryResult;
 
     console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
     return this.generateQuizFallbackFromTopic(topic, count);
@@ -683,16 +439,7 @@ export class StudyService implements StudyUseCase {
     let context = '';
 
     // For "Harder" mode, get web context (cache-first)
-    const userProvidedScope = !!(
-      previousResults?.sourceType === 'upload' ||
-      previousResults?.sourceType === 'text' ||
-      previousResults?.inputSource === 'upload' ||
-      previousResults?.uploadedFileName ||
-      (previousResults as any)?.sourceUrls?.length ||
-      previousResults?.providedContext
-    );
-
-    if (mode === 'harder' && previousResults.topic && !userProvidedScope) {
+    if (mode === 'harder' && previousResults.topic) {
       try {
         console.log(`[StudyService] Getting web context for advanced quiz on: ${previousResults.topic}`);
         context = await this.getCachedOrFreshWebContext(previousResults.topic);
@@ -728,10 +475,6 @@ export class StudyService implements StudyUseCase {
 
   async getDeckHistory(): Promise<Deck[]> {
     return this.storageAdapter.getDeckHistory();
-  }
-
-  async getDeck(id: string): Promise<Deck | null> {
-    return this.storageAdapter.getDeck(id);
   }
   /**
    * Local fallback: build simple MCQs from flashcards without LLM.
@@ -890,17 +633,13 @@ Respond in JSON format:
       );
 
       // Parse the AI response
-      if (!response || typeof response !== 'string') {
-        console.warn('[StudyService] Invalid response from AI for recommendations');
-        return;
-      }
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const recommendations = JSON.parse(jsonMatch[0]);
 
         // Store in cache
         if (this.webContextCache) {
-          await this.webContextCache.set(
+          this.webContextCache.set(
             `recommendations:${topic}`,
             JSON.stringify(recommendations)
           );
@@ -913,24 +652,5 @@ Respond in JSON format:
     }
   }
 
-  /**
-   * Shutdown: abort in-flight network requests and allow tests to force cleanup.
-   */
-  async shutdown(): Promise<void> {
-    // Abort any pending HTTP requests we started
-    for (const c of Array.from(this.inFlightControllers)) {
-      try { c.abort(); } catch { /* ignore */ }
-      this.inFlightControllers.delete(c);
-    }
-
-    // If FlashcardGenerationGraph exposes a stop/close API, call it.
-    try {
-      if (this.flashcardGraph && typeof (this.flashcardGraph as any).shutdown === 'function') {
-        await (this.flashcardGraph as any).shutdown();
-      }
-    } catch (e) {
-      // swallow - shutdown best-effort
-    }
-  }
 
 }

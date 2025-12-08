@@ -1,5 +1,4 @@
 import { LoggerService } from './LoggerService.js';
-import type { RedisService } from './RedisService.js';
 
 const logger = new LoggerService();
 
@@ -10,152 +9,94 @@ interface CacheEntry {
 }
 
 export class FlashcardCacheService {
-    private localCache: Map<string, CacheEntry>;
-    private redis?: RedisService;
+    private cache: Map<string, CacheEntry>;
     private ttlMs: number;
-    private ttlSeconds: number;
-    private cleanupInterval: ReturnType<typeof setInterval>;
 
-    constructor(ttlSeconds: number = 3600, redis?: RedisService) {
-        this.localCache = new Map();
-        this.redis = redis;
-        this.ttlSeconds = ttlSeconds;
+    constructor(ttlSeconds: number = 3600) {
+        this.cache = new Map();
         this.ttlMs = ttlSeconds * 1000;
 
-        // Periodic cleanup of expired entries (local only). `unref` so tests/app exit cleanly
-        this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
-        if (typeof (this.cleanupInterval as any).unref === 'function') {
-            (this.cleanupInterval as any).unref();
-        }
+        // Periodic cleanup of expired entries
+        setInterval(() => this.cleanup(), 60000); // Every minute
 
-        logger.info('FlashcardCacheService initialized', { ttl: `${ttlSeconds}s`, redis: !!redis });
+        logger.info('FlashcardCacheService initialized', { ttl: `${ttlSeconds}s` });
     }
 
     /**
      * Generate cache key from request parameters
      */
     private generateKey(topic: string, count: number, mode?: string, knowledgeSource?: string): string {
-        return `flashcard:${topic}|${count}|${mode || 'standard'}|${knowledgeSource || 'ai-web'}`.toLowerCase();
+        return `${topic}|${count}|${mode || 'standard'}|${knowledgeSource || 'ai-web'}`.toLowerCase();
     }
 
     /**
      * Check if cache has entry and it's not expired
      */
-    async has(topic: string, count: number, mode?: string, knowledgeSource?: string): Promise<boolean> {
+    has(topic: string, count: number, mode?: string, knowledgeSource?: string): boolean {
         const key = this.generateKey(topic, count, mode, knowledgeSource);
+        const entry = this.cache.get(key);
 
-        // Check local
-        if (this.localCache.has(key)) {
-            const entry = this.localCache.get(key)!;
-            if (Date.now() <= entry.expiresAt) return true;
-            this.localCache.delete(key);
+        if (!entry) return false;
+
+        if (Date.now() > entry.expiresAt) {
+            this.cache.delete(key);
+            return false;
         }
 
-        // Check Redis
-        if (this.redis && await this.redis.isHealthy()) {
-            try {
-                const val = await this.redis.get(key);
-                return val !== null;
-            } catch (error) {
-                logger.warn('Redis check failed', { key, error });
-            }
-        }
-
-        return false;
+        return true;
     }
 
     /**
      * Get cached result
      */
-    async get(topic: string, count: number, mode?: string, knowledgeSource?: string): Promise<any | null> {
+    get(topic: string, count: number, mode?: string, knowledgeSource?: string): any | null {
         const key = this.generateKey(topic, count, mode, knowledgeSource);
+        const entry = this.cache.get(key);
 
-        // 1. Try Local
-        const entry = this.localCache.get(key);
-        if (entry) {
-            if (Date.now() > entry.expiresAt) {
-                this.localCache.delete(key);
-                logger.debug('Local cache expired', { key });
-            } else {
-                logger.info('Local cache hit', { key });
-                return entry.data;
-            }
+        if (!entry) return null;
+
+        if (Date.now() > entry.expiresAt) {
+            this.cache.delete(key);
+            logger.debug('Cache expired', { key });
+            return null;
         }
 
-        // 2. Try Redis
-        if (this.redis && await this.redis.isHealthy()) {
-            try {
-                const redisData = await this.redis.get(key);
-                if (redisData) {
-                    logger.info('Redis cache hit', { key });
-
-                    // Repopulate local cache
-                    this.localCache.set(key, {
-                        data: redisData,
-                        timestamp: Date.now(),
-                        expiresAt: Date.now() + this.ttlMs
-                    });
-
-                    return redisData;
-                }
-            } catch (error) {
-                logger.warn('Redis read failed', { key, error });
-            }
-        }
-
-        return null;
+        logger.info('Cache hit', { key });
+        return entry.data;
     }
 
     /**
      * Store result in cache
      */
-    async set(topic: string, count: number, data: any, mode?: string, knowledgeSource?: string): Promise<void> {
+    set(topic: string, count: number, data: any, mode?: string, knowledgeSource?: string): void {
         const key = this.generateKey(topic, count, mode, knowledgeSource);
         const now = Date.now();
 
-        // 1. Set Local
-        this.localCache.set(key, {
+        this.cache.set(key, {
             data,
             timestamp: now,
             expiresAt: now + this.ttlMs
         });
 
-        // 2. Set Redis
-        if (this.redis && await this.redis.isHealthy()) {
-            try {
-                await this.redis.set(key, data, this.ttlSeconds);
-                logger.info('Redis cache set', { key });
-            } catch (error) {
-                logger.warn('Redis write failed', { key, error });
-            }
-        }
-
-        logger.info('Cache set', { key });
+        logger.info('Cache set', { key, size: this.cache.size });
     }
 
     /**
-     * Remove expired entries (Local only)
-     * Redis handles its own expiration
+     * Remove expired entries
      */
     private cleanup(): void {
         const now = Date.now();
-        let expiredCount = 0;
+        let removed = 0;
 
-        for (const [key, entry] of this.localCache.entries()) {
-            if (now - entry.timestamp > this.ttlMs) {
-                this.localCache.delete(key);
-                expiredCount++;
+        for (const [key, entry] of this.cache.entries()) {
+            if (now > entry.expiresAt) {
+                this.cache.delete(key);
+                removed++;
             }
         }
 
-        if (expiredCount > 0) {
-            logger.info('Local cache cleanup', { expiredCount, currentSize: this.localCache.size });
-        }
-    }
-
-    dispose(): void {
-        if (this.cleanupInterval) {
-            clearInterval(this.cleanupInterval);
+        if (removed > 0) {
+            logger.debug('Cache cleanup', { removed, remaining: this.cache.size });
         }
     }
 
@@ -164,20 +105,16 @@ export class FlashcardCacheService {
      */
     getStats() {
         return {
-            size: this.localCache.size,
-            ttlSeconds: this.ttlSeconds,
-            redisConnected: this.redis?.isHealthy()
+            size: this.cache.size,
+            ttlSeconds: this.ttlMs / 1000
         };
     }
 
     /**
      * Clear all cache
      */
-    async clear(): Promise<void> {
-        this.localCache.clear();
-        logger.info('Local cache cleared');
-
-        // We generally don't clear generic Redis via this method to avoid blowing away unrelated data,
-        // unless we used key prefixes (which we added: 'flashcard:')
+    clear(): void {
+        this.cache.clear();
+        logger.info('Cache cleared');
     }
 }

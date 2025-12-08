@@ -27,7 +27,7 @@ export class SerperAdapter implements SearchServicePort {
     // Check cache first
     const cacheKey = `serper:${query}`;
     if (this.cache) {
-      const cached = await this.cache.get(cacheKey);
+      const cached = this.cache.get(cacheKey);
       if (cached !== undefined) {
         return cached;
       }
@@ -49,7 +49,7 @@ export class SerperAdapter implements SearchServicePort {
 
       // Store in cache
       if (this.cache) {
-        await this.cache.set(cacheKey, results);
+        this.cache.set(cacheKey, results);
       }
 
       return results;

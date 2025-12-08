@@ -20,17 +20,6 @@ export class UpstashVectorService {
      */
     async initialize(): Promise<void> {
         try {
-            // Check for required environment variables first
-            const url = process.env.UPSTASH_VECTOR_REST_URL;
-            const token = process.env.UPSTASH_VECTOR_REST_TOKEN;
-
-            if (!url || !token) {
-                logger.warn('⚠️  Upstash Vector not configured (missing UPSTASH_VECTOR_REST_URL or UPSTASH_VECTOR_REST_TOKEN). Vector search will be unavailable.');
-                this.index = null;
-                this.isInitialized = false;
-                return;
-            }
-
             // Upstash Vector automatically reads from env:
             // UPSTASH_VECTOR_REST_URL
             // UPSTASH_VECTOR_REST_TOKEN
@@ -38,7 +27,7 @@ export class UpstashVectorService {
             this.isInitialized = true;
             logger.info('✅ Upstash Vector initialized successfully');
         } catch (error: any) {
-            logger.warn('⚠️  Upstash Vector initialization failed. Vector search will be unavailable.', error.message);
+            logger.warn('⚠️  Upstash Vector initialization failed:', error.message);
             this.index = null;
             this.isInitialized = false;
         }

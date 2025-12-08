@@ -3,22 +3,22 @@ import { CacheService } from '../../src/core/services/CacheService.js';
 describe('CacheService', () => {
   const cache = new CacheService<{ value: number }>({ ttlSeconds: 60, maxEntries: 50 });
 
-  beforeEach(async () => await cache.clear());
+  beforeEach(() => cache.clear());
 
-  it('stores and retrieves values', async () => {
-    await cache.set('a', { value: 1 });
-    expect(await cache.get('a')).toEqual({ value: 1 });
+  it('stores and retrieves values', () => {
+    cache.set('a', { value: 1 });
+    expect(cache.get('a')).toEqual({ value: 1 });
   });
 
-  it('returns undefined for misses', async () => {
-    expect(await cache.get('missing')).toBeUndefined();
+  it('returns undefined for misses', () => {
+    expect(cache.get('missing')).toBeUndefined();
   });
 
-  it('reports existence with has()', async () => {
-    await cache.set('k', { value: 2 });
-    expect(await cache.has('k')).toBe(true);
-    await cache.delete('k');
-    expect(await cache.has('k')).toBe(false);
+  it('reports existence with has()', () => {
+    cache.set('k', { value: 2 });
+    expect(cache.has('k')).toBe(true);
+    cache.delete('k');
+    expect(cache.has('k')).toBe(false);
   });
 
   it('hashKey produces stable short hashes', () => {

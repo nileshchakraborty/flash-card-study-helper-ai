@@ -6,6 +6,8 @@ const FlashcardsInputSchema = z.object({
     model: z.string().optional().describe('Ollama model to use (default: llama3.2:latest)'),
 });
 
+type FlashcardsInput = z.infer<typeof FlashcardsInputSchema>;
+
 export const flashcardsOllamaTool = {
     name: 'generate_flashcards_ollama',
     description: 'Generate flashcards using Ollama LLM',

@@ -1,99 +1,49 @@
 import { LRUCache } from 'lru-cache';
 import crypto from 'crypto';
-import type { RedisService } from './RedisService.js';
 
 export interface CacheOptions {
     ttlSeconds: number;
     maxEntries: number;
-    redis?: RedisService;
 }
 
 export class CacheService<T extends {} = any> {
-    private localCache: LRUCache<string, T>;
-    private redis?: RedisService;
-    private ttlSeconds: number;
+    private cache: LRUCache<string, T>;
 
     constructor(options: CacheOptions) {
-        this.redis = options.redis;
-        this.ttlSeconds = options.ttlSeconds;
-
-        this.localCache = new LRUCache<string, T>({
+        this.cache = new LRUCache<string, T>({
             max: options.maxEntries,
-            ttl: options.ttlSeconds * 1000,
+            ttl: options.ttlSeconds * 1000, // Convert to milliseconds
             updateAgeOnGet: false,
             updateAgeOnHas: false
         });
     }
 
-    async get(key: string): Promise<T | undefined> {
-        // 1. Try Memory Cache first (fastest)
-        const localValue = this.localCache.get(key);
-        if (localValue !== undefined) {
-            console.log(`✅ Memory Cache hit for: ${key}`);
-            return localValue;
+    get(key: string): T | undefined {
+        const value = this.cache.get(key);
+        if (value !== undefined) {
+            console.log(`✅ Cache hit for: ${key}`);
+        } else {
+            console.log(`🔍 Cache miss for: ${key}`);
         }
-
-        // 2. Try Redis Cache
-        if (this.redis && await this.redis.isHealthy()) {
-            try {
-                const redisValue = await this.redis.get<T>(key);
-                if (redisValue) {
-                    console.log(`✅ Redis Cache hit for: ${key}`);
-                    // Populate local cache from Redis for next time
-                    this.localCache.set(key, redisValue);
-                    return redisValue;
-                }
-            } catch (error) {
-                console.warn(`⚠️ Redis get failed for ${key}`, error);
-            }
-        }
-
-        console.log(`🔍 Cache miss for: ${key}`);
-        return undefined;
+        return value;
     }
 
-    async set(key: string, value: T): Promise<void> {
-        // 1. Update Memory Cache
-        this.localCache.set(key, value);
-        console.log(`💾 Cached (Memory): ${key}`);
-
-        // 2. Update Redis Cache
-        if (this.redis && await this.redis.isHealthy()) {
-            try {
-                await this.redis.set(key, value, this.ttlSeconds);
-                console.log(`💾 Cached (Redis): ${key}`);
-            } catch (error) {
-                console.warn(`⚠️ Redis set failed for ${key}`, error);
-            }
-        }
+    set(key: string, value: T): void {
+        this.cache.set(key, value);
+        console.log(`💾 Cached: ${key}`);
     }
 
-    async has(key: string): Promise<boolean> {
-        if (this.localCache.has(key)) return true;
-
-        if (this.redis && await this.redis.isHealthy()) {
-            const val = await this.redis.get(key);
-            return val !== null;
-        }
-
-        return false;
+    has(key: string): boolean {
+        return this.cache.has(key);
     }
 
-    async clear(): Promise<void> {
-        this.localCache.clear();
-        console.log('🗑️  Memory Cache cleared');
-
-        // Note: We don't clear Redis here as it might be shared
-        // or we'd need a pattern matching delete which is expensive/dangerous
+    clear(): void {
+        this.cache.clear();
+        console.log('🗑️  Cache cleared');
     }
 
-    async delete(key: string): Promise<void> {
-        this.localCache.delete(key);
-
-        if (this.redis && await this.redis.isHealthy()) {
-            await this.redis.delete(key);
-        }
-
+    delete(key: string): void {
+        this.cache.delete(key);
         console.log(`🗑️  Deleted from cache: ${key}`);
     }
 

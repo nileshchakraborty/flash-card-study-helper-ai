@@ -5,6 +5,7 @@ const SerperInputSchema = z.object({
     num_results: z.number().optional().describe('Number of results to return (default: 5)'),
 });
 
+type SerperInput = z.infer<typeof SerperInputSchema>;
 
 export const serperTool = {
     name: 'search_web',

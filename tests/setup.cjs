@@ -1,10 +1,5 @@
 // Polyfill TextEncoder/TextDecoder for Node.js environment
 const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('util');
-const { ReadableStream } = require('stream/web');
-
-if (typeof global.ReadableStream === 'undefined') {
-  global.ReadableStream = ReadableStream;
-}
 
 if (typeof global.TextEncoder === 'undefined') {
   global.TextEncoder = class TextEncoder extends NodeTextEncoder {
@@ -60,24 +55,4 @@ if (typeof global.File === 'undefined') {
     }
   }
   global.File = FilePolyfill;
-}
-// Mock IndexedDB for JSDOM
-if (typeof global.indexedDB === 'undefined') {
-  global.indexedDB = {
-    open: () => ({
-      result: {
-        createObjectStore: () => { },
-        transaction: () => ({
-          objectStore: () => ({
-            get: () => ({ result: null }),
-            put: () => { },
-            getAllKeys: () => ({ result: [] }),
-            delete: () => { }
-          })
-        })
-      },
-      onupgradeneeded: null,
-      onsuccess: null,
-    }),
-  };
 }
