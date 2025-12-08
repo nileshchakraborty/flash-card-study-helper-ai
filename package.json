@@ -10,6 +10,7 @@
     "clean:frontend": "rm -rf public/dist",
     "prebuild": "npm run clean:backend",
     "build": "tsc -p tsconfig.build.json",
+    "build:backend": "npm run clean:backend && tsc -p tsconfig.build.json",
     "prebuild:frontend": "npm run clean:frontend",
     "build:frontend": "node esbuild.config.cjs",
     "build:all": "npm run clean && npm run build && npm run build:frontend",

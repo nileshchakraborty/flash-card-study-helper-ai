@@ -45,6 +45,54 @@ export class SupabaseService {
         return this.isInitialized && this.client !== null;
     }
 
+    /**
+     * Upsert a user profile (id, email, name). Safe to call on every login/signup.
+     */
+    async upsertUser(user: { id: string; email?: string; name?: string }) {
+        if (!this.client) return { data: null, error: 'Supabase not initialized' };
+        const payload = {
+            id: user.id,
+            email: user.email || null,
+            name: user.name || null,
+            updated_at: new Date().toISOString()
+        };
+        return await (this.client as any)
+            .from('users')
+            .upsert(payload, { onConflict: 'id' });
+    }
+
+    /**
+     * Store flashcards persistently.
+     */
+    async storeFlashcards(cards: Array<{ id: string; front: string; back: string; topic?: string; sourceType?: string; sourceName?: string }>) {
+        if (!this.client || !cards?.length) return { data: null, error: 'Supabase not initialized' };
+        const payload = cards.map(c => ({
+            id: c.id,
+            topic: c.topic || 'General',
+            front: c.front,
+            back: c.back,
+            source_type: c.sourceType || null,
+            source_name: c.sourceName || null,
+            created_at: new Date().toISOString()
+        }));
+
+        return await (this.client as any)
+            .from('flashcards')
+            .upsert(payload, { onConflict: 'id' });
+    }
+
+    /**
+     * Retrieve flashcards by topic (best-effort).
+     */
+    async getFlashcardsByTopic(topic: string, limit = 50) {
+        if (!this.client) return { data: null, error: 'Supabase not initialized' };
+        return await (this.client as any)
+            .from('flashcards')
+            .select('*')
+            .ilike('topic', topic)
+            .limit(limit);
+    }
+
     // Flashcard operations
     async getFlashcards() {
         if (!this.client) return { data: null, error: 'Supabase not initialized' };

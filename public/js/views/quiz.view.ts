@@ -66,6 +66,7 @@ export class QuizView extends BaseView {
   init() {
     this.bindEvents();
     this.loadHistory();
+    this.showSetupState();
 
     eventBus.on('quiz:started', (question) => {
       this.showQuestionUI();
@@ -100,6 +101,13 @@ export class QuizView extends BaseView {
     eventBus.on('quiz:timer-tick', (remainingTime) => {
       this.updateTimerDisplay(remainingTime);
     });
+  }
+
+  showSetupState() {
+    // Default state when no quiz has started yet
+    this.hide(this.elements.questions);
+    this.hide(this.elements.results);
+    this.show(this.elements.setup);
   }
 
   updateTimerDisplay(remainingTime: number) {
@@ -457,6 +465,7 @@ export class QuizView extends BaseView {
     // Tab switching handles visibility.
     this.hide(this.elements.results);
     this.show(this.elements.questions);
+    this.hide(this.elements.setup);
 
     console.log('[QuizView] setup classes:', this.elements.setup?.className);
     console.log('[QuizView] questions classes:', this.elements.questions?.className);

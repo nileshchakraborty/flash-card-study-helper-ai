@@ -31,7 +31,7 @@ import type { WebLLMService } from '../../../core/services/WebLLMService.js';
 import type { QuizStorageService } from '../../../core/services/QuizStorageService.js';
 import type { FlashcardStorageService } from '../../../core/services/FlashcardStorageService.js';
 import type { RedisService } from '../../../core/services/RedisService.js';
-import type { SupabaseService } from '../../../core/services/SupabaseService.js';
+import { SupabaseService } from '../../../core/services/SupabaseService.js';
 import type { LocalDbService } from '../../../core/services/LocalDbService.js';
 import type { UpstashVectorService } from '../../../core/services/UpstashVectorService.js';
 import type { InMemoryVectorService } from '../../../core/services/InMemoryVectorService.js';
@@ -70,6 +70,8 @@ export class ExpressServer {
   // private _supabaseService: SupabaseService | null;
   // private _vectorService: UpstashVectorService | null;
   // private _blobService: BlobStorageService | null;
+  private redisService: RedisService | null = null;
+  private supabaseService: SupabaseService | null = null;
 
   constructor(
     private studyService: StudyUseCase,
@@ -99,6 +101,11 @@ export class ExpressServer {
     this.queueService = queueService;
     this.flashcardCache = flashcardCache;
     this.webllmService = webllmService;
+    this.redisService = _redisService;
+    // Initialize Supabase service if credentials present
+    const supa = (_supabaseService as SupabaseService | null) || new SupabaseService();
+    supa.initialize().catch(err => logger.warn('Supabase init failed', err));
+    this.supabaseService = supa;
     // this._redisService = redisService;
     // this._supabaseService = supabaseService;
     // this._vectorService = vectorService;
@@ -437,6 +444,16 @@ export class ExpressServer {
           };
 
           const token = await this.authService.encryptToken(mockUser);
+
+          // Persist dev user too (useful for local testing)
+          if (this.supabaseService && this.supabaseService.isAvailable()) {
+            try {
+              await this.supabaseService.upsertUser(mockUser);
+            } catch (err) {
+              logger.warn('Supabase upsert user failed (dev-login)', err);
+            }
+          }
+
           res.json({ success: true, token, user: mockUser });
         } catch (error: any) {
           res.status(500).json({ error: error.message });
@@ -453,6 +470,19 @@ export class ExpressServer {
           email: user.emails?.[0]?.value,
           name: user.displayName
         });
+
+        // Persist basic profile to Supabase (best-effort)
+        if (this.supabaseService && this.supabaseService.isAvailable()) {
+          try {
+            await this.supabaseService.upsertUser({
+              id: user.id,
+              email: user.emails?.[0]?.value,
+              name: user.displayName
+            });
+          } catch (err) {
+            logger.warn('Supabase upsert user failed', err);
+          }
+        }
         // Redirect to frontend with token
         res.redirect(`/?token=${token}`);
       }
@@ -577,6 +607,9 @@ export class ExpressServer {
         if (this.flashcardStorage && Array.isArray(cards)) {
           this.flashcardStorage.storeFlashcards(cards as any);
         }
+        if (this.supabaseService && this.supabaseService.isAvailable() && Array.isArray(cards)) {
+          this.supabaseService.storeFlashcards(cards as any).catch(err => logger.warn('Supabase store flashcards failed (upload)', err));
+        }
 
         return sendSuccess(res, { cards }, { requestId });
       } catch (error: unknown) {
@@ -682,6 +715,9 @@ export class ExpressServer {
 
         if (this.flashcardStorage && Array.isArray(cards)) {
           this.flashcardStorage.storeFlashcards(cards as any);
+        }
+        if (this.supabaseService && this.supabaseService.isAvailable() && Array.isArray(cards)) {
+          this.supabaseService.storeFlashcards(cards as any).catch(err => logger.warn('Supabase store flashcards failed (chunk upload)', err));
         }
 
         return sendSuccess(res, { cards }, { requestId });
@@ -1349,13 +1385,18 @@ export class ExpressServer {
         };
 
         // Service status
+        const redisHealthy = this.redisService ? await this.redisService.isHealthy() : false;
         const services = {
           studyService: !!this.studyService,
           queueService: !!this.queueService && this.queueAvailable,
           flashcardCache: !!this.flashcardCache,
           flashcardStorage: !!this.flashcardStorage,
           quizStorage: !!this.quizStorage,
-          webLLMService: !!this.webllmService
+          webLLMService: !!this.webllmService,
+          redis: {
+            configured: !!this.redisService,
+            healthy: redisHealthy
+          }
         };
 
         // Environment info
@@ -1464,6 +1505,31 @@ export class ExpressServer {
         }
       }
 
+      // Check Supabase persistent store
+      if (this.supabaseService && this.supabaseService.isAvailable()) {
+        try {
+          const { data } = await this.supabaseService.getFlashcardsByTopic(topic, desiredCount);
+          if (data && Array.isArray(data) && data.length > 0) {
+            const cards = data.slice(0, desiredCount).map((c: any) => ({
+              id: c.id,
+              front: c.front,
+              back: c.back,
+              topic: c.topic,
+              sourceType: c.source_type || c.sourceType,
+              sourceName: c.source_name || c.sourceName
+            }));
+            return res.json({
+              success: true,
+              cached: true,
+              cards,
+              recommendedTopics: []
+            });
+          }
+        } catch (err) {
+          logger.warn('Supabase fetch flashcards failed', err);
+        }
+      }
+
       let jobId: string | null = null;
 
       // If queue is available, try to offload to background job
@@ -1497,6 +1563,11 @@ export class ExpressServer {
         runtime || 'ollama',
         parentTopic
       );
+
+      // Persist to Supabase (best-effort)
+      if (this.supabaseService && this.supabaseService.isAvailable() && result.cards?.length) {
+        this.supabaseService.storeFlashcards(result.cards).catch(err => logger.warn('Supabase store flashcards failed', err));
+      }
 
       return res.json({
         success: true,
