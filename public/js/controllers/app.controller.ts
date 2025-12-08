@@ -462,9 +462,24 @@ export class AppController {
   }
 
   switchTab(tabId: string) {
-    const tabBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    // Prefer triggering the existing click handler to keep any per-tab logic
+    const tabBtn = document.querySelector<HTMLElement>(`.nav-tab[data-tab="${tabId}"]`);
     if (tabBtn) {
-      (tabBtn as HTMLElement).click();
+      tabBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return;
     }
+
+    // Fallback: toggle classes manually if button not found (defensive)
+    const tabButtons = document.querySelectorAll('.nav-tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach((btn) => {
+      const isTarget = (btn as HTMLElement).dataset.tab === tabId;
+      btn.classList.toggle('active', isTarget);
+      btn.classList.toggle('text-indigo-600', isTarget);
+    });
+    tabContents.forEach((content) => {
+      const isTarget = content.id === `${tabId}-tab`;
+      content.classList.toggle('hidden', !isTarget);
+    });
   }
 } // End AppController

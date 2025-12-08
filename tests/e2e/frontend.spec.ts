@@ -181,6 +181,40 @@ test.describe('MindFlip AI - Frontend E2E Tests', () => {
         await expect(h1).toBeVisible();
     });
 
+    test('should switch tabs when nav buttons are clicked', async ({ page }) => {
+        // Ensure loading overlay does not block clicks in CI
+        await page.evaluate(() => {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                (overlay as HTMLElement).style.display = 'none';
+                (overlay as HTMLElement).style.pointerEvents = 'none';
+            }
+        });
+
+        const studySection = page.locator('#study-tab');
+        const createSection = page.locator('#create-tab');
+        const quizSection = page.locator('#quiz-tab');
+
+        const studyBtn = page.locator('.nav-tab[data-tab="study"]');
+        const createBtn = page.locator('.nav-tab[data-tab="create"]');
+        const quizBtn = page.locator('.nav-tab[data-tab="quiz"]');
+
+        await expect(studySection).toBeVisible();
+
+        await createBtn.click();
+        await expect(createSection).toBeVisible();
+        await expect(studySection).toBeHidden();
+
+        await quizBtn.click();
+        await expect(quizSection).toBeVisible();
+        await expect(createSection).toBeHidden();
+
+        await studyBtn.click();
+        await expect(studySection).toBeVisible();
+        await expect(quizSection).toBeHidden();
+    });
+
     test('should cache API responses', async ({ page }) => {
         // Ensure auth token exists on every load using init script
         await page.addInitScript(() => {
