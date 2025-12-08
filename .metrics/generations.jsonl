@@ -102,3 +102,25 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Java Generics and Type Erasure","cardCount":5,"duration":13767,"success":true,"timestamp":1764909593446}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Java Performance Optimization Techniques","cardCount":5,"duration":30824,"success":true,"timestamp":1764909624276}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Concurrency Utilities in Java","cardCount":5,"duration":16173,"success":true,"timestamp":1764909640456}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Machine Learning","cardCount":0,"duration":1345,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765071449402}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Machine Learning","cardCount":0,"duration":7,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765071451444}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Machine Learning","cardCount":0,"duration":5,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765071455495}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Machine Learning","cardCount":2,"duration":11623,"success":true,"timestamp":1765071519517}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"TypeScript","cardCount":2,"duration":26279,"success":true,"timestamp":1765071632453}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Python","cardCount":3,"duration":12705,"success":true,"timestamp":1765071645163}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"kubernetes","cardCount":5,"duration":10845,"success":true,"timestamp":1765075547024}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"k8s","cardCount":5,"duration":17330,"success":true,"timestamp":1765083710073}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":11385,"success":true,"timestamp":1765085347527}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world history","cardCount":5,"duration":13239,"success":true,"timestamp":1765085891238}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":1401,"success":true,"timestamp":1765086063267}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":1778,"success":true,"timestamp":1765086129803}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":16583,"success":true,"timestamp":1765086320115}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":8749,"success":true,"timestamp":1765087414336}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":8451,"success":true,"timestamp":1765087888507}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":5,"duration":16519,"success":true,"timestamp":1765088712115}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"General","cardCount":10,"duration":48298,"success":true,"timestamp":1765154167488}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Cognitive Load Management","cardCount":5,"duration":13626,"success":true,"timestamp":1765154181160}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Personalized Learning Design","cardCount":5,"duration":15454,"success":true,"timestamp":1765154196656}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Emotional Intelligence in Education","cardCount":5,"duration":12323,"success":true,"timestamp":1765154209019}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"kubernetes","cardCount":5,"duration":48038,"success":true,"timestamp":1765156926795}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Himalayas geography","cardCount":5,"duration":14141,"success":true,"timestamp":1765157446303}

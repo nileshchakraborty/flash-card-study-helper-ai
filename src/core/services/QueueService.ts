@@ -28,6 +28,15 @@ export class QueueService {
             lazyConnect: true
         });
 
+        this.connection.on('error', (err) => {
+            // Silence ECONNREFUSED for clearer logs if we expect fallback, or log as warn
+            if ((err as any).code === 'ECONNREFUSED') {
+                logger.warn('Redis connection failed (ECONNREFUSED). Ensure Redis is running or expect in-memory fallback if configured.');
+            } else {
+                logger.error('Redis connection error:', err);
+            }
+        });
+
         this.generateQueue = new Queue('flashcard-generation', { connection: this.connection });
         this.deadLetterQueue = new Queue('flashcard-generation-dlq', { connection: this.connection });
 
