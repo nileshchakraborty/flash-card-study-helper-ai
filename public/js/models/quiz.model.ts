@@ -149,7 +149,9 @@ export class QuizModel {
       total: this.questions.length,
       topic: quizTopic,
       results,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      questions: [...this.questions],
+      timeLimit: this.timeLimit
     };
 
     try {
@@ -161,12 +163,14 @@ export class QuizModel {
         quizResult.id = response.id || response.quizId; // Add ID from server
       }
       this.history.unshift(quizResult); // Add to local history
+      this.history = this.history.slice(0, 10); // Keep last 10
       eventBus.emit('quiz:completed', quizResult);
       eventBus.emit('quiz:history-updated', this.history);
     } catch (error) {
       console.error('Failed to save quiz result:', error);
       // Still emit events even if save fails
       this.history.unshift(quizResult);
+      this.history = this.history.slice(0, 10);
       eventBus.emit('quiz:completed', quizResult);
       eventBus.emit('quiz:history-updated', this.history);
     }
@@ -178,7 +182,7 @@ export class QuizModel {
     try {
       const data = await apiService.get('/quiz/history');
       if (data.history) {
-        this.history = data.history;
+        this.history = (data.history || []).slice(0, 10);
         eventBus.emit('quiz:history-updated', this.history);
       }
     } catch (error) {

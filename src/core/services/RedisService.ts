@@ -17,8 +17,8 @@ export class RedisService {
             this.client = createClient({
                 url,
                 socket: {
-                    connectTimeout: 2000,
-                    reconnectStrategy: false
+                    connectTimeout: 5000,
+                    reconnectStrategy: (retries) => Math.min(2000, retries * 200) // backoff up to 2s
                 }
             });
 
@@ -30,6 +30,10 @@ export class RedisService {
             this.client.on('connect', () => {
                 logger.info('✅ Redis connected successfully');
                 this.isConnected = true;
+            });
+
+            this.client.on('reconnecting', () => {
+                logger.warn('Redis reconnecting...');
             });
 
             await this.client.connect();

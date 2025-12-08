@@ -7,6 +7,7 @@ import { apiService } from './services/api.service.js';
 import { graphqlService } from './services/graphql.service.js';
 import { settingsService } from './services/settings.service.js';
 import { eventBus } from './utils/event-bus.js';
+import { initErrorBar } from './utils/error-bar.util.js';
 import SkeletonLoader from './components/SkeletonLoader.js';
 
 // Basic client-side error logging
@@ -25,6 +26,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     (overlay as HTMLElement).style.pointerEvents = 'none';
     (overlay as HTMLElement).style.display = 'none';
   }
+
+  // Initialize global error bar
+  initErrorBar();
 
   // Initialize Speed Insights
   injectSpeedInsights();

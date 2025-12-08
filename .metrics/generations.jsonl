@@ -124,3 +124,6 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Emotional Intelligence in Education","cardCount":5,"duration":12323,"success":true,"timestamp":1765154209019}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"kubernetes","cardCount":5,"duration":48038,"success":true,"timestamp":1765156926795}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Himalayas geography","cardCount":5,"duration":14141,"success":true,"timestamp":1765157446303}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world history","cardCount":5,"duration":12268,"success":true,"timestamp":1765171006877}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world history","cardCount":5,"duration":117,"success":true,"timestamp":1765174862103}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":13841,"success":true,"timestamp":1765175362001}

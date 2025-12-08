@@ -2,6 +2,7 @@ import { BaseView } from './base.view.js';
 import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import { isAuthError, redirectToLoginWithAlert, alertError } from '../utils/error.util.js';
+import { showLoading, hideLoading, setLoadingText } from '../utils/loading.util.js';
 import type { Flashcard } from '../models/deck.model.js';
 import { settingsService } from '../services/settings.service.js';
 import SkeletonLoader from '../components/SkeletonLoader.js';
@@ -821,8 +822,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
   }
 
   showLoading() {
-    this.show(this.elements.loadingOverlay);
-    this.updateLoadingProgress(0, 'Starting...');
+    showLoading('Starting...', 0);
 
     // Inject skeleton cards into the loading modal for visual feedback
     const skeletonContainer = document.getElementById('skeleton-container');
@@ -834,7 +834,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
   }
 
   hideLoading() {
-    this.hide(this.elements.loadingOverlay);
+    hideLoading();
 
     // Clear skeleton from modal
     const skeletonContainer = document.getElementById('skeleton-container');
@@ -844,22 +844,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
   }
 
   updateLoadingProgress(progress?: number, message?: string) {
-    const overlay = document.getElementById('loading-overlay');
-    const progressEl = document.getElementById('loading-progress');
-    const progressBar = document.getElementById('loading-progress-bar') as HTMLElement | null;
-    if (!overlay) return;
-
-    const parts = [];
-    if (typeof progress === 'number') {
-      const pct = Math.max(0, Math.min(100, Math.round(progress)));
-      parts.push(`Progress: ${pct}%`);
-      if (progressBar) progressBar.style.width = `${pct}%`;
-    }
-    if (message) parts.push(message);
-
-    if (progressEl) {
-      progressEl.textContent = parts.join(' • ') || 'Working...';
-    }
+    setLoadingText(message, progress);
   }
 
   async pollForRecommendations(topic: string) {

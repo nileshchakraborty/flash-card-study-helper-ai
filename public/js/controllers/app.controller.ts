@@ -7,6 +7,9 @@ import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import { settingsService } from '../services/settings.service.js';
 import { storageService } from '../services/storage.service.js';
+import { hideLoading } from '../utils/loading.util.js';
+import { showErrorBar } from '../utils/error-bar.util.js';
+import { hideLoading } from '../utils/loading.util.js';
 
 type DeckHistoryEntry = {
   id: string;
@@ -109,12 +112,11 @@ export class AppController {
         });
         btn.classList.add('active');
 
-        // Update content
+        // Update content (force show/hide + display)
         tabContents.forEach((content) => {
-          content.classList.add('hidden');
-          if (content.id === `${targetTab}-tab`) {
-            content.classList.remove('hidden');
-          }
+          const isTarget = content.id === `${targetTab}-tab`;
+          content.classList.toggle('hidden', !isTarget);
+          (content as HTMLElement).style.display = isTarget ? 'block' : 'none';
         });
 
         // Specific view resets if needed
@@ -176,8 +178,8 @@ export class AppController {
 
           if (flashcardResponse.jobId) {
             const jobResult: any = await apiService.waitForJobResult(flashcardResponse.jobId, {
-              maxWaitMs: 150000,
-              pollIntervalMs: 2000,
+              maxWaitMs: 90000,
+              pollIntervalMs: 1500,
               onProgress: (p: number) => this.quizView.updateLoadingProgress(p, 'Generating quiz questions...')
             });
             const generatedCards = jobResult?.cards;
@@ -230,7 +232,10 @@ export class AppController {
         this.switchTab('quiz');
       } catch (error: any) {
         console.error("Quiz generation failed", error);
-        alert(`Failed to start quiz: ${error.message || 'Unknown error'}`);
+        const message = (error?.message || '').toLowerCase().includes('timed out')
+          ? 'Quiz generation took too long and was stopped. Try fewer questions or a shorter timer.'
+          : `Failed to start quiz: ${error?.message || 'Unknown error'}`;
+        showErrorBar(message);
       } finally {
         this.quizView.hideLoading();
       }
@@ -332,8 +337,8 @@ export class AppController {
         let cards = data.cards;
         if ((!cards || cards.length === 0) && data.jobId) {
           const jobResult: any = await apiService.waitForJobResult(data.jobId, {
-            maxWaitMs: 180000,
-            pollIntervalMs: 2000,
+            maxWaitMs: 90000,
+            pollIntervalMs: 1500,
             onProgress: (p: number) => this.generatorView.updateLoadingProgress(p, 'Generating harder flashcards...')
           });
           cards = jobResult?.cards || [];
@@ -355,7 +360,10 @@ export class AppController {
         }
       } catch (error) {
         console.error('Generation error:', error);
-        alert('Failed to generate harder cards.');
+        const message = (error?.message || '').toLowerCase().includes('timed out')
+          ? 'Harder flashcards timed out. Try again with fewer cards.'
+          : 'Failed to generate harder cards.';
+        showErrorBar(message);
       } finally {
         this.generatorView.hideLoading();
       }
@@ -376,17 +384,18 @@ export class AppController {
         if (!previousResults) { alert('No quiz history found.'); return; }
 
         const response = await apiService.post('/quiz/generate-advanced', { previousResults, mode: data.mode || 'harder' });
-        if (response?.quiz) {
-          quizModel.startQuiz(response.quiz.questions, 'harder', response.quiz.topic);
+        const qset = response?.quiz?.questions;
+        if (response?.quiz && Array.isArray(qset) && qset.length > 0) {
+          quizModel.startQuiz(qset, 'harder', response.quiz.topic);
           this.quizView.showQuestionUI();
-          this.quizView.renderQuestion(response.quiz.questions[0]);
+          this.quizView.renderQuestion(qset[0]);
           this.switchTab('quiz');
         } else {
-          alert('Failed to generate harder quiz.');
+          showErrorBar('Failed to generate harder quiz: no questions returned.');
         }
       } catch (error) {
         console.error('Quiz harder error:', error);
-        alert('Failed to generate harder quiz.');
+        showErrorBar('Failed to generate harder quiz. Please try again.');
       }
     });
 
@@ -465,6 +474,26 @@ export class AppController {
     const tabBtn = document.querySelector(`[data-tab="${tabId}"]`);
     if (tabBtn) {
       (tabBtn as HTMLElement).click();
+      hideLoading(); // clear any lingering overlay when changing tabs
+      // Fallback: force-show correct tab content in case click handler doesn't fire
+      const tabContents = document.querySelectorAll('.tab-content');
+      tabContents.forEach((content) => {
+        const isTarget = (content as HTMLElement).id === `${tabId}-tab`;
+        content.classList.toggle('hidden', !isTarget);
+        (content as HTMLElement).style.display = isTarget ? 'block' : 'none';
+      });
+      const tabButtons = document.querySelectorAll('.nav-tab');
+      tabButtons.forEach((btn) => {
+        const isTarget = (btn as HTMLElement).dataset.tab === tabId;
+        btn.classList.toggle('active', isTarget);
+        btn.classList.toggle('text-indigo-600', isTarget);
+      });
+      const targetTab = document.getElementById(`${tabId}-tab`);
+      if (!targetTab) {
+        console.warn('[Tab Switch] target tab section not found:', `${tabId}-tab`);
+      } else {
+        console.log('[Tab Switch] showing tab:', `${tabId}-tab`);
+      }
     }
   }
 } // End AppController

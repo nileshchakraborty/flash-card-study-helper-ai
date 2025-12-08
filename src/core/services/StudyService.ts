@@ -601,6 +601,25 @@ export class StudyService implements StudyUseCase {
     flashcards?: Flashcard[],
     preferredRuntime: 'ollama' | 'webllm' = 'ollama'
   ): Promise<QuizQuestion[]> {
+    const ensureCount = (qs: QuizQuestion[] | null, fallback: () => QuizQuestion[]): QuizQuestion[] => {
+      let result = qs && qs.length ? [...qs] : [];
+      if (!result.length) {
+        result = fallback();
+      }
+      if (count && result.length > count) {
+        result = result.slice(0, count);
+      }
+      if (count && result.length < count) {
+        const needed = count - result.length;
+        const extra = fallback().slice(0, needed);
+        result = [...result, ...extra];
+        if (result.length > count) {
+          result = result.slice(0, count);
+        }
+      }
+      return result;
+    };
+
     const order = preferredRuntime === 'webllm'
       ? ['webllm', 'ollama']
       : ['ollama', 'webllm'];
@@ -635,44 +654,44 @@ export class StudyService implements StudyUseCase {
 
       // Try primary
       const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (primaryResult && primaryResult.length > 0) {
-        console.log(`[StudyService] Primary quiz generation succeeded: ${primaryResult.length} questions`);
-        return primaryResult;
-      }
-      if (primaryResult === null || primaryResult.length === 0) {
+      if (primaryResult === null || primaryResult?.length === 0) {
         console.warn('[StudyService] Primary quiz generation returned empty/null result');
       }
 
       // Quality failed or generation failed; try secondary for validation
-      const secondaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
+      const secondaryResult = !primaryResult
+        ? await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate))
+        : null;
       if (secondaryResult && secondaryResult.length > 0) {
         console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
-        return secondaryResult;
       }
 
-      console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
-      return this.generateQuizFallbackFromFlashcards(flashcards, count);
+      const filled = ensureCount(primaryResult || secondaryResult, () =>
+        this.generateQuizFallbackFromFlashcards(flashcards, count)
+      );
+      return filled;
     }
 
     // 2) Topic-based quiz
     console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
     const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (primaryResult && primaryResult.length > 0) {
-      console.log(`[StudyService] Primary topic quiz generation succeeded: ${primaryResult.length} questions`);
-      return primaryResult;
-    }
-    if (primaryResult === null || primaryResult.length === 0) {
+    if (primaryResult === null || primaryResult?.length === 0) {
       console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
+    } else {
+      console.log(`[StudyService] Primary topic quiz generation succeeded: ${primaryResult.length} questions`);
     }
 
-    const secondaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
+    const secondaryResult = !primaryResult
+      ? await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate))
+      : null;
     if (secondaryResult && secondaryResult.length > 0) {
       console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
-      return secondaryResult;
     }
 
-    console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
-    return this.generateQuizFallbackFromTopic(topic, count);
+    const filled = ensureCount(primaryResult || secondaryResult, () =>
+      this.generateQuizFallbackFromTopic(topic, count)
+    );
+    return filled;
   }
 
   async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {

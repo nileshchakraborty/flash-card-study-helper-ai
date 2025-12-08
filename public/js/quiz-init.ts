@@ -107,6 +107,7 @@ export function initializeQuizHandlers(quizView: any) {
             return;
         }
 
+        quizView.showLoading();
         try {
             const response = await apiService.createQuiz({
                 topic,
@@ -125,6 +126,8 @@ export function initializeQuizHandlers(quizView: any) {
         } catch (error) {
             console.error('Failed to create quiz:', error);
             alert('Failed to create quiz. Please try again.');
+        } finally {
+            quizView.hideLoading();
         }
     });
 
