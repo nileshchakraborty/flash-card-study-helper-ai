@@ -14,11 +14,17 @@ export class RedisService {
      */
     async connect(url: string): Promise<void> {
         try {
+            const isTest = process.env.NODE_ENV === 'test';
+            const testConnectTimeout = 300; // ms
+
             this.client = createClient({
                 url,
                 socket: {
-                    connectTimeout: 5000,
-                    reconnectStrategy: (retries) => Math.min(2000, retries * 200) // backoff up to 2s
+                    connectTimeout: isTest ? testConnectTimeout : 5000,
+                    reconnectStrategy: (retries) => {
+                        if (isTest) return new Error('skip reconnect in tests');
+                        return Math.min(2000, retries * 200); // backoff up to 2s
+                    }
                 }
             });
 
