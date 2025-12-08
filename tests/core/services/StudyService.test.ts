@@ -153,13 +153,16 @@ describe('StudyService', () => {
       ).rejects.toThrow('Unable to extract meaningful text');
     });
 
-    it('should handle file processing errors gracefully', async () => {
-      mockAiAdapter.generateFlashcardsFromText.mockRejectedValueOnce(new Error('AI service failed'));
-      const buffer = Buffer.from('Valid content with more than 10 characters');
+  it('should handle file processing errors gracefully', async () => {
+    mockAiAdapter.generateFlashcardsFromText.mockRejectedValueOnce(new Error('AI service failed'));
+    const buffer = Buffer.from('Valid content with more than 10 characters');
 
-      await expect(
-        studyService.processFile(buffer, 'test.txt', 'text/plain', 'Test')
-      ).rejects.toThrow('AI service failed'); // The original error is preserved in this case
-    });
+    const result = await studyService.processFile(buffer, 'test.txt', 'text/plain', 'Test');
+
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0); // falls back to heuristic generation
+    expect(result[0].sourceType).toBe('upload');
   });
+});
 });

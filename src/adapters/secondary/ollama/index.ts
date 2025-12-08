@@ -140,31 +140,20 @@ Now create ${count} flashcards:`;
       if (cached !== undefined) return cached;
     }
 
-    const systemPrompt = `You are a helpful study assistant creating educational flashcards. You explain concepts, you do NOT copy code.`;
-    const prompt = `Text: ${text.substring(0, 10000)}
+    const systemPrompt = `You are a careful study assistant. You must ONLY use the provided source text to create flashcards. Do not add outside knowledge.`;
+    const prompt = `SOURCE TEXT (truncated to 10k chars):
+${text.substring(0, 10000)}
 
-⚠️ TASK: Create ${count} educational flashcards about: ${topic}
+TASK: Create ${count} educational flashcards grounded strictly in the source text above.
 
-⚠️ CRITICAL RULES:
-1. Ask questions ABOUT the concepts in the text
-2. Provide explanatory answers in plain English  
-3. NEVER copy code snippets as questions or answers
-4. Questions must end with "?"
-5. Answers must be 1-3 sentences explaining the concept
+RULES:
+1) Every question must reflect a fact/concept present in the source text (no external facts).
+2) Answers must be 1-3 sentences, concise, and derived from the source text.
+3) Questions end with "?".
+4) If a detail is unclear or absent in the text, skip it.
+5) Output JSON only: [{"question": "...", "answer": "..."}]
 
-✅ CORRECT EXAMPLE:
-Q: "What is the purpose of the 'with' statement when working with files?"
-A: "The 'with' statement ensures files are properly closed after use, even if errors occur. This prevents resource leaks."
-
-❌ WRONG (DO NOT DO THIS):
-Q: "with open(txt_file_path, 'r') as f:"
-A: "for line in f: if ':' in line: question_list.append(line.rstrip())"
-
-JSON FORMAT:
-- Return ONLY: [{"question": "...", "answer": "..."}]
-- No code blocks, no markdown, pure JSON array
-
-Create ${count} flashcards now:`;
+Begin now.`;
 
     const response = await this.callOllama(prompt, systemPrompt);
     const result = this.extractJSON(response).map((card: any, index: number) => ({

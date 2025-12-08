@@ -90,7 +90,7 @@ export class GeneratorView extends BaseView {
         const input = e.target as HTMLInputElement;
         const files = Array.from(input.files || []);
         if (files.length) {
-          this.selectedFiles.push(...files);
+          this.addFilesWithValidation(files);
           this.refreshFileList();
         }
       });
@@ -107,11 +107,28 @@ export class GeneratorView extends BaseView {
       this.bind(this.elements.uploadArea, 'drop', (ev: any) => {
         const files = Array.from((ev.dataTransfer?.files as FileList) || []);
         if (files.length) {
-          this.selectedFiles.push(...files);
+          this.addFilesWithValidation(files);
           this.refreshFileList();
         }
       });
     }
+
+    // Allow pasting images directly (clipboard)
+    this.bind(document, 'paste', (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length) {
+        this.addFilesWithValidation(files);
+        this.refreshFileList();
+      }
+    });
 
     // Sub-tab switching
     if (this.elements.subTabs) {
@@ -457,14 +474,17 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         this.updateLoadingProgress(progress, `Processing ${file.name}...`);
 
         try {
-          const response: any = await apiService.uploadFile(file, topic);
-          if (response.cards && Array.isArray(response.cards)) {
-            allCards.push(...response.cards);
+        const response: any = await apiService.uploadFile(file, topic);
+          const cards = (response && response.cards) || (response && response.data && response.data.cards);
+          if (cards && Array.isArray(cards)) {
+            allCards.push(...cards);
           }
         } catch (err) {
           console.error(`Failed to upload ${file.name}:`, err);
-          // Continue with other files? 
-          // Maybe alert user but continue?
+          const message = (err as any)?.message || 'Unknown error';
+          alert(`Upload failed for ${file.name}:\n${message}`);
+          // stop further uploads to avoid repeated errors
+          throw err;
         }
       }
 
@@ -522,6 +542,36 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         this.selectedFiles.splice(idx, 1);
         this.refreshFileList();
       });
+    });
+  }
+
+  private addFilesWithValidation(files: File[]) {
+    const MAX_SIZE = 30 * 1024 * 1024; // 30MB (server hard limit)
+    const allowedTypes = new Set([
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp'
+    ]);
+
+    files.forEach(file => {
+      if (file.size > MAX_SIZE) {
+        const sizeMb = (file.size / 1024 / 1024).toFixed(2);
+        alert(`"${file.name}" is ${sizeMb}MB. Maximum size is 30MB. Please choose a smaller file.`);
+        return;
+      }
+      if (!allowedTypes.has(file.type) && !file.type.startsWith('image/')) {
+        alert(`"${file.name}" is not a supported type. Allowed: PDF, Word, Excel, TXT, and common images.`);
+        return;
+      }
+      this.selectedFiles.push(file);
     });
   }
 

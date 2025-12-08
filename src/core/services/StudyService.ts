@@ -92,7 +92,23 @@ export class StudyService implements StudyUseCase {
       }
 
       console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
-      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+
+      const sourceMeta: any = { sourceType: 'upload', sourceName: filename };
+
+      // Primary generation
+      try {
+        const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+        if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+      } catch (genErr) {
+        console.warn('[StudyService] Primary generation from text failed, attempting fallback.', genErr);
+      }
+
+      // Fallback: quick heuristic flashcards from the text itself
+      const fallback = this.generateFallbackFlashcardsFromText(text, topic, 6, sourceMeta);
+      if (fallback.length === 0) {
+        throw new Error('No flashcards generated from the uploaded file. Please try a different file or format.');
+      }
+      return fallback;
     } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
@@ -474,9 +490,39 @@ export class StudyService implements StudyUseCase {
 
   async processRawText(text: string, topic: string): Promise<Flashcard[]> {
     if (!text || text.trim().length === 0) return [];
-    // Limit text length if needed? 
-    // For now, let adapter handle it or chunk it. Adapter usually handles 10-15k chars.
-    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
+    const sourceMeta: any = { sourceType: 'text' };
+    try {
+      const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
+      if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+    } catch (err) {
+      console.warn('[StudyService] Primary raw-text generation failed, using fallback.', err);
+    }
+    return this.generateFallbackFlashcardsFromText(text, topic, 6, sourceMeta);
+  }
+
+  /**
+   * Very simple fallback to ensure some flashcards are returned even when the LLM fails.
+   */
+  private generateFallbackFlashcardsFromText(text: string, topic: string, count: number, meta: any = {}): Flashcard[] {
+    const sentences = text
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .filter(s => s.trim().length > 0)
+      .slice(0, Math.max(count * 2, 10)); // take more to ensure variety
+
+    const cards: Flashcard[] = [];
+    for (let i = 0; i < count; i++) {
+      const idx = i % sentences.length;
+      const sentence = sentences[idx] || `Provide one key fact about ${topic}.`;
+      cards.push({
+        id: `fallback-${Date.now()}-${i}`,
+        front: `What is a key idea related to "${topic}"?`,
+        back: sentence.length > 220 ? sentence.slice(0, 217) + '...' : sentence,
+        topic,
+        ...meta
+      } as any);
+    }
+    return cards;
   }
 
   async processUrls(urls: string[], topic: string): Promise<Flashcard[]> {
@@ -485,7 +531,17 @@ export class StudyService implements StudyUseCase {
     const content = await this.scrapeMultipleSources(urls);
     if (!content) throw new Error('Failed to scrape content from provided URLs');
 
-    return this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
+    const sourceMeta: any = { sourceType: 'urls', sourceUrls: urls };
+    try {
+      const cards = await this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
+      if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+    } catch (err) {
+      console.warn('[StudyService] URL-based generation failed, using fallback.', err);
+    }
+
+    const fallback = this.generateFallbackFlashcardsFromText(content, topic, 6, sourceMeta);
+    if (fallback.length === 0) throw new Error('No flashcards generated from provided URLs.');
+    return fallback;
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
@@ -584,7 +640,16 @@ export class StudyService implements StudyUseCase {
     let context = '';
 
     // For "Harder" mode, get web context (cache-first)
-    if (mode === 'harder' && previousResults.topic) {
+    const userProvidedScope = !!(
+      previousResults?.sourceType === 'upload' ||
+      previousResults?.sourceType === 'text' ||
+      previousResults?.inputSource === 'upload' ||
+      previousResults?.uploadedFileName ||
+      (previousResults as any)?.sourceUrls?.length ||
+      previousResults?.providedContext
+    );
+
+    if (mode === 'harder' && previousResults.topic && !userProvidedScope) {
       try {
         console.log(`[StudyService] Getting web context for advanced quiz on: ${previousResults.topic}`);
         context = await this.getCachedOrFreshWebContext(previousResults.topic);

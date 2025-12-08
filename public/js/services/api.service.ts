@@ -168,33 +168,79 @@ export class ApiService {
    * Upload configuration file or document
    */
   async uploadFile(file: File, topic: string) {
+    const MAX_DIRECT = 5 * 1024 * 1024; // 5MB
+    if (file.size <= MAX_DIRECT) {
+      return this.uploadSingle(file, topic);
+    }
+    return this.uploadChunked(file, topic);
+  }
+
+  private async uploadSingle(file: File, topic: string) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('topic', topic);
 
-    // Auth token
-    const token = localStorage.getItem('authToken');
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     const response = await fetch(`${this.baseUrl}/upload`, {
       method: 'POST',
-      headers,
+      headers: this.authHeaders(),
       body: formData
     });
+    return this.handleJsonResponse(response);
+  }
 
+  private async uploadChunked(file: File, topic: string) {
+    const chunkSize = 5 * 1024 * 1024; // 5MB chunks for smoother uploads
+    const total = Math.ceil(file.size / chunkSize);
+    const uploadId = `upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    for (let index = 0; index < total; index++) {
+      const start = index * chunkSize;
+      const end = Math.min(file.size, start + chunkSize);
+      const blob = file.slice(start, end);
+
+      const formData = new FormData();
+      formData.append('chunk', blob, file.name);
+      formData.append('uploadId', uploadId);
+      formData.append('index', index.toString());
+      formData.append('total', total.toString());
+      formData.append('filename', file.name);
+      formData.append('mimeType', file.type || 'application/octet-stream');
+      formData.append('topic', topic);
+
+      const response = await fetch(`${this.baseUrl}/upload/chunk`, {
+        method: 'POST',
+        headers: this.authHeaders(),
+        body: formData
+      });
+
+      const payload = await this.handleJsonResponse(response);
+      if (payload.status === 'partial') {
+        continue;
+      }
+      // Final response carries cards
+      return payload;
+    }
+    throw new Error('Chunked upload did not return a final response.');
+  }
+
+  private authHeaders(): Record<string, string> {
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+
+  private async handleJsonResponse(response: Response) {
     if (!response.ok) {
-      let errorMsg = 'Upload failed';
+      let errorMsg = `Upload failed (HTTP ${response.status})`;
       try {
         const err = await response.json();
-        errorMsg = err.error || errorMsg;
-      } catch (e) { }
+        errorMsg = err.error || err.message || errorMsg;
+      } catch { /* ignore */ }
       throw new Error(errorMsg);
     }
-
-    return await response.json();
+    const payload = await response.json();
+    return payload?.data ?? payload;
   }
 
   /**

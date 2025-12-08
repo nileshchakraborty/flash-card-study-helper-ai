@@ -118,3 +118,7 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":8749,"success":true,"timestamp":1765087414336}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Physics","cardCount":2,"duration":8451,"success":true,"timestamp":1765087888507}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":5,"duration":16519,"success":true,"timestamp":1765088712115}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"General","cardCount":10,"duration":48298,"success":true,"timestamp":1765154167488}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Cognitive Load Management","cardCount":5,"duration":13626,"success":true,"timestamp":1765154181160}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Personalized Learning Design","cardCount":5,"duration":15454,"success":true,"timestamp":1765154196656}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Emotional Intelligence in Education","cardCount":5,"duration":12323,"success":true,"timestamp":1765154209019}

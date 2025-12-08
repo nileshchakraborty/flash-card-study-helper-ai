@@ -44,6 +44,15 @@ export class ExpressServer {
   private wss: WebSocketServer | null = null;
   private queueAvailable = true;
   private upload: multer.Multer;
+  private uploadChunkStore: Map<string, {
+    chunks: Buffer[];
+    expected: number;
+    received: number;
+    mimeType: string;
+    filename: string;
+    topic: string;
+    totalSize: number;
+  }>;
   private authService: AuthService;
   private quizStorage: QuizStorageService;
   private flashcardStorage: FlashcardStorageService;
@@ -68,10 +77,11 @@ export class ExpressServer {
   ) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
+    this.uploadChunkStore = new Map();
     this.upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
+        fileSize: 30 * 1024 * 1024 // 30MB total limit (single part)
       }
     });
     this.authService = AuthService.getInstance();
@@ -503,7 +513,9 @@ export class ExpressServer {
 
       try {
         const file = req.file;
-        const topic = req.body.topic || 'General';
+        const topic = (req.body.topic && req.body.topic.trim().length > 0)
+          ? req.body.topic.trim()
+          : path.parse(file?.originalname || 'Uploaded Content').name || 'Uploaded Content';
 
         // Input validation
         if (!file) {
@@ -547,6 +559,11 @@ export class ExpressServer {
           topic.trim()
         );
 
+        // Ensure we actually generated flashcards
+        if (!cards || !Array.isArray(cards) || cards.length === 0) {
+          throw new Error('No flashcards generated from the uploaded file. Please try a different file or format.');
+        }
+
         // Persist uploaded cards for later quiz generation
         if (this.flashcardStorage && Array.isArray(cards)) {
           this.flashcardStorage.storeFlashcards(cards as any);
@@ -559,6 +576,7 @@ export class ExpressServer {
         // Determine error type and code
         const isUnsupportedType = message.includes('Unsupported file type');
         const isExtractionError = message.includes('Unable to extract');
+        const isEmptyResult = message.includes('No flashcards generated');
 
         if (isUnsupportedType) {
           return sendError(res, 400, message, {
@@ -574,11 +592,121 @@ export class ExpressServer {
           });
         }
 
+        if (isEmptyResult) {
+          return sendError(res, 422, message, {
+            requestId,
+            code: ErrorCodes.PROCESSING_ERROR
+          });
+        }
+
         return sendError(res, 500, message, {
           requestId,
           code: ErrorCodes.INTERNAL_ERROR
         });
       }
+    });
+
+    // Chunked upload endpoint for large files
+    this.app.post('/api/upload/chunk', apiRateLimiter, authMiddleware, this.upload.single('chunk'), async (req, res) => {
+      const requestId = (req as any).requestId;
+      try {
+        const uploadId = req.body.uploadId;
+        const index = parseInt(req.body.index, 10);
+        const total = parseInt(req.body.total, 10);
+        const filename = req.body.filename;
+        const mimeType = req.body.mimeType;
+        const topic = (req.body.topic || 'General').trim();
+        const chunk = req.file?.buffer;
+
+        if (!uploadId || Number.isNaN(index) || Number.isNaN(total) || !filename || !mimeType || !chunk) {
+          return sendError(res, 400, 'Invalid chunk upload payload.', { requestId, code: ErrorCodes.VALIDATION_ERROR });
+        }
+
+        if (total > 100 || total < 1) {
+          return sendError(res, 400, 'Invalid total chunk count.', { requestId, code: ErrorCodes.VALIDATION_ERROR });
+        }
+
+        const entry = this.uploadChunkStore.get(uploadId) || {
+          chunks: new Array(total).fill(null),
+          expected: total,
+          received: 0,
+          mimeType,
+          filename,
+          topic,
+          totalSize: 0
+        };
+
+        entry.chunks[index] = chunk;
+        entry.received += 1;
+        entry.totalSize += chunk.length;
+        this.uploadChunkStore.set(uploadId, entry);
+
+        // Enforce 30MB aggregate cap
+        if (entry.totalSize > 30 * 1024 * 1024) {
+          this.uploadChunkStore.delete(uploadId);
+          return sendError(res, 400, 'File too large. Maximum size is 30MB.', { requestId, code: ErrorCodes.FILE_TOO_LARGE });
+        }
+
+        // If not all chunks are in, acknowledge partial
+        if (entry.received < entry.expected) {
+          return sendSuccess(res, { status: 'partial', received: entry.received, expected: entry.expected }, { requestId });
+        }
+
+        // All chunks received: merge and process
+        const merged = Buffer.concat(entry.chunks.filter(Boolean) as Buffer[]);
+        this.uploadChunkStore.delete(uploadId);
+
+        const cards = await this.studyService.processFile(
+          merged,
+          filename,
+          mimeType,
+          topic
+        );
+
+        if (this.flashcardStorage && Array.isArray(cards)) {
+          this.flashcardStorage.storeFlashcards(cards as any);
+        }
+
+        return sendSuccess(res, { cards }, { requestId });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return sendError(res, 500, message, { requestId, code: ErrorCodes.INTERNAL_ERROR });
+      }
+    });
+
+    // Multer error handling middleware (must be right after the upload route)
+    this.app.use('/api/upload', (error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const requestId = (req as any).requestId;
+
+      // Handle Multer-specific errors
+      if (error.name === 'MulterError') {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return sendError(res, 400, 'File too large. Maximum size is 10MB.', {
+            requestId,
+            code: ErrorCodes.FILE_TOO_LARGE
+          });
+        }
+        if (error.code === 'LIMIT_FILE_COUNT') {
+          return sendError(res, 400, 'Too many files. Only one file allowed.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+        if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+          return sendError(res, 400, 'Unexpected field name. Use "file" as the field name.', {
+            requestId,
+            code: ErrorCodes.VALIDATION_ERROR
+          });
+        }
+
+        return sendError(res, 400, `File upload error: ${error.message}`, {
+          requestId,
+          code: ErrorCodes.VALIDATION_ERROR
+        });
+      }
+
+      // Pass non-Multer errors to the global error handler
+      next(error);
     });
 
     // Endpoint for generating from raw content (Text or URLs)
@@ -1258,12 +1386,20 @@ export class ExpressServer {
     });
 
     // Global error handler (must be last)
-    this.app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      console.error('🔥 Unhandled Server Error:', err);
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: err.message || 'Unknown error',
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    this.app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      const requestId = (req as any).requestId;
+      logger.error('🔥 Unhandled Server Error', {
+        requestId,
+        path: req.path,
+        method: req.method,
+        error: err?.message,
+        stack: err?.stack
+      });
+
+      // Avoid leaking stack traces to clients
+      sendError(res, 500, 'Internal server error. Please try again later.', {
+        requestId,
+        code: ErrorCodes.INTERNAL_ERROR
       });
     });
   }
