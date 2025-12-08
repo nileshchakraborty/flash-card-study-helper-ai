@@ -25,9 +25,10 @@ export function normalizeMimeType(mimeType: string, filename: string): string {
   const lowerMime = (mimeType || '').toLowerCase();
   if (lowerMime && lowerMime !== 'application/octet-stream') return lowerMime;
 
-  const lowerName = filename.toLowerCase();
+  const lowerName = (filename || '').toLowerCase();
   const ext = Object.keys(extensionMimeMap).find(e => lowerName.endsWith(e));
-  return ext ? extensionMimeMap[ext] : lowerMime;
+  const mapped = ext ? extensionMimeMap[ext] : undefined;
+  return mapped || lowerMime || 'application/octet-stream';
 }
 
 export function isSupportedFileType(mimeType: string, filename: string): boolean {
