@@ -601,7 +601,7 @@ export class StudyService implements StudyUseCase {
     flashcards?: Flashcard[],
     preferredRuntime: 'ollama' | 'webllm' = 'ollama'
   ): Promise<QuizQuestion[]> {
-    const sanitizeQuestions = (qs: QuizQuestion[] | null, sourceHint: 'topic' | 'flashcards'): QuizQuestion[] | null => {
+    const sanitizeQuestions = (qs: QuizQuestion[] | null): QuizQuestion[] | null => {
       if (!qs) return null;
       const bannedPhrases = [
         'provided code snippet',
@@ -670,14 +670,14 @@ export class StudyService implements StudyUseCase {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
 
       // Try primary
-      const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs) => sanitizeQuestions(qs, 'flashcards')));
+      const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
       if (primaryResult === null || primaryResult?.length === 0) {
         console.warn('[StudyService] Primary quiz generation returned empty/null result');
       }
 
       // Quality failed or generation failed; try secondary for validation
       const secondaryResult = !primaryResult
-        ? await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs) => sanitizeQuestions(qs, 'flashcards')))
+        ? await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
         : null;
       if (secondaryResult && secondaryResult.length > 0) {
         console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
@@ -691,7 +691,7 @@ export class StudyService implements StudyUseCase {
 
     // 2) Topic-based quiz
     console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
-    const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs) => sanitizeQuestions(qs, 'topic')));
+    const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
     if (primaryResult === null || primaryResult?.length === 0) {
       console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
     } else {
@@ -699,7 +699,7 @@ export class StudyService implements StudyUseCase {
     }
 
     const secondaryResult = !primaryResult
-      ? await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs) => sanitizeQuestions(qs, 'topic')))
+      ? await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
       : null;
     if (secondaryResult && secondaryResult.length > 0) {
       console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
