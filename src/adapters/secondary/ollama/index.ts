@@ -58,7 +58,7 @@ export class OllamaAdapter implements LLMAdapter {
     // Check cache
     const cacheKey = `ollama:flashcards:${topic}:${count}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -125,7 +125,7 @@ Now create ${count} flashcards:`;
 
     // Store in cache
     if (this.cache && result.length > 0) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;
@@ -136,7 +136,7 @@ Now create ${count} flashcards:`;
     const textHash = CacheServiceClass.hashKey(text.substring(0, 10000));
     const cacheKey = `ollama:flashcards-text:${textHash}:${topic}:${count}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -177,7 +177,7 @@ Create ${count} flashcards now:`;
 
     // Store in cache
     if (this.cache && result.length > 0) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;
@@ -193,7 +193,7 @@ Create ${count} flashcards now:`;
     // Check cache
     const cacheKey = `ollama:summary:${topic}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -203,7 +203,7 @@ Create ${count} flashcards now:`;
 
     // Store in cache
     if (this.cache && result) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;
@@ -213,7 +213,7 @@ Create ${count} flashcards now:`;
     // Check cache
     const cacheKey = `ollama:query:${topic}:${parentTopic || ''}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -231,7 +231,7 @@ Create ${count} flashcards now:`;
 
     // Store in cache
     if (this.cache && result) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;
@@ -241,7 +241,7 @@ Create ${count} flashcards now:`;
     // Check cache
     const cacheKey = `ollama:subtopics:${topic}`;
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -255,7 +255,7 @@ Create ${count} flashcards now:`;
 
     // Store in cache
     if (this.cache && result && result.length > 0) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;
@@ -287,7 +287,7 @@ Create ${count} flashcards now:`;
     const cacheKey = `ollama:quiz:flashcards:${CacheServiceClass.hashKey(flashcardIds)}:${count}`;
 
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -470,7 +470,7 @@ Create ${count} flashcards now:`;
     const cacheKey = `ollama: quiz: topic:${topic}:${count}:${contextHash} `;
 
     if (this.cache) {
-      const cached = this.cache.get(cacheKey);
+      const cached = await this.cache.get(cacheKey);
       if (cached !== undefined) return cached;
     }
 
@@ -520,7 +520,7 @@ Create ${count} flashcards now:`;
 
     // Store in cache
     if (this.cache && result.length > 0) {
-      this.cache.set(cacheKey, result);
+      await this.cache.set(cacheKey, result);
     }
 
     return result;

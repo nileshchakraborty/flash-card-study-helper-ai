@@ -1,61 +1,104 @@
 export class StudyPlanService {
   generatePlan(stats) {
-    const {total, remaining, left, right} = stats;
-    
+    const { total, remaining, left, right } = stats;
+
     if (total === 0) {
-      return '<p class="text-gray-500 italic">Generate some flashcards to get a study plan.</p>';
+      return `
+        <div class="text-center p-4">
+          <span class="material-icons text-gray-300 text-4xl mb-2">style</span>
+          <p class="text-gray-500 italic text-sm">Generate some flashcards to get a study plan.</p>
+        </div>
+      `;
     }
-    
-    let plan = '<ul class="space-y-3">';
-    
-    // Progress analysis
-    const progress = ((total - remaining) / total) * 100;
-    
+
+    const answered = total - remaining;
+    const progress = Math.round((answered / total) * 100);
+
+    // Status Logic
+    let statusTitle = "";
+    let statusMessage = "";
+    let state = "start"; // start, progress, almost, done
+
     if (progress === 0) {
-      plan += this.createPlanItem('start', 'Start by reviewing 5 cards today.');
-      plan += this.createPlanItem('tip', 'Focus on understanding the core concepts first.');
+      statusTitle = "Ready to Begin";
+      statusMessage = `You have <strong>${total}</strong> cards to master.`;
+      state = "start";
     } else if (progress < 50) {
-      plan += this.createPlanItem('continue', `You're ${Math.round(progress)}% through. Keep going!`);
-      if (left > right) {
-        plan += this.createPlanItem('review', 'You seem to be struggling with some cards. Review them twice.');
-      }
+      statusTitle = "Off to a Good Start";
+      statusMessage = `You've reviewed <strong>${answered}</strong> cards. Keep the momentum!`;
+      state = "progress";
     } else if (progress < 100) {
-      plan += this.createPlanItem('push', 'Almost there! Finish the remaining cards.');
+      statusTitle = "Almost There";
+      statusMessage = `Only <strong>${remaining}</strong> cards left. You're crushing it!`;
+      state = "almost";
     } else {
-      plan += this.createPlanItem('done', 'Great job! You have reviewed all cards.');
-      if (left > 0) {
-        plan += this.createPlanItem('review', `Review the ${left} cards you missed.`);
-      }
+      statusTitle = "Deck Complete!";
+      statusMessage = `You've reviewed all <strong>${total}</strong> cards. Excellent work!`;
+      state = "done";
     }
-    
-    plan += '</ul>';
-    return plan;
-  }
-  
-  createPlanItem(type, text) {
-    const icons = {
-      start: 'play_circle',
-      tip: 'lightbulb',
-      continue: 'trending_up',
-      review: 'refresh',
-      push: 'flag',
-      done: 'check_circle'
-    };
-    
-    const colors = {
-      start: 'text-blue-500',
-      tip: 'text-yellow-500',
-      continue: 'text-indigo-500',
-      review: 'text-orange-500',
-      push: 'text-purple-500',
-      done: 'text-green-500'
-    };
-    
+
+    // Recommendation based on state
+    let recommendation = "";
+    if (left > right && progress > 0) {
+      recommendation = this.createRecommendation('review', 'High miss rate detected. Review "Mastered" cards again just to be safe.');
+    } else if (state === 'done') {
+      recommendation = this.createRecommendation('quiz', 'Now is a great time to take a quiz and verify your knowledge.');
+    } else {
+      recommendation = this.createRecommendation('continue', 'Focus on understanding, not just memorizing.');
+    }
+
     return `
-      <li class="flex items-start gap-3 text-sm text-gray-600">
-        <span class="material-icons text-lg ${colors[type] || 'text-gray-400'}">${icons[type] || 'info'}</span>
-        <span>${text}</span>
-      </li>
+      <div class="space-y-4">
+        <!-- Progress Ring / Header -->
+        <div class="flex items-center gap-4">
+           <div class="relative w-12 h-12 flex-shrink-0">
+              <svg class="w-full h-full transform -rotate-90">
+                <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="4" fill="transparent" class="text-gray-100" />
+                <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="4" fill="transparent" class="text-indigo-600 transition-all duration-1000 ease-out" stroke-dasharray="125.6" stroke-dashoffset="${125.6 - (125.6 * progress) / 100}" />
+              </svg>
+              <span class="absolute inset-0 flex items-center justify-center text-xs font-bold text-indigo-700">${progress}%</span>
+           </div>
+           <div>
+              <h4 class="text-gray-900 font-bold text-sm leading-tight">${statusTitle}</h4>
+              <p class="text-xs text-gray-500 mt-0.5">${answered} of ${total} cards reviewed</p>
+           </div>
+        </div>
+
+        <div class="h-px bg-gray-100 w-full"></div>
+
+        <!-- Action Item -->
+        <div class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100/50">
+             <p class="text-sm text-gray-700 leading-relaxed">${statusMessage}</p>
+        </div>
+        
+        ${recommendation}
+
+      </div>
+    `;
+  }
+
+  createRecommendation(type: string, text: string) {
+    const icons = {
+      review: 'refresh',
+      quiz: 'quiz',
+      continue: 'lightbulb'
+    };
+
+    const colors = {
+      review: 'text-orange-500 bg-orange-50',
+      quiz: 'text-purple-500 bg-purple-50',
+      continue: 'text-yellow-500 bg-yellow-50'
+    };
+
+    const style = colors[type] || colors.continue;
+
+    return `
+      <div class="flex gap-3 items-start">
+         <div class="w-6 h-6 rounded-full ${style} flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span class="material-icons text-xs">${icons[type]}</span>
+         </div>
+         <p class="text-xs text-gray-500 italic leading-relaxed pt-0.5">${text}</p>
+      </div>
     `;
   }
 }

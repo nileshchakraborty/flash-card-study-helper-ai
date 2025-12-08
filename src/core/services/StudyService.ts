@@ -3,18 +3,105 @@ import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models
 import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
 import { CacheService } from './CacheService.js';
+import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.js';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 // @ts-ignore
 import Tesseract from 'tesseract.js';
+// @ts-ignore
 import mammoth from 'mammoth';
-import xlsx from 'xlsx';
+
+
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import http from 'http';
 import https from 'https';
+import xlsx from 'xlsx';
+
+// ... existing imports ...
 
 export class StudyService implements StudyUseCase {
+  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
+    const supportedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp'
+    ];
+
+    // Basic type guard
+    if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
+      throw new Error('Unsupported file type');
+    }
+
+    let text = '';
+
+    try {
+      if (mimeType === 'application/pdf') {
+        const data = await pdfParse(file);
+        text = data.text;
+      } else if (mimeType.startsWith('image/')) {
+        const result = await Tesseract.recognize(file);
+        text = result.data.text;
+      } else if (
+        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        mimeType === 'application/msword' ||
+        filename.endsWith('.doc') ||
+        filename.endsWith('.docx')
+      ) {
+        const result = await mammoth.extractRawText({ buffer: file });
+        text = result.value;
+        if (result.messages.length > 0) {
+          console.warn('[StudyService] Mammoth warnings:', result.messages);
+        }
+      } else if (
+        mimeType === 'application/vnd.ms-excel' ||
+        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        filename.endsWith('.xls') ||
+        filename.endsWith('.xlsx')
+      ) {
+        const workbook = xlsx.read(file, { type: 'buffer' });
+        const sheets: string[] = [];
+
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          if (!sheet) return;
+          const sheetText = xlsx.utils.sheet_to_txt(sheet, { blankrows: false });
+          if (sheetText.trim()) {
+            sheets.push(`SHEET: ${sheetName}\n${sheetText}`);
+          }
+        });
+
+        text = sheets.join('\n\n---\n\n');
+      } else if (mimeType === 'text/plain') {
+        text = file.toString('utf-8');
+      } else {
+        // Fallback: treat as utf-8 text
+        text = file.toString('utf-8');
+      }
+
+      if (!text || text.trim().length < 10) {
+        throw new Error('Unable to extract meaningful text');
+      }
+
+      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
+      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
+      throw new Error(message);
+    }
+  }
+
+  // @ts-ignore - Will be used when graph is wired into generation flow
+  private flashcardGraph: FlashcardGenerationGraph;
   private disableAsyncRecommendations: boolean;
   private inFlightControllers = new Set<AbortController>();
 
@@ -37,6 +124,7 @@ export class StudyService implements StudyUseCase {
 
     throw new Error(`No AI adapter found for runtime '${runtime}' and no fallback available`);
   }
+
   constructor(
     private aiAdapters: Record<string, AIServicePort>,
     private searchAdapter: SearchServicePort,
@@ -46,6 +134,10 @@ export class StudyService implements StudyUseCase {
     disableAsyncRecommendations: boolean = process.env.NODE_ENV === 'test'
   ) {
     this.disableAsyncRecommendations = disableAsyncRecommendations;
+    // Initialize FlashcardGenerationGraph with Ollama adapter for resilient generation
+    this.flashcardGraph = new FlashcardGenerationGraph(
+      this.getAdapter('ollama') as any // Cast as adapter type flexibility
+    );
   }
 
   /**
@@ -200,9 +292,12 @@ export class StudyService implements StudyUseCase {
     if (combinedContext) {
       // Use the text-based generation with our rich context
       cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, topic, count);
-    } else {
-      // Fallback if absolutely no context (unlikely)
-      console.log('   No context available, falling back to basic generation.');
+    }
+
+    // Fallback or Initial Attempt if no context:
+    // If context generation failed OR yielded 0 cards, try basic generation
+    if (!cards || cards.length === 0) {
+      console.log('   Context-based generation returned empty/null, falling back to basic generation.');
       cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
     }
 
@@ -320,7 +415,7 @@ export class StudyService implements StudyUseCase {
 
     //Check cache first
     if (this.webContextCache) {
-      const cached = this.webContextCache.get(cacheKey);
+      const cached = await this.webContextCache.get(cacheKey);
       if (cached) {
         console.log(`[Cache Hit] Using cached web context for: ${topic}`);
         return cached;
@@ -371,89 +466,26 @@ export class StudyService implements StudyUseCase {
 
     // Store in cache
     if (this.webContextCache && webContext) {
-      this.webContextCache.set(cacheKey, webContext);
+      await this.webContextCache.set(cacheKey, webContext);
     }
 
     return webContext;
   }
 
-  async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
-    let text = '';
+  async processRawText(text: string, topic: string): Promise<Flashcard[]> {
+    if (!text || text.trim().length === 0) return [];
+    // Limit text length if needed? 
+    // For now, let adapter handle it or chunk it. Adapter usually handles 10-15k chars.
+    return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
+  }
 
-    try {
-      // Validate file type
-      const supportedTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
-        'application/msword', // DOC (legacy)
-        'application/vnd.ms-excel', // XLS
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
-        'text/plain',
-        'image/png',
-        'image/jpeg',
-        'image/jpg',
-        'image/gif',
-        'image/webp'
-      ];
+  async processUrls(urls: string[], topic: string): Promise<Flashcard[]> {
+    if (!urls || urls.length === 0) return [];
 
-      if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
-        throw new Error(`Unsupported file type: ${mimeType}. Supported types: PDF, DOCX, XLS, XLSX, TXT, and images.`);
-      }
+    const content = await this.scrapeMultipleSources(urls);
+    if (!content) throw new Error('Failed to scrape content from provided URLs');
 
-      // Process based on mime type
-      if (mimeType === 'application/pdf') {
-        // PDF processing
-        const data = await pdfParse(file);
-        text = data.text;
-      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        mimeType === 'application/msword') {
-        // DOCX/DOC processing using mammoth
-        const result = await mammoth.extractRawText({ buffer: file });
-        text = result.value;
-        if (result.messages.length > 0) {
-          console.warn('[StudyService] Mammoth warnings:', result.messages);
-        }
-      } else if (mimeType === 'application/vnd.ms-excel' ||
-        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-        // XLS/XLSX processing using xlsx
-        const workbook = xlsx.read(file, { type: 'buffer' });
-        const sheets: string[] = [];
-
-        workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          if (!worksheet) return; // Skip if worksheet is undefined
-          const sheetText = xlsx.utils.sheet_to_txt(worksheet, { blankrows: false });
-          if (sheetText.trim()) {
-            sheets.push(`Sheet: ${sheetName}\n${sheetText}`);
-          }
-        });
-
-        text = sheets.join('\n\n---\n\n');
-      } else if (mimeType.startsWith('image/')) {
-        // Image OCR processing using Tesseract
-        const result = await Tesseract.recognize(file);
-        text = result.data.text;
-      } else if (mimeType === 'text/plain') {
-        // Plain text
-        text = file.toString('utf-8');
-      } else {
-        // Fallback: try to read as UTF-8 text
-        text = file.toString('utf-8');
-      }
-
-      // Validate extracted text
-      if (!text || text.trim().length < 10) {
-        throw new Error(`Unable to extract meaningful text from file. Extracted: ${text.length} characters.`);
-      }
-
-      console.log(`[StudyService] Processed ${mimeType} file (${filename}): ${text.length} characters extracted`);
-
-      return this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
-    } catch (error: any) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[StudyService] File processing failed for ${filename} (${mimeType}):`, message);
-      throw new Error(`Failed to process file: ${message}`);
-    }
+    return this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
   }
 
   async getBriefAnswer(question: string, context: string): Promise<string> {
@@ -504,22 +536,41 @@ export class StudyService implements StudyUseCase {
 
       // Try primary
       const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (primaryResult) return primaryResult;
+      if (primaryResult && primaryResult.length > 0) {
+        console.log(`[StudyService] Primary quiz generation succeeded: ${primaryResult.length} questions`);
+        return primaryResult;
+      }
+      if (primaryResult === null || primaryResult.length === 0) {
+        console.warn('[StudyService] Primary quiz generation returned empty/null result');
+      }
 
       // Quality failed or generation failed; try secondary for validation
       const secondaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate));
-      if (secondaryResult) return secondaryResult;
+      if (secondaryResult && secondaryResult.length > 0) {
+        console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
+        return secondaryResult;
+      }
 
       console.warn('[StudyService] All adapters failed; returning local fallback quiz.');
       return this.generateQuizFallbackFromFlashcards(flashcards, count);
     }
 
     // 2) Topic-based quiz
+    console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
     const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (primaryResult) return primaryResult;
+    if (primaryResult && primaryResult.length > 0) {
+      console.log(`[StudyService] Primary topic quiz generation succeeded: ${primaryResult.length} questions`);
+      return primaryResult;
+    }
+    if (primaryResult === null || primaryResult.length === 0) {
+      console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
+    }
 
     const secondaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate));
-    if (secondaryResult) return secondaryResult;
+    if (secondaryResult && secondaryResult.length > 0) {
+      console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
+      return secondaryResult;
+    }
 
     console.warn('[StudyService] All adapters failed for topic quiz; returning lightweight fallback.');
     return this.generateQuizFallbackFromTopic(topic, count);
@@ -569,6 +620,10 @@ export class StudyService implements StudyUseCase {
 
   async getDeckHistory(): Promise<Deck[]> {
     return this.storageAdapter.getDeckHistory();
+  }
+
+  async getDeck(id: string): Promise<Deck | null> {
+    return this.storageAdapter.getDeck(id);
   }
   /**
    * Local fallback: build simple MCQs from flashcards without LLM.
@@ -727,13 +782,17 @@ Respond in JSON format:
       );
 
       // Parse the AI response
+      if (!response || typeof response !== 'string') {
+        console.warn('[StudyService] Invalid response from AI for recommendations');
+        return;
+      }
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const recommendations = JSON.parse(jsonMatch[0]);
 
         // Store in cache
         if (this.webContextCache) {
-          this.webContextCache.set(
+          await this.webContextCache.set(
             `recommendations:${topic}`,
             JSON.stringify(recommendations)
           );
@@ -754,6 +813,15 @@ Respond in JSON format:
     for (const c of Array.from(this.inFlightControllers)) {
       try { c.abort(); } catch { /* ignore */ }
       this.inFlightControllers.delete(c);
+    }
+
+    // If FlashcardGenerationGraph exposes a stop/close API, call it.
+    try {
+      if (this.flashcardGraph && typeof (this.flashcardGraph as any).shutdown === 'function') {
+        await (this.flashcardGraph as any).shutdown();
+      }
+    } catch (e) {
+      // swallow - shutdown best-effort
     }
   }
 

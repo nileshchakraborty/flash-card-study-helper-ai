@@ -150,10 +150,27 @@ export class ExpressServer {
 
     // Swagger UI - handle gracefully if swagger.yaml doesn't exist
     try {
-      const swaggerDocument = YAML.load(path.join(process.cwd(), 'swagger.yaml'));
-      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+      const swaggerPath = path.join(process.cwd(), 'swagger.yaml');
+      let swaggerDocument;
+      try {
+        swaggerDocument = YAML.load(swaggerPath);
+      } catch (e) {
+        // Fallback to json if yaml fails or doesn't exist
+        try {
+          swaggerDocument = require(path.join(process.cwd(), 'swagger.json'));
+        } catch (jsonErr) {
+          // Both failed
+        }
+      }
+
+      if (swaggerDocument) {
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+        logger.info('📖 Swagger documentation available at /api-docs');
+      } else {
+        logger.warn('⚠️ Swagger documentation not found (swagger.yaml or swagger.json), /api-docs will be unavailable.');
+      }
     } catch (error) {
-      console.warn('Swagger documentation not available');
+      console.warn('Swagger documentation setup failed:', error);
     }
   }
 
@@ -390,6 +407,25 @@ export class ExpressServer {
     // Auth Routes
     this.app.get('/api/auth/google', authRateLimiter, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
+    // DEV ONLY: Login endpoint for mobile/development
+    if (process.env.NODE_ENV !== 'production') {
+      this.app.post('/api/auth/dev-login', async (_req, res) => {
+        try {
+          // Create a mock user for development
+          const mockUser = {
+            id: 'dev-user-id',
+            email: 'dev@mindflip.ai',
+            name: 'Dev User'
+          };
+
+          const token = await this.authService.encryptToken(mockUser);
+          res.json({ success: true, token, user: mockUser });
+        } catch (error: any) {
+          res.status(500).json({ error: error.message });
+        }
+      });
+    }
+
     this.app.get('/api/auth/google/callback',
       passport.authenticate('google', { session: false, failureRedirect: '/' }),
       async (req, res) => {
@@ -542,6 +578,30 @@ export class ExpressServer {
           requestId,
           code: ErrorCodes.INTERNAL_ERROR
         });
+      }
+    });
+
+    // Endpoint for generating from raw content (Text or URLs)
+    this.app.post('/api/generate/from-content', apiRateLimiter, authMiddleware, async (req, res) => {
+      try {
+        const { type, content, topic } = req.body;
+        let cards: any[] = [];
+
+        if (type === 'text' && typeof content === 'string') {
+          cards = await this.studyService.processRawText(content, topic || 'Text Content');
+        } else if (type === 'url' && Array.isArray(content)) {
+          cards = await this.studyService.processUrls(content, topic || 'Web Content');
+        } else {
+          throw new Error('Invalid content type or format');
+        }
+
+        if (this.flashcardStorage && Array.isArray(cards)) {
+          this.flashcardStorage.storeFlashcards(cards as any);
+        }
+
+        res.json({ success: true, cards });
+      } catch (error: unknown) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
       }
     });
 
@@ -1079,6 +1139,20 @@ export class ExpressServer {
       }
     });
 
+    this.app.get('/api/decks/:id', async (req, res) => {
+      try {
+        const deck = await this.studyService.getDeck(req.params.id);
+        if (!deck) {
+          res.status(404).json({ error: 'Deck not found' });
+          return;
+        }
+        res.json(deck);
+      } catch (error: any) {
+        console.warn('[API] Failed to get deck:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     this.app.post('/api/decks', async (req, res) => {
       try {
         const deck = req.body;
@@ -1221,7 +1295,7 @@ export class ExpressServer {
 
       // Check cache first
       if (this.flashcardCache) {
-        const cachedResult = this.flashcardCache.get(
+        const cachedResult = await this.flashcardCache.get(
           topic,
           desiredCount,
           mode,

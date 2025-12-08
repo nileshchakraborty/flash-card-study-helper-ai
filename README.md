@@ -213,6 +213,10 @@ curl -X POST /graphql -d '{
 - ✅ Validation & Self-Repair: Generated flashcards are validated for strict JSON/question-answer shape; if invalid/insufficient, the system re-prompts the runtime to repair before returning.
 - 📏 Count Enforcement: Returned flashcards are trimmed/padded to match the requested count; client-side generation auto-falls back to backend if underfilled.
 - 🛡️ Runtime fallback ladder: Preferred runtime (configurable) → alternate runtime → local quiz fallback to prevent failures when an LLM is unavailable
+- 📱 **Mobile-Friendly**: Swipe gestures for flashcard study (left/right) used on mobile devices
+- 🗂️ **Deck History**: Persistent deck history that survives page reloads
+- 🎓 **Quiz from Flashcards**: Select specific cards from a deck to create a custom quiz
+
 
 ## 🚀 Getting Started
 

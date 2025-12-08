@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 const SearchInputSchema = z.object({
-    query: z.string().describe('The search query'),
-    limit: z.number().optional().describe('Number of results to return (default: 5)'),
+    query: z.string().describe("Search query"),
+    limit: z.number().optional().describe("Number of results to return"),
 });
 
-type SearchInput = z.infer<typeof SearchInputSchema>;
+// type SearchInput = z.infer<typeof SearchInputSchema>;
 
 export const searchWebTool = {
     name: 'search_web_serper',
