@@ -18,3 +18,5 @@ test_output.txt
 dump.rdb
 integration_failure.txt
 test_error.out
+playwright-report/*
+test-results/
