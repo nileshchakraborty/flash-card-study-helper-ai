@@ -37,6 +37,13 @@ import type { UpstashVectorService } from '../../../core/services/UpstashVectorS
 import type { InMemoryVectorService } from '../../../core/services/InMemoryVectorService.js';
 import type { BlobStorageService } from '../../../core/services/BlobStorageService.js';
 import { logger } from '../../../core/services/LoggerService.js';
+import { appProperties } from '../../../config/properties.js';
+
+const MAX_UPLOAD_BYTES = appProperties.MAX_UPLOAD_MB * 1024 * 1024;
+const MAX_UPLOAD_BYTES_TEST = appProperties.TEST_MAX_UPLOAD_MB * 1024 * 1024;
+
+const isTestAuth = (req: express.Request): boolean =>
+  (req.headers['x-test-auth'] === 'true');
 
 export class ExpressServer {
   private app: express.Application;
@@ -81,7 +88,7 @@ export class ExpressServer {
     this.upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: 30 * 1024 * 1024 // 30MB total limit (single part)
+        fileSize: MAX_UPLOAD_BYTES_TEST // cap at highest to allow test header; we validate per-request below
       }
     });
     this.authService = AuthService.getInstance();
@@ -516,6 +523,7 @@ export class ExpressServer {
         const topic = (req.body.topic && req.body.topic.trim().length > 0)
           ? req.body.topic.trim()
           : path.parse(file?.originalname || 'Uploaded Content').name || 'Uploaded Content';
+        const maxSize = isTestAuth(req) ? MAX_UPLOAD_BYTES_TEST : MAX_UPLOAD_BYTES;
 
         // Input validation
         if (!file) {
@@ -525,11 +533,9 @@ export class ExpressServer {
           });
         }
 
-        // Validate file size (10MB max)
-        const maxSize = 10 * 1024 * 1024; // 10MB
         if (file.size > maxSize) {
           return sendError(res, 400,
-            `File too large. Maximum size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
+            `File too large. Maximum size is ${(maxSize / 1024 / 1024)}MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
             {
               requestId,
               code: ErrorCodes.FILE_TOO_LARGE
@@ -642,9 +648,10 @@ export class ExpressServer {
         this.uploadChunkStore.set(uploadId, entry);
 
         // Enforce 30MB aggregate cap
-        if (entry.totalSize > 30 * 1024 * 1024) {
+        const maxTotal = isTestAuth(req) ? MAX_UPLOAD_BYTES_TEST : MAX_UPLOAD_BYTES;
+        if (entry.totalSize > maxTotal) {
           this.uploadChunkStore.delete(uploadId);
-          return sendError(res, 400, 'File too large. Maximum size is 30MB.', { requestId, code: ErrorCodes.FILE_TOO_LARGE });
+          return sendError(res, 400, `File too large. Maximum size is ${(maxTotal / 1024 / 1024)}MB.`, { requestId, code: ErrorCodes.FILE_TOO_LARGE });
         }
 
         // If not all chunks are in, acknowledge partial

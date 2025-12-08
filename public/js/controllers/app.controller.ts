@@ -189,8 +189,9 @@ export class AppController {
                 topic: topic,
                 preferredRuntime: rt
               });
-              if (quizResponse.questions) {
-                quizModel.startQuiz(quizResponse.questions, 'standard', topic, timer || 0);
+              const questions = quizResponse?.questions || quizResponse?.data?.questions;
+              if (questions && questions.length > 0) {
+                quizModel.startQuiz(questions, 'standard', topic, timer || 0);
               } else { throw new Error('Invalid quiz response from server'); }
             } else { throw new Error('Failed to generate flashcards for quiz'); }
           } else if (flashcardResponse.cards) {
@@ -200,8 +201,9 @@ export class AppController {
               topic: topic,
               preferredRuntime: settingsService.getPreferredRuntime()
             });
-            if (quizResponse.questions) {
-              quizModel.startQuiz(quizResponse.questions, 'standard', topic, timer || 0);
+            const questions = quizResponse?.questions || quizResponse?.data?.questions;
+            if (questions && questions.length > 0) {
+              quizModel.startQuiz(questions, 'standard', topic, timer || 0);
             } else { throw new Error('Invalid quiz response from server'); }
           } else {
             throw new Error('Failed to generate flashcards for quiz');
@@ -215,8 +217,9 @@ export class AppController {
             preferredRuntime: settingsService.getPreferredRuntime()
           });
 
-          if (response.questions) {
-            quizModel.startQuiz(response.questions, 'standard', quizTopic, timer || 0);
+          const questions = response?.questions || response?.data?.questions;
+          if (questions && questions.length > 0) {
+            quizModel.startQuiz(questions, 'standard', quizTopic, timer || 0);
           } else {
             throw new Error('Invalid quiz response from server');
           }

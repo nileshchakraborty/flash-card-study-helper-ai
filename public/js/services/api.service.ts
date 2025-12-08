@@ -547,14 +547,17 @@ export class ApiService {
    * Returns the job result (e.g., { cards, recommendedTopics }).
    */
   async waitForJobResult(jobId: string, options: { maxWaitMs?: number; pollIntervalMs?: number; onProgress?: (progress: number) => void } = {}) {
-    const { maxWaitMs = 120000, pollIntervalMs = 2000, onProgress } = options;
+    const { maxWaitMs = 60000, pollIntervalMs = 2000, onProgress } = options; // fail faster by default (60s)
     const start = Date.now();
+    const hardCapMs = Math.max(maxWaitMs, 300000); // never wait more than 5 minutes
+    let allowedWaitMs = maxWaitMs;
 
     let lastStatus: JobStatus | null = null;
     const expectedPolls = Math.max(1, Math.ceil(maxWaitMs / pollIntervalMs));
     let attempt = 0;
+    let lastProgressAt = Date.now();
 
-    while (Date.now() - start < maxWaitMs) {
+    while (Date.now() - start < allowedWaitMs) {
       attempt += 1;
       lastStatus = await this.getJobStatus(jobId);
       const status = (lastStatus?.status || '').toString().toLowerCase();
@@ -562,6 +565,7 @@ export class ApiService {
       if (typeof onProgress === 'function') {
         if (typeof lastStatus?.progress === 'number') {
           onProgress(lastStatus.progress);
+          lastProgressAt = Date.now();
         } else {
           const elapsed = Date.now() - start;
           const timeProgress = Math.min(95, Math.round((elapsed / maxWaitMs) * 90) + 5);
@@ -584,10 +588,16 @@ export class ApiService {
       }
 
       await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+      // If we recently saw progress, extend wait a bit (up to hard cap) to avoid premature timeout.
+      const sinceProgress = Date.now() - lastProgressAt;
+      if (sinceProgress < 30000 && allowedWaitMs < hardCapMs) {
+        allowedWaitMs = Math.min(hardCapMs, allowedWaitMs + pollIntervalMs);
+      }
     }
 
     if (typeof onProgress === 'function') onProgress(100);
-    throw new Error(`Job ${jobId} timed out after ${Math.round(maxWaitMs / 1000)}s`);
+    throw new Error(`Job ${jobId} timed out after ${Math.round(allowedWaitMs / 1000)}s`);
   }
 
   /**

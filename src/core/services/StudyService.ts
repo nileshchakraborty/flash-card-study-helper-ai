@@ -2,6 +2,7 @@ import type { StudyUseCase, AIServicePort, SearchServicePort, StoragePort } from
 import type { Flashcard, QuizQuestion, QuizResult, Deck } from '../domain/models.js';
 import type { KnowledgeSource, Runtime, QuizMode } from '../domain/types.js';
 import { MetricsService } from './MetricsService.js';
+import { appProperties } from '../../config/properties.js';
 import { CacheService } from './CacheService.js';
 import { FlashcardGenerationGraph } from '../workflows/FlashcardGenerationGraph.js';
 // @ts-ignore
@@ -22,6 +23,26 @@ import xlsx from 'xlsx';
 
 export class StudyService implements StudyUseCase {
   async processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]> {
+    const ext = (filename || '').toLowerCase().split('.').pop() || '';
+    const extensionMimeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      doc: 'application/msword',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      txt: 'text/plain',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp'
+    };
+
+    // Normalize mime type if octet-stream or missing
+    if (!mimeType || mimeType === 'application/octet-stream' || mimeType === 'binary/octet-stream') {
+      mimeType = extensionMimeMap[ext] || mimeType;
+    }
+
     const supportedTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -38,7 +59,13 @@ export class StudyService implements StudyUseCase {
 
     // Basic type guard
     if (!supportedTypes.includes(mimeType) && !mimeType.startsWith('image/')) {
-      throw new Error('Unsupported file type');
+      // Try to resolve by extension if mimeType is unrecognized but extension is mapped
+      const mapped = extensionMimeMap[ext];
+      if (mapped && (supportedTypes.includes(mapped) || mapped.startsWith('image/'))) {
+        mimeType = mapped;
+      } else {
+        throw new Error('Unsupported file type');
+      }
     }
 
     let text = '';
@@ -73,13 +100,22 @@ export class StudyService implements StudyUseCase {
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
           if (!sheet) return;
-          const sheetText = xlsx.utils.sheet_to_txt(sheet, { blankrows: false });
-          if (sheetText.trim()) {
-            sheets.push(`SHEET: ${sheetName}\n${sheetText}`);
+          // rows as arrays, coerce to text
+          const rows: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+          const limitedRows = rows.slice(0, appProperties.XLS_MAX_ROWS_PER_SHEET); // configurable row limit
+          const lines = limitedRows
+            .map(r => r.map(c => String(c || '')).join('\t'))
+            .filter(line => line.trim().length > 0);
+          if (lines.length > 0) {
+            sheets.push(`SHEET: ${sheetName}\n` + lines.join('\n'));
           }
         });
 
         text = sheets.join('\n\n---\n\n');
+        // Trim extremely large text to keep within LLM prompt budget
+        if (text.length > appProperties.MAX_EXTRACT_TEXT_CHARS) {
+          text = text.slice(0, appProperties.MAX_EXTRACT_TEXT_CHARS);
+        }
       } else if (mimeType === 'text/plain') {
         text = file.toString('utf-8');
       } else {
@@ -98,7 +134,8 @@ export class StudyService implements StudyUseCase {
       // Primary generation
       try {
         const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename });
-        if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+        const grounded = this.filterGroundedCards(text, cards || []);
+        if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
       } catch (genErr) {
         console.warn('[StudyService] Primary generation from text failed, attempting fallback.', genErr);
       }
@@ -493,7 +530,8 @@ export class StudyService implements StudyUseCase {
     const sourceMeta: any = { sourceType: 'text' };
     try {
       const cards = await this.getAdapter('ollama').generateFlashcardsFromText(text, topic, 10, { filename: 'raw-text' });
-      if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+      const grounded = this.filterGroundedCards(text, cards || []);
+      if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
     } catch (err) {
       console.warn('[StudyService] Primary raw-text generation failed, using fallback.', err);
     }
@@ -525,6 +563,48 @@ export class StudyService implements StudyUseCase {
     return cards;
   }
 
+  /**
+   * Filter out hallucinated cards by requiring overlap with source text.
+   */
+  private filterGroundedCards(sourceText: string, cards: Flashcard[]): Flashcard[] {
+    if (!cards || cards.length === 0) return [];
+
+    const tokens = this.extractTokens(sourceText);
+    if (tokens.size === 0) return [];
+
+    const grounded: Flashcard[] = [];
+    for (const card of cards) {
+      const qTokens = this.extractTokens((card as any).question || (card as any).front || '');
+      const aTokens = this.extractTokens((card as any).answer || (card as any).back || '');
+      const qOverlap = this.countOverlap(tokens, qTokens);
+      const aOverlap = this.countOverlap(tokens, aTokens);
+      // Require both sides to have some overlap, and combined overlap to be meaningful
+      if (qOverlap >= 1 && aOverlap >= 1 && (qOverlap + aOverlap) >= 3) {
+        grounded.push(card);
+      }
+    }
+    return grounded;
+  }
+
+  private extractTokens(text: string): Set<string> {
+    const stop = new Set(['the','a','an','and','or','of','in','on','to','for','with','by','from','at','as','is','are','was','were','be','this','that','these','those','it','its','their','his','her','our','your','my','we','you','they']);
+    return new Set(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stop.has(w))
+    );
+  }
+
+  private countOverlap(source: Set<string>, target: Set<string>): number {
+    let count = 0;
+    target.forEach(t => {
+      if (source.has(t)) count++;
+    });
+    return count;
+  }
+
   async processUrls(urls: string[], topic: string): Promise<Flashcard[]> {
     if (!urls || urls.length === 0) return [];
 
@@ -534,7 +614,8 @@ export class StudyService implements StudyUseCase {
     const sourceMeta: any = { sourceType: 'urls', sourceUrls: urls };
     try {
       const cards = await this.getAdapter('ollama').generateFlashcardsFromText(content, topic, 10, { filename: 'urls-content' });
-      if (cards && cards.length > 0) return cards.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
+      const grounded = this.filterGroundedCards(content, cards || []);
+      if (grounded.length > 0) return grounded.map((c: Flashcard) => ({ ...c, ...sourceMeta }));
     } catch (err) {
       console.warn('[StudyService] URL-based generation failed, using fallback.', err);
     }

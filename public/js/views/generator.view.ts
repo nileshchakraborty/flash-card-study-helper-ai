@@ -92,12 +92,19 @@ export class GeneratorView extends BaseView {
         if (files.length) {
           this.addFilesWithValidation(files);
           this.refreshFileList();
+          // clear value so selecting the same file again still fires change
+          input.value = '';
         }
       });
     }
 
     if (this.elements.uploadArea) {
-      this.bind(this.elements.uploadArea, 'click', () => this.elements.fileInput?.click());
+      this.bind(this.elements.uploadArea, 'click', (ev) => {
+        // Avoid double-opening the dialog when clicking the label (which already triggers the input)
+        const target = ev.target as HTMLElement;
+        if (target.closest('label')) return;
+        this.elements.fileInput?.click();
+      });
       ['dragover', 'dragenter'].forEach(evt => {
         this.bind(this.elements.uploadArea, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea.classList.add('border-purple-400'); });
       });
@@ -352,7 +359,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
           let backendResult = backendResponse;
           if ((!backendResponse.cards || backendResponse.cards.length === 0) && backendResponse.jobId) {
             backendResult = await apiService.waitForJobResult(backendResponse.jobId, {
-              maxWaitMs: 180000,
+              maxWaitMs: 90000, // fail fast: 90s cap
               pollIntervalMs: 2000,
               onProgress: (p) => this.updateLoadingProgress(p, 'Generating on server...')
             });
@@ -409,7 +416,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
 
         if ((!data.cards || data.cards.length === 0) && data.jobId) {
           backendResult = await apiService.waitForJobResult(data.jobId, {
-            maxWaitMs: 180000,
+            maxWaitMs: 90000, // fail fast: 90s cap
             pollIntervalMs: 2000,
             onProgress: (p) => this.updateLoadingProgress(p, 'Waiting for backend to finish...')
           });
@@ -812,7 +819,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
     // Inject skeleton cards into the loading modal for visual feedback
     const skeletonContainer = document.getElementById('skeleton-container');
     if (skeletonContainer) {
-      const skeletonGrid = SkeletonLoader.createFlashcardGrid(3); // Show 3 mini previews
+      const skeletonGrid = SkeletonLoader.createFlashcardGrid(1); // Single preview to reduce visual noise
       skeletonContainer.innerHTML = '';
       skeletonContainer.appendChild(skeletonGrid);
     }
