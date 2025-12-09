@@ -14,9 +14,9 @@
     "prebuild:frontend": "npm run clean:frontend",
     "build:frontend": "node esbuild.config.cjs",
     "build:all": "npm run clean && npm run build && npm run build:frontend",
-    "start": "npm run clean && npm run build:all && node dist/index.js",
+    "start": "USE_LOCAL_DB=true USE_LOCAL_VECTOR=true USE_LOCAL_QUEUE=true npm run clean && npm run build:all && tsx src/index.ts",
     "serve": "node dist/index.js",
-    "dev": "npm run clean && npm run build:all && tsx src/index.ts",
+    "dev": "npm run build:frontend && tsx src/index.ts",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.config.cjs"
   },
   "keywords": [
