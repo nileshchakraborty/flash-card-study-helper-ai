@@ -16,7 +16,7 @@
     "build:all": "npm run clean && npm run build && npm run build:frontend",
     "start": "npm run clean && npm run build:all && node dist/index.js",
     "serve": "node dist/index.js",
-    "dev": "USE_LOCAL_DB=true USE_LOCAL_VECTOR=true USE_LOCAL_QUEUE=true npm run clean && npm run build:all && tsx src/index.ts",
+    "dev": "npm run clean && npm run build:all && tsx src/index.ts",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.config.cjs"
   },
   "keywords": [
