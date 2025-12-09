@@ -9,7 +9,7 @@ import { settingsService } from '../services/settings.service.js';
 import { storageService } from '../services/storage.service.js';
 import { hideLoading } from '../utils/loading.util.js';
 import { showErrorBar } from '../utils/error-bar.util.js';
-import { hideLoading } from '../utils/loading.util.js';
+
 
 type DeckHistoryEntry = {
   id: string;
@@ -37,14 +37,14 @@ export class AppController {
   private studyView: StudyView;
   private quizView: QuizView;
   private deckHistory: DeckHistoryEntry[] = [];
-  private currentDeck: any = null;
+
 
   constructor() {
     this.generatorView = new GeneratorView();
     this.studyView = new StudyView();
     this.quizView = new QuizView();
     this.deckHistory = [];
-    this.currentDeck = null;
+
 
     this.init();
   }
@@ -350,7 +350,7 @@ export class AppController {
           this.renderDeckHistory();
           await apiService.createDeck(deck);
 
-          this.currentDeck = deck;
+
           deckModel.setCards(deck.cards);
           this.studyView.renderCard(deckModel.getCurrentCard());
           this.studyView.updateStats(deckModel.getStats());
@@ -358,7 +358,7 @@ export class AppController {
         } else {
           throw new Error('No flashcards generated');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Generation error:', error);
         const message = (error?.message || '').toLowerCase().includes('timed out')
           ? 'Harder flashcards timed out. Try again with fewer cards.'
@@ -461,7 +461,7 @@ export class AppController {
     (window as any).loadDeck = (id: string) => {
       const deck = this.deckHistory.find(d => d.id === id);
       if (deck) {
-        this.currentDeck = deck;
+
         deckModel.setCards(deck.cards);
         this.studyView.renderCard(deckModel.getCurrentCard());
         this.studyView.updateStats(deckModel.getStats());

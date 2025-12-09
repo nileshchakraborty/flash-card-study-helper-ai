@@ -8,7 +8,7 @@ import { graphqlService } from './services/graphql.service.js';
 import { settingsService } from './services/settings.service.js';
 import { eventBus } from './utils/event-bus.js';
 import { initErrorBar } from './utils/error-bar.util.js';
-import SkeletonLoader from './components/SkeletonLoader.js';
+// import SkeletonLoader from './components/SkeletonLoader.js';
 
 // Basic client-side error logging
 window.addEventListener('error', (event) => {

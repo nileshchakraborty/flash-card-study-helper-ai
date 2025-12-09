@@ -1,5 +1,5 @@
 import { LLMOrchestrator } from '../services/llm/LLMOrchestrator';
-import type { ModelConfig } from '../services/llm/types.js';
+// import type { ModelConfig } from '../services/llm/types.js';
 
 export class ModelManagerUI {
     private orchestrator: LLMOrchestrator;
@@ -127,7 +127,7 @@ export class ModelManagerUI {
         if (this.enableBtn) this.enableBtn.disabled = true;
 
         try {
-            await this.orchestrator.loadModel(config, (progress, message) => {
+            await this.orchestrator.loadModel(config, (progress, _message) => {
                 if (this.progressFill) this.progressFill.style.width = `${progress}%`;
                 if (this.progressText) this.progressText.textContent = `${progress}%`;
             });

@@ -68,7 +68,10 @@ export class WebLLMRuntime implements LLMRuntime {
             // Let's keep it simple: non-streaming for now unless requested.
         }
 
-        return reply.choices[0].message.content || "";
+        if (reply.choices && reply.choices.length > 0) {
+            return reply.choices[0]?.message?.content || "";
+        }
+        return "";
     }
 
     async unload(): Promise<void> {

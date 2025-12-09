@@ -3,13 +3,14 @@ import { apiService } from '../services/api.service.js';
 import { eventBus } from '../utils/event-bus.js';
 import { isAuthError, redirectToLoginWithAlert, alertError } from '../utils/error.util.js';
 import { showLoading, hideLoading, setLoadingText } from '../utils/loading.util.js';
-import type { Flashcard } from '../models/deck.model.js';
 import { settingsService } from '../services/settings.service.js';
 import SkeletonLoader from '../components/SkeletonLoader.js';
 
 export class GeneratorView extends BaseView {
   selectedFiles: File[];
   lastUploadedCards: any[];
+  subTabs: NodeListOf<Element>;
+  modeContents: NodeListOf<Element>;
 
   constructor() {
     super();
@@ -29,8 +30,6 @@ export class GeneratorView extends BaseView {
       uploadQuizBtn: this.getElement('#upload-quiz-btn'),
       uploadTopic: this.getElement('#upload-topic'),
       // New elements for multi-source
-      subTabs: document.querySelectorAll('.sub-tab'),
-      modeContents: document.querySelectorAll('.mode-content'),
       textForm: this.getElement('#text-form'),
       urlsForm: this.getElement('#urls-form'),
       rawTextInput: this.getElement('#raw-text-input'),
@@ -40,6 +39,9 @@ export class GeneratorView extends BaseView {
     };
     this.selectedFiles = [];
     this.lastUploadedCards = [];
+    this.subTabs = document.querySelectorAll('.sub-tab');
+    this.modeContents = document.querySelectorAll('.mode-content');
+
 
     this.init();
   }
@@ -60,9 +62,9 @@ export class GeneratorView extends BaseView {
 
     // Topic Input Validation
     if (this.elements.topicInput) {
-      this.bind(this.elements.topicInput, 'input', (e) => {
+      this.bind(this.elements.topicInput, 'input', (e: Event) => {
         if (this.elements.generateBtn) {
-          this.elements.generateBtn.disabled = e.target.value.trim().length === 0;
+          (this.elements.generateBtn as HTMLButtonElement).disabled = (e.target as HTMLInputElement).value.trim().length === 0;
         }
       });
     }
@@ -108,10 +110,10 @@ export class GeneratorView extends BaseView {
         this.elements.fileInput?.click();
       });
       ['dragover', 'dragenter'].forEach(evt => {
-        this.bind(this.elements.uploadArea, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea.classList.add('border-purple-400'); });
+        this.bind(this.elements.uploadArea!, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea?.classList.add('border-purple-400'); });
       });
       ['dragleave', 'drop'].forEach(evt => {
-        this.bind(this.elements.uploadArea, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea.classList.remove('border-purple-400'); });
+        this.bind(this.elements.uploadArea!, evt, (ev) => { ev.preventDefault(); this.elements.uploadArea?.classList.remove('border-purple-400'); });
       });
       this.bind(this.elements.uploadArea, 'drop', (ev: any) => {
         const files = Array.from((ev.dataTransfer?.files as FileList) || []);
@@ -123,8 +125,9 @@ export class GeneratorView extends BaseView {
     }
 
     // Allow pasting images directly (clipboard)
-    this.bind(document, 'paste', (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
+    this.bind(document as unknown as HTMLElement, 'paste', (event: Event) => {
+      const clipboardEvent = event as ClipboardEvent;
+      const items = clipboardEvent.clipboardData?.items;
       if (!items) return;
       const files: File[] = [];
       for (const item of Array.from(items)) {
@@ -140,8 +143,8 @@ export class GeneratorView extends BaseView {
     });
 
     // Sub-tab switching
-    if (this.elements.subTabs) {
-      (this.elements.subTabs as NodeListOf<HTMLElement>).forEach((tab) => {
+    if (this.subTabs) {
+      (this.subTabs as NodeListOf<HTMLElement>).forEach((tab) => {
         this.bind(tab, 'click', (e) => {
           const target = e.target as HTMLElement;
           const tabBtn = target.closest('.sub-tab') as HTMLElement;
@@ -149,7 +152,7 @@ export class GeneratorView extends BaseView {
           if (!targetId) return;
 
           // Update tab styles
-          (this.elements.subTabs as NodeListOf<HTMLElement>).forEach((t) => {
+          (this.subTabs as NodeListOf<HTMLElement>).forEach((t) => {
             t.classList.remove('bg-white', 'text-indigo-600', 'shadow');
             t.classList.add('text-gray-500', 'hover:text-gray-700');
             t.setAttribute('aria-selected', 'false');
@@ -159,7 +162,7 @@ export class GeneratorView extends BaseView {
           tabBtn.setAttribute('aria-selected', 'true');
 
           // Show content
-          (this.elements.modeContents as NodeListOf<HTMLElement>).forEach((c) => {
+          (this.modeContents as NodeListOf<HTMLElement>).forEach((c) => {
             c.classList.add('hidden');
           });
           const targetContent = document.getElementById(targetId);
@@ -276,7 +279,7 @@ export class GeneratorView extends BaseView {
     const orchestrator = (window as any).llmOrchestrator;
     const prefersBrowser = settingsService.getPreferredRuntime() === 'webllm' && !!orchestrator;
     const useBrowser = prefersBrowser; // single flag
-    const runtime = useBrowser ? 'webllm' : 'ollama';
+    // const runtime = useBrowser ? 'webllm' : 'ollama';
 
     this.showLoading();
     try {
@@ -356,7 +359,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         if (cards.length !== count) {
           this.updateLoadingProgress(35, 'Switching to backend for reliable generation...');
           usedBackend = true;
-          const backendResponse = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' });
+          const backendResponse = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' } as any);
 
           let backendResult = backendResponse;
           if ((!backendResponse.cards || backendResponse.cards.length === 0) && backendResponse.jobId) {
@@ -378,7 +381,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         if (cards.length > 0) {
           this.updateLoadingProgress(95, usedBackend ? 'Finalizing server results...' : 'Finalizing local results...');
           // Robust mapping to handle various property names
-          cards = cards.map((c, i) => {
+          cards = cards.map((c: any, i: number) => {
             // Try to find the question and answer in common properties
             const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
             const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
@@ -392,7 +395,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
           });
 
           // Filter out cards where both sides are missing or placeholders
-          cards = cards.filter(c =>
+          cards = cards.filter((c: any) =>
             (c.front !== "Question missing" || c.back !== "Answer missing") &&
             c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
           );
@@ -413,7 +416,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
           count,
           runtime: useBrowser ? 'webllm' : 'ollama',
           knowledgeSource
-        });
+        } as any);
         let backendResult = data;
 
         if ((!data.cards || data.cards.length === 0) && data.jobId) {
@@ -478,22 +481,23 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
       // Process files sequentially to avoid overwhelming server
       for (let i = 0; i < this.selectedFiles.length; i++) {
         const file = this.selectedFiles[i];
+        if (!file) continue;
         const progress = 10 + Math.round(((i) / this.selectedFiles.length) * 80);
         this.updateLoadingProgress(progress, `Processing ${file.name}...`);
 
         try {
-        const response: any = await apiService.uploadFile(file, topic);
+          const response: any = await apiService.uploadFile(file, topic);
           const cards = (response && response.cards) || (response && response.data && response.data.cards);
           if (cards && Array.isArray(cards)) {
             allCards.push(...cards);
           }
         } catch (err) {
-          console.error(`Failed to upload ${file.name}:`, err);
+          console.error(`Failed to upload ${file?.name}:`, err);
           if (isAuthError(err)) {
             redirectToLoginWithAlert();
           } else {
             const message = (err as any)?.message || 'Unknown error';
-            alert(`Upload failed for ${file.name}:\n${message}`);
+            alert(`Upload failed for ${file?.name}:\n${message}`);
           }
           // stop further uploads to avoid repeated errors
           throw err;
@@ -625,7 +629,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
     // Add event listeners to new buttons
     this.elements.deckHistoryList.querySelectorAll('.load-deck-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const deckId = btn.dataset.id;
+        const deckId = (btn as HTMLElement).dataset.id;
         const deck = history.find(d => d.id === deckId);
         if (deck) {
           eventBus.emit('deck:loaded', deck.cards);
@@ -634,22 +638,22 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
     });
   }
 
-  parseLLMResponse(response) {
-    const isCodeLike = (text) => /import\s+|class\s+|def\s+|function\s|console\.log|System\.out\.println|flashcards_json|randomly selected/i.test(text);
-    const normalizeCard = (raw) => ({
+  parseLLMResponse(response: string) {
+    const isCodeLike = (text: string) => /import\s+|class\s+|def\s+|function\s|console\.log|System\.out\.println|flashcards_json|randomly selected/i.test(text);
+    const normalizeCard = (raw: any) => ({
       question: (raw?.question || raw?.front || '').trim(),
       answer: (raw?.answer || raw?.back || '').trim()
     });
-    const isValidCard = (card) => card.question && card.answer && card.question.length > 6 && card.answer.length > 6 && !isCodeLike(card.question + ' ' + card.answer);
+    const isValidCard = (card: any) => card.question && card.answer && card.question.length > 6 && card.answer.length > 6 && !isCodeLike(card.question + ' ' + card.answer);
 
-    const stripNoise = (str) => str
+    const stripNoise = (str: string) => str
       .replace(/```[a-z]*\n?/gi, '')
       .replace(/```/g, '')
       .replace(/<<<JSON_START>>>/g, '')
       .replace(/<<<JSON_END>>>/g, '')
       .replace(/^[\s\S]*?(\[)/, '$1');
 
-    const tryParse = (str) => {
+    const tryParse = (str: string) => {
       try {
         let clean = stripNoise(str)
           .replace(/\{\{/g, '{').replace(/\}\}/g, '}')
@@ -712,7 +716,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
 
     // 4) CSV / pipe / tab fallback (skip lines that look like code)
     if (cards.length === 0) {
-      const lines = response.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !isCodeLike(l));
+      const lines = response.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !isCodeLike(l));
       for (const line of lines) {
         let csvMatch = line.match(/^\"([^\"]+)\"\s*,\s*\"([^\"]+)\"$/);
         if (csvMatch) {
@@ -737,7 +741,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         }
 
         if (line.includes('\t')) {
-          const parts = line.split('\t').map(p => p.trim());
+          const parts = line.split('\t').map((p: string) => p.trim());
           if (parts.length === 2) {
             const card = normalizeCard({ question: parts[0], answer: parts[1] });
             if (isValidCard(card)) cards.push(card);
@@ -751,14 +755,15 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
     if (cards.length === 0) {
       const sentences = response
         .split(/\n+/)
-        .map(line => line.trim())
-        .filter(line => line.length > 10 && line.length < 200 && !isCodeLike(line))
-        .map(line => line.replace(/^[\"']|[\"']$/g, ''))
-        .filter((line, index, arr) => arr.indexOf(line) === index);
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 10 && line.length < 200 && !isCodeLike(line))
+        .map((line: string) => line.replace(/^[\"']|[\"']$/g, ''))
+        .filter((line: string, index: number, arr: any[]) => arr.indexOf(line) === index);
 
       for (let i = 0; i < sentences.length - 1; i += 2) {
+        if (!sentences[i] || !sentences[i + 1]) continue;
         const card = normalizeCard({
-          question: sentences[i].endsWith('?') ? sentences[i] : `${sentences[i]}?`,
+          question: sentences[i]?.endsWith('?') ? sentences[i] : `${sentences[i]}?`,
           answer: sentences[i + 1]
         });
         if (isValidCard(card)) cards.push(card);
@@ -769,7 +774,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
   }
 
   // Stricter parser for client-side generation: requires explicit markers and clean JSON
-  parseLLMResponseStrict(response, expectedCount = null) {
+  parseLLMResponseStrict(response: string, expectedCount: number | null = null) {
     if (!response) return [];
 
     // Strip common wrappers (e.g., <stdout>, markdown fences)
@@ -808,7 +813,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
 
     if (!Array.isArray(parsed)) return [];
 
-    let cards = parsed.map((c, i) => {
+    let cards = parsed.map((c, _i) => {
       const question = (c.question || c.front || '').trim();
       const answer = (c.answer || c.back || '').trim();
       return { question, answer };

@@ -38,12 +38,12 @@ export class ModelRegistry {
     static getRecommendedModel(tier: 'high' | 'mid' | 'low'): ModelConfig {
         switch (tier) {
             case 'high':
-                return this.MODELS['phi-2-q4']; // Safer default than 8B for "High" but not "Ultra"
+                return this.MODELS['phi-2-q4']!; // Safer default than 8B for "High" but not "Ultra"
             case 'mid':
-                return this.MODELS['tiny-llama-1.1b'];
+                return this.MODELS['tiny-llama-1.1b']!;
             case 'low':
             default:
-                return this.MODELS['remote-gpt-4o-mini'];
+                return this.MODELS['remote-gpt-4o-mini']!;
         }
     }
 }
