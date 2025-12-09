@@ -1,13 +1,28 @@
 const overlayId = 'loading-overlay';
 const progressId = 'loading-progress';
 const progressBarId = 'loading-progress-bar';
+const titleId = 'loading-title';
+const subtitleId = 'loading-subtitle';
 
-export function showLoading(message = 'Working...', progress?: number) {
+export interface LoadingOptions {
+  message?: string;
+  progress?: number;
+  title?: string;
+  subtitle?: string;
+}
+
+export function showLoading(message = 'Working...', progress?: number, options?: LoadingOptions) {
   const overlay = document.getElementById(overlayId);
   if (!overlay) return;
   overlay.classList.remove('hidden');
   overlay.style.display = 'flex';
   overlay.style.pointerEvents = 'auto';
+
+  // Set title/subtitle if provided
+  if (options?.title) {
+    setLoadingTitle(options.title, options.subtitle);
+  }
+
   setLoadingText(message, progress);
 }
 
@@ -18,6 +33,20 @@ export function hideLoading() {
   overlay.style.display = 'none';
   overlay.style.pointerEvents = 'none';
   setLoadingText(''); // clear text as well
+  // Reset to defaults
+  setLoadingTitle('Crafting Flashcards', 'AI is analyzing your topic to build the perfect study deck...');
+}
+
+export function setLoadingTitle(title: string, subtitle?: string) {
+  const titleEl = document.getElementById(titleId);
+  const subtitleEl = document.getElementById(subtitleId);
+
+  if (titleEl && title) {
+    titleEl.textContent = title;
+  }
+  if (subtitleEl && subtitle) {
+    subtitleEl.textContent = subtitle;
+  }
 }
 
 export function setLoadingText(message?: string, progress?: number) {

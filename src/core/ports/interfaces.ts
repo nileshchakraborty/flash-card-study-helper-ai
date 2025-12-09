@@ -9,19 +9,20 @@ export interface SearchResult {
 
 // Output Ports (Driven)
 export interface AIServicePort {
-  generateFlashcards(topic: string, count: number): Promise<Flashcard[]>;
+  generateFlashcards(topic: string, count: number, llmConfig?: any): Promise<Flashcard[]>;
   generateFlashcardsFromText(
     text: string,
     topic: string,
     count: number,
-    pageInfo?: Record<string, unknown>
+    pageInfo?: Record<string, unknown>,
+    llmConfig?: any
   ): Promise<Flashcard[]>;
-  generateBriefAnswer(question: string, context: string): Promise<string>;
-  generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]>;
-  generateQuizFromFlashcards(flashcards: Flashcard[], count: number): Promise<QuizQuestion[]>;
-  generateSummary(topic: string): Promise<string>;
-  generateSearchQuery(topic: string, parentTopic?: string): Promise<string>;
-  generateSubTopics(topic: string): Promise<string[]>;
+  generateBriefAnswer(question: string, context: string, llmConfig?: any): Promise<string>;
+  generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial', context?: string, llmConfig?: any): Promise<QuizQuestion[]>;
+  generateQuizFromFlashcards(flashcards: Flashcard[], count: number, llmConfig?: any): Promise<QuizQuestion[]>;
+  generateSummary(topic: string, llmConfig?: any): Promise<string>;
+  generateSearchQuery(topic: string, parentTopic?: string, llmConfig?: any): Promise<string>;
+  generateSubTopics(topic: string, llmConfig?: any): Promise<string[]>;
 }
 
 export interface SearchServicePort {
@@ -38,13 +39,13 @@ export interface StoragePort {
 
 // Input Ports (Driving)
 export interface StudyUseCase {
-  generateFlashcards(topic: string, count: number, mode?: 'standard' | 'deep-dive', knowledgeSource?: KnowledgeSource, runtime?: Runtime, parentTopic?: string): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }>;
+  generateFlashcards(topic: string, count: number, mode?: 'standard' | 'deep-dive', knowledgeSource?: KnowledgeSource, runtime?: Runtime, parentTopic?: string, llmConfig?: any): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }>;
   processFile(file: Buffer, filename: string, mimeType: string, topic: string): Promise<Flashcard[]>;
   processRawText(text: string, topic: string): Promise<Flashcard[]>;
   processUrls(urls: string[], topic: string): Promise<Flashcard[]>;
   getBriefAnswer(question: string, context: string): Promise<string>;
-  generateQuiz(topic: string, count: number, flashcards?: Flashcard[], preferredRuntime?: Runtime): Promise<QuizQuestion[]>;
-  generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]>;
+  generateQuiz(topic: string, count: number, flashcards?: Flashcard[], preferredRuntime?: Runtime, llmConfig?: any): Promise<QuizQuestion[]>;
+  generateAdvancedQuiz(previousResults: unknown, mode: 'harder' | 'remedial', llmConfig?: any): Promise<QuizQuestion[]>;
   saveQuizResult(result: QuizResult): Promise<string>;
   getQuizHistory(): Promise<QuizResult[]>;
   saveDeck(deck: Deck): Promise<void>;

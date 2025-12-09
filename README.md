@@ -315,6 +315,7 @@ npm run dev
 | Method | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
 | **POST** | `/api/generate` | Generate flashcards (async, returns jobId) | Yes |
+| **POST** | `/api/generate/from-content` | Generate directly from Text/URL | Yes |
 | **GET** | `/api/jobs/:id` | Poll job status and retrieve results | Yes |
 | **POST** | `/api/upload` | Upload PDF/Image for processing | Yes |
 

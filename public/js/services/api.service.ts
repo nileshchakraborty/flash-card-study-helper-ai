@@ -1,5 +1,6 @@
 import { graphqlService } from './graphql.service';
 import { cacheService } from './cache.service';
+import { configService } from './ConfigService';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 type RequestOptions = {
@@ -291,7 +292,7 @@ export class ApiService {
     let result: DeckResponse;
     if (this.useGraphQL) {
       try {
-        result = await graphqlService.createDeck(deck);
+        result = await graphqlService.createDeck(deck as any);
       } catch (error) {
         console.warn('[API] GraphQL createDeck failed, falling back to REST', error);
         result = await this.post('/decks', deck) as DeckResponse;
@@ -391,16 +392,8 @@ export class ApiService {
   private async _createQuizInternal(params: CreateQuizParams): Promise<{ success?: boolean; quiz?: QuizSummary; quizId?: string }> {
     if (this.useGraphQL) {
       try {
-        const input = {
-          topic: params.topic,
-          count: params.count,
-          cards: params.flashcardIds ? params.flashcards : undefined // Need to map IDs to objects if needed
-        };
+
         // Note: GraphQL createQuiz expects cards as objects, but REST uses IDs.
-        // For now, if flashcardIds are passed, we might need to fetch them or change logic.
-        // But createQuiz resolver handles "cards" input.
-        // If we only have IDs, we might need to stick to REST or update GraphQL to accept IDs.
-        // The schema has `cards: [FlashcardInput!]`.
 
         // If params has flashcardIds, we can't easily use GraphQL createQuiz unless we have the card data.
         // However, the frontend usually has the card data when calling this.
@@ -466,10 +459,12 @@ export class ApiService {
           answers = data.answers as Array<{ questionId: string; answer: string }>;
         } else if (data.results && Array.isArray(data.results)) {
           // Extract from QuizModel results
-          answers = data.results.map(r => ({
-            questionId: r.cardId || r.id, // Use cardId or id as questionId
-            answer: r.userAnswer
-          }));
+          answers = data.results
+            .filter(r => r.cardId || r.id)
+            .map(r => ({
+              questionId: (r.cardId || r.id) as string, // Use cardId or id as questionId
+              answer: r.userAnswer
+            }));
         }
 
         if (answers.length > 0) {
@@ -490,7 +485,15 @@ export class ApiService {
   /**
    * Generate flashcards - supports both REST and GraphQL
    */
-  async generateFlashcards(params: { topic: string; count: number; mode?: string; knowledgeSource?: string; parentTopic?: string }) {
+  async generateFlashcards(params: {
+    topic: string;
+    count: number;
+    mode?: string;
+    knowledgeSource?: string;
+    parentTopic?: string;
+    preferredRuntime?: string;
+    llmConfig?: any;
+  }) {
     if (this.useGraphQL) {
       try {
         const input = {
@@ -499,9 +502,17 @@ export class ApiService {
           mode: params.mode,
           knowledgeSource: params.knowledgeSource,
           parentTopic: params.parentTopic
+          // GraphQL schema might not support llmConfig/runtime yet, so we might need to fallback to REST
+          // for custom LLM config if we want to support it strictly via GraphQL.
+          // For now, let's assume if llmConfig is present, we fallback to REST or update GraphQL later.
         };
 
-        const result = await graphqlService.generateFlashcards(input);
+        if (params.llmConfig || params.preferredRuntime) {
+          // Fallback to REST to ensure custom config is respected until GraphQL schema is updated
+          return this.post('/generate', params);
+        }
+
+        const result: any = await graphqlService.generateFlashcards(input);
 
         // GraphQL returns { cards, jobId, recommendedTopics }
         // Convert to REST-compatible format
@@ -519,6 +530,40 @@ export class ApiService {
     return this.post('/generate', params);
   }
 
+  async generateFlashcardsFromText(
+    text: string,
+    topic: string,
+    count: number,
+    preferredRuntime?: string,
+    llmConfig?: any
+  ) {
+    return this.post('/generate/from-content', {
+      type: 'text',
+      content: text,
+      topic,
+      count,
+      preferredRuntime,
+      llmConfig
+    });
+  }
+
+  async generateFlashcardsFromUrls(
+    urls: string[],
+    topic: string,
+    count?: number,
+    preferredRuntime?: string,
+    llmConfig?: any
+  ) {
+    return this.post('/generate/from-content', {
+      type: 'url',
+      content: urls,
+      topic,
+      count,
+      preferredRuntime,
+      llmConfig
+    });
+  }
+
   /**
    * Get job status - supports both REST and GraphQL
    */
@@ -526,6 +571,7 @@ export class ApiService {
     if (this.useGraphQL) {
       try {
         const job = await graphqlService.getJobStatus(jobId);
+        if (!job) return null;
         // Convert to REST-compatible format
         return {
           id: job.id,
@@ -536,10 +582,17 @@ export class ApiService {
         };
       } catch (error) {
         console.warn('[API] GraphQL getJobStatus failed, falling back to REST', error);
-        return this.get(`/jobs/${jobId}`) as Promise<JobStatus>;
+        // Fall through to REST
       }
     }
-    return this.get(`/jobs/${jobId}`) as Promise<JobStatus>;
+    // REST returns { success: true, data: { status, result, ... } }
+    // We need to unwrap the data field
+    const response = await this.get(`/jobs/${jobId}`) as any;
+    if (response?.data) {
+      return response.data as JobStatus;
+    }
+    // Fallback for non-wrapped responses
+    return response as JobStatus;
   }
 
   /**
@@ -547,7 +600,9 @@ export class ApiService {
    * Returns the job result (e.g., { cards, recommendedTopics }).
    */
   async waitForJobResult(jobId: string, options: { maxWaitMs?: number; pollIntervalMs?: number; onProgress?: (progress: number) => void } = {}) {
-    const { maxWaitMs = 60000, pollIntervalMs = 2000, onProgress } = options; // fail faster by default (60s)
+    const { pollIntervalMs = 2000, onProgress } = options;
+    // Use configured timeout (default to 3m) unless overridden
+    const maxWaitMs = options.maxWaitMs || configService.getJobTimeout();
     const start = Date.now();
     const hardCapMs = Math.max(maxWaitMs, 300000); // never wait more than 5 minutes
     let allowedWaitMs = maxWaitMs;
@@ -591,7 +646,8 @@ export class ApiService {
 
       // If we recently saw progress, extend wait a bit (up to hard cap) to avoid premature timeout.
       const sinceProgress = Date.now() - lastProgressAt;
-      if (sinceProgress < 30000 && allowedWaitMs < hardCapMs) {
+      // Allow up to 5 minutes of silence before giving up on extension
+      if (sinceProgress < 300000 && allowedWaitMs < hardCapMs) {
         allowedWaitMs = Math.min(hardCapMs, allowedWaitMs + pollIntervalMs);
       }
     }

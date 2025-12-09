@@ -365,7 +365,8 @@
                                             class="material-icons text-5xl text-gray-400 mb-4 block">cloud_upload</span>
                                         <span class="block text-gray-700 font-medium mb-2" id="upload-text">Click to
                                             upload or drag and drop</span>
-                                        <span class="text-sm text-gray-500">PDF, Word, Excel, PNG, JPG, GIF, WEBP (Max 30MB, large files auto-split)</span>
+                                        <span class="text-sm text-gray-500">PDF, Word, Excel, PNG, JPG, GIF, WEBP (Max
+                                            30MB, large files auto-split)</span>
                                     </label>
                                 </div>
                                 <div class="selected-files hidden" id="selected-files">
@@ -585,15 +586,15 @@
 
             <!-- Quiz Tab (NEW - for taking quizzes) -->
             <section class="tab-content hidden" id="quiz-tab">
-                    <div class="max-w-4xl mx-auto">
-                        <!-- Quiz Questions (moved from old design) -->
-                        <div class="bg-white/85 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 p-6 mb-4"
-                          id="quiz-setup-guide">
-                          <!-- populated by QuizView -->
-                        </div>
+                <div class="max-w-4xl mx-auto">
+                    <!-- Quiz Questions (moved from old design) -->
+                    <div class="bg-white/85 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 p-6 mb-4"
+                        id="quiz-setup-guide">
+                        <!-- populated by QuizView -->
+                    </div>
 
-                        <div class="hidden bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 relative hover:shadow-2xl transition-all duration-300"
-                            id="quiz-questions">
+                    <div class="hidden bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8 relative hover:shadow-2xl transition-all duration-300"
+                        id="quiz-questions">
                         <div class="flex items-center justify-between mb-6">
                             <h2 class="text-xl font-semibold text-gray-900">Quiz</h2>
                             <div class="flex items-center gap-4">
@@ -705,6 +706,108 @@
             </div>
         </div>
 
+        <!-- Settings Modal -->
+        <div id="settings-modal"
+            class="fixed inset-0 bg-gray-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center">
+            <div
+                class="bg-white/95 backdrop-blur-lg rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl transform transition-all border border-white/20">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <span class="material-icons text-indigo-600">settings</span> Settings
+                    </h3>
+                    <button id="close-settings-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <span class="material-icons text-3xl">close</span>
+                    </button>
+                </div>
+
+                <form id="settings-form" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preferred Runtime</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="cursor-pointer relative">
+                                <input type="radio" name="runtime" value="ollama" class="peer sr-only">
+                                <div
+                                    class="p-4 rounded-xl border-2 border-gray-200 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all hover:bg-gray-50 h-full">
+                                    <div class="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                                        <span class="material-icons text-indigo-600">dns</span> Server / Recommended
+                                    </div>
+                                    <div class="text-xs text-gray-500">Run generic LLMs via Ollama or custom endpoint.
+                                        Supports more features.</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer relative">
+                                <input type="radio" name="runtime" value="webllm" class="peer sr-only">
+                                <div
+                                    class="p-4 rounded-xl border-2 border-gray-200 peer-checked:border-purple-500 peer-checked:bg-purple-50 transition-all hover:bg-gray-50 h-full">
+                                    <div class="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                                        <span class="material-icons text-purple-600">laptop_chromebook</span> In-Browser
+                                        (WebLLM)
+                                    </div>
+                                    <div class="text-xs text-gray-500">Run local LLM directly in browser. Privacy
+                                        focused, requires WebGPU.</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="ollama-settings" class="space-y-4 pt-4 border-t border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Custom Endpoint
+                            Configuration</h4>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="custom-llm-url">API
+                                URL</label>
+                            <input type="text" id="custom-llm-url"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-sm"
+                                placeholder="http://localhost:11434">
+                            <p class="text-xs text-gray-500 mt-1">Base URL for Ollama or compatible API.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="custom-llm-model">Model
+                                Name</label>
+                            <input type="text" id="custom-llm-model"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-sm"
+                                placeholder="llama3">
+                            <p class="text-xs text-gray-500 mt-1">Model identifier to use (e.g., llama3, mistral, qwen).
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="custom-llm-key">API Key
+                                (Optional)</label>
+                            <input type="password" id="custom-llm-key"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-sm"
+                                placeholder="sk-...">
+                            <p class="text-xs text-gray-500 mt-1">Leave blank for local Ollama.</p>
+                        </div>
+                    </div>
+
+                    <div id="webllm-settings" class="hidden space-y-4 pt-4 border-t border-gray-200">
+                        <div class="bg-purple-50 p-4 rounded-xl border border-purple-100 flex items-start gap-3">
+                            <span class="material-icons text-purple-600 mt-0.5">info</span>
+                            <div class="text-sm text-purple-800">
+                                WebLLM runs entirely in your browser. First run will convert and cache the model (2GB+).
+                                <br><br>
+                                <strong>Note:</strong> Currently supports only 'Llama-3-8B-Instruct' (q4f32_1).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                        <button type="button" id="cancel-settings"
+                            class="px-6 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium text-gray-700">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all">
+                            Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Quiz Completion Popup -->
         <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center"
             id="quiz-completion-popup">
@@ -751,10 +854,11 @@
                 </div>
 
                 <!-- Text -->
-                <h3
+                <h3 id="loading-title"
                     class="text-3xl font-bold text-center mb-3 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
                     Crafting Flashcards</h3>
-                <p class="text-gray-500 text-center mb-10 font-medium">AI is analyzing your topic to build the perfect
+                <p id="loading-subtitle" class="text-gray-500 text-center mb-10 font-medium">AI is analyzing your topic
+                    to build the perfect
                     study deck...</p>
 
                 <!-- Progress -->
@@ -826,57 +930,15 @@
             </article>
         </template>
 
-        <!-- Settings Modal -->
-        <div id="settings-modal"
-            class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm z-50 hidden items-center justify-center">
-            <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-200">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xl font-semibold text-gray-900">Preferences</h3>
-                    <button id="settings-close" class="text-gray-500 hover:text-gray-800">
-                        <span class="material-icons">close</span>
-                    </button>
-                </div>
-                <div class="space-y-4">
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-800 mb-2">Default AI Runtime</h4>
-                        <div class="space-y-2">
-                            <label class="flex items-center gap-2">
-                                <input type="radio" name="runtime-pref" value="ollama" class="runtime-radio">
-                                <span>Ollama (prefer if available)</span>
-                            </label>
-                            <label class="flex items-center gap-2">
-                                <input type="radio" name="runtime-pref" value="webllm" class="runtime-radio">
-                                <span>WebLLM (browser) first</span>
-                            </label>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-2">The other runtime will be used automatically as fallback.
-                        </p>
-                    </div>
-                    <div class="pt-2 border-t border-gray-200">
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" id="model-manager-enabled" class="h-4 w-4 rounded border-gray-300">
-                            <div>
-                                <span class="font-medium text-gray-800">Enable AI Model Manager</span>
-                                <p class="text-xs text-gray-500">Enabled by default. Loads only when enabled.</p>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-                <div class="mt-6 flex justify-end gap-3">
-                    <button id="settings-cancel"
-                        class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                    <button id="settings-save"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
-                </div>
-            </div>
-        </div>
+
     </div>
     <script src="dist/speed-insights-init.js" type="module"></script>
     <script src="dist/analytics-init.js" type="module"></script>
     <script src="dist/main.js" type="module"></script>
 
     <!-- Global Error Bar -->
-    <div id="error-bar" class="hidden fixed left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[520px] bottom-4 z-[120] bg-red-600 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center justify-between transition-all duration-200 opacity-0 translate-y-10">
+    <div id="error-bar"
+        class="hidden fixed left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[520px] bottom-4 z-[120] bg-red-600 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center justify-between transition-all duration-200 opacity-0 translate-y-10">
         <span id="error-bar-message" class="text-sm font-medium pr-3"></span>
         <button id="error-bar-close" class="text-white/80 hover:text-white text-sm font-semibold">Close</button>
     </div>

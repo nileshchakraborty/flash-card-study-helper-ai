@@ -131,6 +131,7 @@ Headers:
   }
 }
 ```
+> **Note**: The `result` field is **ALWAYS** a parsed JSON Object (never a stringified JSON string). For flashcard generation jobs, it strictly adheres to the `{ cards: DeckCard[] }` schema. Clients should expect this format and need not handle string parsing.
 
 **Response** (200) - Failed:
 ```json

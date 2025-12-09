@@ -127,3 +127,48 @@
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world history","cardCount":5,"duration":12268,"success":true,"timestamp":1765171006877}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world history","cardCount":5,"duration":117,"success":true,"timestamp":1765174862103}
 {"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"java","cardCount":5,"duration":13841,"success":true,"timestamp":1765175362001}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":5,"duration":18605,"success":true,"timestamp":1765247246915}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"python","cardCount":5,"duration":1,"success":true,"timestamp":1765247246964}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"python","cardCount":10,"duration":20800,"success":true,"timestamp":1765247837406}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Type Hints and Static Analysis for Python Code","cardCount":5,"duration":15433,"success":true,"timestamp":1765247852891}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Python Decorators and Generators for Efficient Programming","cardCount":5,"duration":12151,"success":true,"timestamp":1765247865086}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Concurrency and Parallel Processing in Python using asyncio and multiprocessing","cardCount":5,"duration":9864,"success":true,"timestamp":1765247874997}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"Advanced Object-Oriented Programming in Python (MRO and metaclasses)","cardCount":10,"duration":29492,"success":true,"timestamp":1765248092583}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Class-Based Inheritance Analysis (Liskov Substitution Principle)","cardCount":5,"duration":14623,"success":true,"timestamp":1765248107254}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Duck Typing and Dynamic Method Resolution (MRO)","cardCount":5,"duration":14256,"success":true,"timestamp":1765248121557}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Python Metaclasses with __new__ and __init__ Methods","cardCount":5,"duration":14380,"success":true,"timestamp":1765248135981}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"terraform","cardCount":5,"duration":10447,"success":true,"timestamp":1765248252235}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"terraform","cardCount":5,"duration":0,"success":true,"timestamp":1765248252277}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"typescript","cardCount":5,"duration":11596,"success":true,"timestamp":1765248726406}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"typescript","cardCount":5,"duration":0,"success":true,"timestamp":1765248726452}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"ruby","cardCount":5,"duration":13877,"success":true,"timestamp":1765248937330}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"ruby","cardCount":5,"duration":0,"success":true,"timestamp":1765248937371}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"javascript","cardCount":5,"duration":8061,"success":true,"timestamp":1765250351324}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"javascript","cardCount":5,"duration":1,"success":true,"timestamp":1765250351379}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":1535,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250606068}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":76,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250606154}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":84,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250608239}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":77,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250608324}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":76,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250612332}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"angular","cardCount":0,"duration":72,"success":false,"errorMessage":"Failed to communicate with AI service","timestamp":1765250612409}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"node.js","cardCount":5,"duration":7721,"success":true,"timestamp":1765250675733}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"node.js","cardCount":5,"duration":1,"success":true,"timestamp":1765250675780}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world war 1","cardCount":5,"duration":6574,"success":true,"timestamp":1765253297262}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world war 1","cardCount":5,"duration":1,"success":true,"timestamp":1765253297452}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world war 2","cardCount":5,"duration":7974,"success":true,"timestamp":1765253464365}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"world war 2","cardCount":5,"duration":1,"success":true,"timestamp":1765253464497}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":".net","cardCount":5,"duration":7466,"success":true,"timestamp":1765253723625}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":".net","cardCount":5,"duration":0,"success":true,"timestamp":1765253723673}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Latency Test Topic","cardCount":5,"duration":2332,"success":true,"timestamp":1765254614790}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Latency Test Topic","cardCount":5,"duration":131,"success":true,"timestamp":1765254705880}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"neural network","cardCount":5,"duration":7721,"success":true,"timestamp":1765255116410}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"neural network","cardCount":5,"duration":1,"success":true,"timestamp":1765255116453}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"spring","cardCount":5,"duration":31656,"success":true,"timestamp":1765255686998}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"spring","cardCount":5,"duration":0,"success":true,"timestamp":1765255687042}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"calculus","cardCount":5,"duration":6730,"success":true,"timestamp":1765256054107}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"calculus","cardCount":5,"duration":1,"success":true,"timestamp":1765256054149}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"geometry","cardCount":5,"duration":8949,"success":true,"timestamp":1765256490092}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"geometry","cardCount":5,"duration":1,"success":true,"timestamp":1765256490137}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"deep-dive","topic":"geometry","cardCount":10,"duration":28641,"success":true,"timestamp":1765256531266}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Non-Euclidean Geometry","cardCount":5,"duration":8046,"success":true,"timestamp":1765256539647}
+{"runtime":"ollama","knowledgeSource":"ai-web","mode":"standard","topic":"Fractal Geometry","cardCount":5,"duration":8814,"success":true,"timestamp":1765256548503}

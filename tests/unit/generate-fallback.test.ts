@@ -73,6 +73,7 @@ describe('Generate fallback when queue is unavailable', () => {
             'standard',
             'ai-web',
             'ollama',
+            undefined,
             undefined
         );
         expect(res.status).not.toHaveBeenCalledWith(500);

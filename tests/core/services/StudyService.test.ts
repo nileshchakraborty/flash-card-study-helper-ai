@@ -22,7 +22,8 @@ const mockStorageAdapter: jest.Mocked<StoragePort> = {
   saveQuizResult: jest.fn(),
   getQuizHistory: jest.fn(),
   saveDeck: jest.fn(),
-  getDeckHistory: jest.fn()
+  getDeckHistory: jest.fn(),
+  getDeck: jest.fn()
 };
 
 describe('StudyService', () => {
@@ -66,7 +67,7 @@ describe('StudyService', () => {
 
       expect(mockSearchAdapter.search).toHaveBeenCalled();
       // When no context is available, it falls back to generateFlashcards
-      expect(mockAiAdapter.generateFlashcards).toHaveBeenCalledWith('test topic', 5);
+      expect(mockAiAdapter.generateFlashcards).toHaveBeenCalledWith('test topic', 5, undefined);
       expect(result.cards).toHaveLength(5); // enforceCardCount pads to requested count
     });
   });
@@ -90,7 +91,7 @@ describe('StudyService', () => {
 
       await studyService.generateQuiz('test', 5);
 
-      expect(mockAiAdapter.generateAdvancedQuiz).toHaveBeenCalledWith({ topic: 'test', wrongAnswers: [] }, 'harder');
+      expect(mockAiAdapter.generateAdvancedQuiz).toHaveBeenCalledWith({ topic: 'test', wrongAnswers: [] }, 'harder', undefined, undefined);
     });
   });
 
@@ -154,16 +155,18 @@ describe('StudyService', () => {
       ).rejects.toThrow('Unable to extract meaningful text');
     });
 
-  it('should handle file processing errors gracefully', async () => {
-    mockAiAdapter.generateFlashcardsFromText.mockRejectedValueOnce(new Error('AI service failed'));
-    const buffer = Buffer.from('Valid content with more than 10 characters');
+    it('should handle file processing errors gracefully', async () => {
+      mockAiAdapter.generateFlashcardsFromText.mockRejectedValueOnce(new Error('AI service failed'));
+      const buffer = Buffer.from('Valid content with more than 10 characters');
 
-    const result = await studyService.processFile(buffer, 'test.txt', 'text/plain', 'Test');
+      const result = await studyService.processFile(buffer, 'test.txt', 'text/plain', 'Test');
 
-    expect(result).toBeDefined();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0); // falls back to heuristic generation
-    expect(result[0].sourceType).toBe('upload');
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0); // falls back to heuristic generation
+      if (result[0]) {
+        expect((result[0] as any).sourceType).toBe('upload');
+      }
+    });
   });
-});
 });

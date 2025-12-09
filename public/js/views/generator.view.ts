@@ -287,23 +287,24 @@ export class GeneratorView extends BaseView {
       let usedBackend = false;
 
       if (useBrowser) {
-        console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: webllm (client-side)');
-        this.updateLoadingProgress(5, 'Loading browser model...');
+        try {
+          console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: webllm (client-side)');
+          this.updateLoadingProgress(5, 'Loading browser model...');
 
-        const orchestrator = (window as any).llmOrchestrator;
-        if (!orchestrator) {
-          throw new Error('LLM Orchestrator not initialized for client-side generation.');
-        }
+          const orchestrator = (window as any).llmOrchestrator;
+          if (!orchestrator) {
+            throw new Error('LLM Orchestrator not available - falling back to server');
+          }
 
-        // Ensure model is loaded (if not, it might try to load default or fail)
-        if (!orchestrator.isModelLoaded()) {
-          const { config } = orchestrator.getRecommendedStrategy();
-          await orchestrator.loadModel(config);
-        }
+          // Ensure model is loaded (if not, it might try to load default or fail)
+          if (!orchestrator.isModelLoaded()) {
+            const { config } = orchestrator.getRecommendedStrategy();
+            await orchestrator.loadModel(config);
+          }
 
-        this.updateLoadingProgress(15, 'Generating locally...');
+          this.updateLoadingProgress(15, 'Generating locally...');
 
-        const prompt = `You must generate flashcards in STRICT JSON format.
+          const prompt = `You must generate flashcards in STRICT JSON format.
 
 TASK: Create exactly ${count} flashcards about: "${topic}"
 
@@ -342,67 +343,79 @@ Topic: "World History"
 
 NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
 
-        console.log('Generating flashcards with client-side LLM...');
-        const response = await orchestrator.generate(prompt);
-        console.log('Client-side LLM Response:', response);
+          console.log('Generating flashcards with client-side LLM...');
+          const response = await orchestrator.generate(prompt);
+          console.log('Client-side LLM Response:', response);
 
-        try {
-          cards = this.parseLLMResponseStrict(response, count);
-        } catch (e) {
-          console.warn('Client-side parsing error, will fallback to backend:', e);
-          cards = [];
-        }
-
-        console.log(`Parsed ${cards.length} raw cards (strict), expected: ${count}`);
-
-        // If client-side failed or count mismatched, fallback to backend queue
-        if (cards.length !== count) {
-          this.updateLoadingProgress(35, 'Switching to backend for reliable generation...');
-          usedBackend = true;
-          const backendResponse = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' } as any);
-
-          let backendResult = backendResponse;
-          if ((!backendResponse.cards || backendResponse.cards.length === 0) && backendResponse.jobId) {
-            backendResult = await apiService.waitForJobResult(backendResponse.jobId, {
-              maxWaitMs: 90000, // fail fast: 90s cap
-              pollIntervalMs: 2000,
-              onProgress: (p) => this.updateLoadingProgress(p, 'Generating on server...')
-            });
+          try {
+            cards = this.parseLLMResponseStrict(response, count);
+          } catch (e) {
+            console.warn('Client-side parsing error, will fallback to backend:', e);
+            cards = [];
           }
 
-          cards = (backendResult?.cards || []).slice(0, count);
+          console.log(`Parsed ${cards.length} raw cards (strict), expected: ${count}`);
+
+          // If client-side failed or count mismatched, fallback to backend queue
+          if (cards.length !== count) {
+            this.updateLoadingProgress(35, 'Switching to backend for reliable generation...');
+            usedBackend = true;
+            const backendResponse = await apiService.generateFlashcards({ topic, count, runtime: 'ollama', knowledgeSource: 'ai-web' } as any);
+
+            let backendResult = backendResponse;
+            if ((!backendResponse.cards || backendResponse.cards.length === 0) && backendResponse.jobId) {
+              backendResult = await apiService.waitForJobResult(backendResponse.jobId, {
+                maxWaitMs: 90000, // fail fast: 90s cap
+                pollIntervalMs: 2000,
+                onProgress: (p) => this.updateLoadingProgress(p, 'Generating on server...')
+              });
+            }
+
+            cards = (backendResult?.cards || []).slice(0, count);
+          }
+
+          // Enforce requested count client-side - final check
+          if (cards.length > count) {
+            cards = cards.slice(0, count);
+          }
+
+          if (cards.length > 0) {
+            this.updateLoadingProgress(95, usedBackend ? 'Finalizing server results...' : 'Finalizing local results...');
+            // Robust mapping to handle various property names
+            cards = cards.map((c: any, i: number) => {
+              // Try to find the question and answer in common properties
+              const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
+              const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
+
+              return {
+                id: `gen-${Date.now()}-${i}`,
+                front: question,
+                back: answer,
+                topic: topic
+              };
+            });
+
+            // Filter out cards where both sides are missing or placeholders
+            cards = cards.filter((c: any) =>
+              (c.front !== "Question missing" || c.back !== "Answer missing") &&
+              c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
+            );
+          }
+
+        } catch (webllmError) {
+          // WebLLM FAILED - Mark for server fallback
+          console.warn('[WebLLM] Client-side generation failed, falling back to server:', webllmError);
+          this.updateLoadingProgress(20, 'Switching to server...');
+          usedBackend = true;
+          cards = []; // Reset cards to trigger server fallback below
         }
+      }
 
-        // Enforce requested count client-side - final check
-        if (cards.length > count) {
-          cards = cards.slice(0, count);
+      // SERVER FALLBACK: Run if WebLLM wasn't tried, failed, or produced no cards
+      if (!useBrowser || cards.length === 0) {
+        if (!useBrowser) {
+          console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: ollama (server-side)');
         }
-
-        if (cards.length > 0) {
-          this.updateLoadingProgress(95, usedBackend ? 'Finalizing server results...' : 'Finalizing local results...');
-          // Robust mapping to handle various property names
-          cards = cards.map((c: any, i: number) => {
-            // Try to find the question and answer in common properties
-            const question = c.question || c.questions || c.front || c.term || c.concept || "Question missing";
-            const answer = c.answer || c.answers || c.back || c.definition || c.description || "Answer missing";
-
-            return {
-              id: `gen-${Date.now()}-${i}`,
-              front: question,
-              back: answer,
-              topic: topic
-            };
-          });
-
-          // Filter out cards where both sides are missing or placeholders
-          cards = cards.filter((c: any) =>
-            (c.front !== "Question missing" || c.back !== "Answer missing") &&
-            c.front !== "Q1" && c.front !== "Q2" // Reject template placeholders
-          );
-        }
-
-      } else {
-        console.log('Generating flashcards for:', topic, 'count:', count, 'runtime: ollama (server-side)');
 
         // Get configuration
         const { ConfigurationService } = await import('../services/ConfigurationService.js');
@@ -414,7 +427,7 @@ NOW create ${count} flashcards about "${topic}" following this EXACT format:`;
         const data = await apiService.generateFlashcards({
           topic,
           count,
-          runtime: useBrowser ? 'webllm' : 'ollama',
+          runtime: 'ollama',
           knowledgeSource
         } as any);
         let backendResult = data;

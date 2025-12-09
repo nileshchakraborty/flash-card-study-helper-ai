@@ -251,7 +251,8 @@ const server = new ExpressServer(
     redisService || undefined, // Pass undefined if null to match updated constructor if needed, or null if expected
     supabaseService,
     vectorService,
-    blobService
+    blobService,
+    directOllamaAdapter // Pass adapter for warmup functionality
 );
 
 const PORT = parseInt(process.env.PORT || '3000', 10);

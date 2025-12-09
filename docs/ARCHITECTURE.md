@@ -1,7 +1,7 @@
 # MindFlip AI - System Architecture
 
-**Last Updated**: 2025-12-06  
-**Version**: 2.0 (MCP-First Architecture)
+**Last Updated**: 2025-12-09  
+**Version**: 2.1 (MCP-First Architecture & robust Queue)
 
 ## High-Level Architecture
 
@@ -32,7 +32,7 @@ graph TB
     end
 
     subgraph "Queue System"
-        BULL[BullMQ]
+        BULL[BullMQ (Redis)<br/>or In-Memory Fallback]
         WORKER[Queue Worker]
         CACHE_SVC[FlashcardCache]
     end
@@ -215,6 +215,8 @@ Queue System (BullMQ)
 Worker Process
     ↓
 [Future: LangGraph Orchestration]
+    ↓
+StudyService (Parallel: AI Summary + Web Content)
     ↓
 Hybrid Adapters (MCP-first)
     ↓

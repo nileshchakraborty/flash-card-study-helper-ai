@@ -165,7 +165,8 @@ export class StudyService implements StudyUseCase {
     mode: QuizMode = 'standard',
     knowledgeSource: KnowledgeSource = 'ai-web',
     runtime: Runtime = 'ollama',
-    parentTopic?: string
+    parentTopic?: string,
+    llmConfig?: any
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     const desiredCount = Math.max(1, count || 1);
     const startTime = Date.now();
@@ -175,7 +176,7 @@ export class StudyService implements StudyUseCase {
     }
 
     try {
-      const result = await this.doGenerateFlashcards(topic, desiredCount, mode, knowledgeSource, adapter, parentTopic);
+      const result = await this.doGenerateFlashcards(topic, desiredCount, mode, knowledgeSource, adapter, parentTopic, llmConfig);
       const validated = await this.validateAndRepairFlashcards(result.cards, desiredCount, topic, adapter);
       const adjustedCards = this.enforceCardCount(validated, desiredCount, topic);
 
@@ -255,43 +256,57 @@ export class StudyService implements StudyUseCase {
     mode: QuizMode,
     knowledgeSource: KnowledgeSource,
     _aiAdapter: AIServicePort,
-    parentTopic?: string
+    parentTopic?: string,
+    llmConfig?: any
   ): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     if (mode === 'deep-dive') {
-      return this.generateDeepDiveFlashcards(topic, count);
+      return this.generateDeepDiveFlashcards(topic, count, llmConfig);
     }
 
     console.log(`\n=== Starting Knowledge Retrieval for: "${topic}" (Mode: ${knowledgeSource}) ===`);
 
-    // Step 1: Check AI Internal Knowledge (skip if web-only)
+    // Parallel Execution for Mixed Mode
     let aiSummary = '';
-    if (knowledgeSource !== 'web-only') {
-      console.log('1. Checking AI internal knowledge...');
-      try {
-        aiSummary = await this.getAdapter('ollama').generateSummary(topic);
-        console.log('   AI Summary:', aiSummary.substring(0, 100) + '...');
-      } catch (e) {
-        console.warn('   Failed to get AI summary:', (e as Error).message);
-      }
-    }
+    let scrapedContent = '';
 
-    // If AI-only mode, generate directly from AI knowledge
     if (knowledgeSource === 'ai-only') {
-      console.log('2. Generating flashcards from AI knowledge (ai-only mode)...');
+      console.log('1. Generating flashcards from AI knowledge (ai-only mode)...');
       try {
-        let cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
-        cards = await this.validateAndRepairFlashcards(cards, count, topic, this.getAdapter('ollama'));
+        const adapter = _aiAdapter as any;
+        let cards = await adapter.generateFlashcards(topic, count, llmConfig);
+        cards = await this.validateAndRepairFlashcards(cards, count, topic, adapter);
         cards = this.enforceCardCount(cards, count, topic);
         return { cards };
       } catch (e) {
-        console.error('   Failed to generate from AI knowledge:', (e as Error).message);
         throw new Error(`Failed to generate flashcards from AI knowledge: ${(e as Error).message}`);
       }
-    }
+    } else if (knowledgeSource === 'web-only') {
+      console.log('1. Fetching web context (web-only mode)...');
+      scrapedContent = await this.getCachedOrFreshWebContext(topic, parentTopic);
+    } else {
+      // ai-web: Run in parallel
+      console.log('1. Fetching AI Summary & Web Context in parallel...');
+      const adapter = _aiAdapter as any;
 
-    // Step 2: Get web context (cache-first)
-    // At this point, we know it's either 'web-only' or 'ai-web' mode
-    const scrapedContent = await this.getCachedOrFreshWebContext(topic, parentTopic);
+      const [summaryResult, webResult] = await Promise.all([
+        // Task A: AI Summary
+        (async () => {
+          try {
+            const s = await adapter.generateSummary(topic, llmConfig);
+            console.log('   AI Summary:', s.substring(0, 100) + '...');
+            return s;
+          } catch (e) {
+            console.warn('   Failed to get AI summary:', (e as Error).message);
+            return '';
+          }
+        })(),
+        // Task B: Web Context
+        this.getCachedOrFreshWebContext(topic, parentTopic)
+      ]);
+
+      aiSummary = summaryResult;
+      scrapedContent = webResult;
+    }
 
     // Step 3: Synthesize & Generate
     console.log('3. Synthesizing context and generating flashcards...');
@@ -306,14 +321,16 @@ export class StudyService implements StudyUseCase {
     let cards: Flashcard[] = [];
     if (combinedContext) {
       // Use the text-based generation with our rich context
-      cards = await this.getAdapter('ollama').generateFlashcardsFromText(combinedContext, topic, count);
+      const adapter = _aiAdapter as any;
+      cards = await adapter.generateFlashcardsFromText(combinedContext, topic, count, undefined, llmConfig);
     }
 
     // Fallback or Initial Attempt if no context:
     // If context generation failed OR yielded 0 cards, try basic generation
     if (!cards || cards.length === 0) {
       console.log('   Context-based generation returned empty/null, falling back to basic generation.');
-      cards = await this.getAdapter('ollama').generateFlashcards(topic, count);
+      const adapter = _aiAdapter as any;
+      cards = await adapter.generateFlashcards(topic, count, llmConfig);
     }
 
     cards = await this.validateAndRepairFlashcards(cards, count, topic, this.getAdapter('ollama'));
@@ -321,22 +338,22 @@ export class StudyService implements StudyUseCase {
     return { cards };
   }
 
-  private async generateDeepDiveFlashcards(topic: string, count: number): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
+  private async generateDeepDiveFlashcards(topic: string, count: number, llmConfig?: any): Promise<{ cards: Flashcard[], recommendedTopics?: string[] }> {
     console.log(`\n=== Starting DEEP DIVE Knowledge Retrieval for: "${topic}" ===`);
 
     // 1. Generate Sub-topics
     console.log('1. Identifying advanced sub-topics...');
     let subTopics: string[] = [];
     try {
-      subTopics = await this.getAdapter('ollama').generateSubTopics(topic);
+      subTopics = await this.getAdapter('ollama').generateSubTopics(topic, llmConfig);
       console.log(`   Identified ${subTopics.length} sub-topics:`, subTopics.join(', '));
     } catch (e) {
       console.warn('   Failed to generate sub-topics, falling back to standard mode.');
-      return this.generateFlashcards(topic, count, 'standard');
+      return this.generateFlashcards(topic, count, 'standard', undefined, undefined, undefined, llmConfig);
     }
 
     if (subTopics.length === 0) {
-      return this.generateFlashcards(topic, count, 'standard');
+      return this.generateFlashcards(topic, count, 'standard', undefined, undefined, undefined, llmConfig);
     }
 
     // 2. Select ONLY the first sub-topic for immediate processing
@@ -364,7 +381,7 @@ export class StudyService implements StudyUseCase {
           uniqueDomains.add(h);
           return true;
         } catch { return false; }
-      }).slice(0, 3);
+      }).slice(0, 2); // Limit Deep Dive sources to 2 for speed
 
       // Scrape
       const urls = topSources.map(r => r.link);
@@ -387,7 +404,7 @@ export class StudyService implements StudyUseCase {
 
   private async scrapeMultipleSources(urls: string[]): Promise<string> {
     const axiosInstance = axios.create({
-      timeout: 4000,
+      timeout: 3000,
       httpAgent: new http.Agent({ keepAlive: false }),
       httpsAgent: new https.Agent({ keepAlive: false }),
     });
@@ -468,7 +485,7 @@ export class StudyService implements StudyUseCase {
       }
     });
 
-    const topSources = diverseSources.slice(0, 5);
+    const topSources = diverseSources.slice(0, 3);
     console.log(`   Selected top ${topSources.length} unique sources for scraping.`);
 
     // Step 4: Scrape content
@@ -549,7 +566,7 @@ export class StudyService implements StudyUseCase {
   }
 
   private extractTokens(text: string): Set<string> {
-    const stop = new Set(['the','a','an','and','or','of','in','on','to','for','with','by','from','at','as','is','are','was','were','be','this','that','these','those','it','its','their','his','her','our','your','my','we','you','they']);
+    const stop = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'to', 'for', 'with', 'by', 'from', 'at', 'as', 'is', 'are', 'was', 'were', 'be', 'this', 'that', 'these', 'those', 'it', 'its', 'their', 'his', 'her', 'our', 'your', 'my', 'we', 'you', 'they']);
     return new Set(
       text
         .toLowerCase()
@@ -599,7 +616,8 @@ export class StudyService implements StudyUseCase {
     topic: string,
     count: number,
     flashcards?: Flashcard[],
-    preferredRuntime: 'ollama' | 'webllm' = 'ollama'
+    preferredRuntime: 'ollama' | 'webllm' = 'ollama',
+    llmConfig?: any
   ): Promise<QuizQuestion[]> {
     const sanitizeQuestions = (qs: QuizQuestion[] | null): QuizQuestion[] | null => {
       if (!qs) return null;
@@ -670,14 +688,14 @@ export class StudyService implements StudyUseCase {
       console.log('Generating quiz from', flashcards.length, 'flashcards');
 
       // Try primary
-      const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
+      const primaryResult = await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count, llmConfig).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
       if (primaryResult === null || primaryResult?.length === 0) {
         console.warn('[StudyService] Primary quiz generation returned empty/null result');
       }
 
       // Quality failed or generation failed; try secondary for validation
       const secondaryResult = !primaryResult
-        ? await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
+        ? await tryAdapters((adapter) => adapter.generateQuizFromFlashcards(flashcards, count, llmConfig).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
         : null;
       if (secondaryResult && secondaryResult.length > 0) {
         console.log(`[StudyService] Secondary quiz generation succeeded: ${secondaryResult.length} questions`);
@@ -691,7 +709,7 @@ export class StudyService implements StudyUseCase {
 
     // 2) Topic-based quiz
     console.log(`[StudyService] Generating topic-based quiz for: ${topic}`);
-    const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
+    const primaryResult = await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder', undefined, llmConfig).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)));
     if (primaryResult === null || primaryResult?.length === 0) {
       console.warn('[StudyService] Primary topic quiz generation returned empty/null result');
     } else {
@@ -699,7 +717,7 @@ export class StudyService implements StudyUseCase {
     }
 
     const secondaryResult = !primaryResult
-      ? await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder').then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
+      ? await tryAdapters((adapter) => adapter.generateAdvancedQuiz({ topic, wrongAnswers: [] }, 'harder', undefined, llmConfig).then(qualityGate).then((qs: QuizQuestion[] | null) => sanitizeQuestions(qs)))
       : null;
     if (secondaryResult && secondaryResult.length > 0) {
       console.log(`[StudyService] Secondary topic quiz generation succeeded: ${secondaryResult.length} questions`);
@@ -711,7 +729,7 @@ export class StudyService implements StudyUseCase {
     return filled;
   }
 
-  async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial'): Promise<QuizQuestion[]> {
+  async generateAdvancedQuiz(previousResults: any, mode: 'harder' | 'remedial', llmConfig?: any): Promise<QuizQuestion[]> {
     console.log('[StudyService.generateAdvancedQuiz] START');
     console.log('[StudyService.generateAdvancedQuiz] Mode:', mode);
     console.log('[StudyService.generateAdvancedQuiz] Previous results:', JSON.stringify(previousResults, null, 2));
@@ -731,7 +749,7 @@ export class StudyService implements StudyUseCase {
     if (mode === 'harder' && previousResults.topic && !userProvidedScope) {
       try {
         console.log(`[StudyService] Getting web context for advanced quiz on: ${previousResults.topic}`);
-        context = await this.getCachedOrFreshWebContext(previousResults.topic);
+        context = await this.getCachedOrFreshWebContext(previousResults.topic); // TODO: pass llmConfig here if searching uses LLM
         console.log(`[StudyService] Web context retrieved, length: ${context.length} chars`);
         console.log('[StudyService] Added web context to advanced quiz generation.');
       } catch (e) {
@@ -743,7 +761,7 @@ export class StudyService implements StudyUseCase {
     }
 
     console.log('[StudyService] Calling adapter.generateAdvancedQuiz with context length:', context.length);
-    const result = await this.getAdapter('ollama').generateAdvancedQuiz(previousResults, mode, context);
+    const result = await this.getAdapter('ollama').generateAdvancedQuiz(previousResults, mode, context, llmConfig);
     console.log('[StudyService.generateAdvancedQuiz] COMPLETE - Generated', result.length, 'questions');
 
     return result;

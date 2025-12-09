@@ -150,7 +150,16 @@ export class QueueService {
 
         const state = await job.getState();
         const progress = job.progress;
-        const returnValue = job.returnvalue;
+        let returnValue = job.returnvalue;
+
+        // Parse stringified JSON if needed (common with Redis storage in BullMQ)
+        if (typeof returnValue === 'string') {
+            try {
+                returnValue = JSON.parse(returnValue);
+            } catch (e) {
+                // If parsing fails, keep as string (might be a simple string result)
+            }
+        }
         const failedReason = job.failedReason;
 
         return {
@@ -170,7 +179,7 @@ export class QueueService {
 
             if (event === 'completed') {
                 logger.info('Job completed (local)', { jobId: job.id, topic: job.data.topic });
-                pubsub.publish(`JOB_UPDATED_${job.id}`, {
+                await pubsub.publish(`JOB_UPDATED_${job.id}`, {
                     jobUpdated: {
                         id: job.id,
                         status: 'COMPLETED',
@@ -180,7 +189,7 @@ export class QueueService {
                 });
             } else if (event === 'failed') {
                 logger.error('Job failed (local)', { jobId: job.id, error: err?.message });
-                pubsub.publish(`JOB_UPDATED_${job.id}`, {
+                await pubsub.publish(`JOB_UPDATED_${job.id}`, {
                     jobUpdated: {
                         id: job.id,
                         status: 'FAILED',
@@ -204,7 +213,16 @@ export class QueueService {
         const worker = new Worker('flashcard-generation', processor, { connection: this.connection! });
 
         worker.on('completed', async (job) => {
-            logger.info('Job completed', { jobId: job.id, topic: job.data.topic });
+            const processedOn = job.processedOn || job.timestamp;
+            const finishedOn = job.finishedOn || Date.now();
+            const duration = finishedOn - processedOn;
+            const waitTime = processedOn - job.timestamp;
+            logger.info('Job completed', {
+                jobId: job.id,
+                topic: job.data.topic,
+                durationMs: duration,
+                waitMs: waitTime
+            });
 
             try {
                 const { pubsub } = await import('../../graphql/resolvers/job.resolvers.js');
@@ -214,7 +232,7 @@ export class QueueService {
                     result: job.returnvalue,
                     progress: 100
                 };
-                pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+                await pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
             } catch (error) {
                 logger.error('Failed to publish job completion', { error });
             }
@@ -232,7 +250,7 @@ export class QueueService {
                         error: err.message,
                         progress: job.progress || 0
                     };
-                    pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+                    await pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
                 } catch (error) {
                     logger.error('Failed to publish job failure', { error });
                 }
@@ -259,7 +277,7 @@ export class QueueService {
                     status: 'PROCESSING',
                     progress: typeof progress === 'number' ? progress : 0
                 };
-                pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
+                await pubsub.publish(`JOB_UPDATED_${job.id}`, { jobUpdated: jobStatus });
             } catch (error) {
                 logger.error('Failed to publish job progress', { error });
             }

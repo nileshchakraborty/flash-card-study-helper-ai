@@ -897,10 +897,34 @@ export class QuizView extends BaseView {
   }
 
   showLoading() {
-    showLoading('Preparing your quiz...', 0);
+    showLoading('Preparing your quiz...', 5, {
+      title: 'Generating Quiz',
+      subtitle: 'AI is creating challenging questions based on your content...'
+    });
+    // Start simulated progress for synchronous quiz operation
+    this.startProgressSimulation();
+  }
+
+  private progressInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startProgressSimulation() {
+    let progress = 5;
+    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.progressInterval = setInterval(() => {
+      progress = Math.min(90, progress + Math.random() * 8 + 2);
+      setLoadingText('Generating questions...', progress);
+    }, 800);
+  }
+
+  private stopProgressSimulation() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
   }
 
   hideLoading() {
+    this.stopProgressSimulation();
     hideLoading();
   }
 

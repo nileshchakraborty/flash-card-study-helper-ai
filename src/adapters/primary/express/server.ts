@@ -72,6 +72,7 @@ export class ExpressServer {
   // private _blobService: BlobStorageService | null;
   private redisService: RedisService | null = null;
   private supabaseService: SupabaseService | null = null;
+  private ollamaAdapter: any = null; // OllamaAdapter for warmup
 
   constructor(
     private studyService: StudyUseCase,
@@ -83,7 +84,8 @@ export class ExpressServer {
     _redisService: RedisService | null = null,
     _supabaseService: SupabaseService | LocalDbService | null = null,
     _vectorService: UpstashVectorService | InMemoryVectorService | null = null,
-    _blobService: BlobStorageService | null = null
+    _blobService: BlobStorageService | null = null,
+    _ollamaAdapter: any = null // OllamaAdapter for warmup
   ) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
@@ -106,6 +108,7 @@ export class ExpressServer {
     const supa = (_supabaseService as SupabaseService | null) || new SupabaseService();
     supa.initialize().catch(err => logger.warn('Supabase init failed', err));
     this.supabaseService = supa;
+    this.ollamaAdapter = _ollamaAdapter; // Store OllamaAdapter for warmup
     // this._redisService = redisService;
     // this._supabaseService = supabaseService;
     // this._vectorService = vectorService;
@@ -813,7 +816,7 @@ export class ExpressServer {
       const requestId = (req as any).requestId;
 
       try {
-        const { topic, numQuestions, count, flashcardIds, cards } = req.body;
+        const { topic, numQuestions, count, flashcardIds, cards, llmConfig } = req.body;
         if (!isValidQuizBody(req.body)) {
           return sendError(res, 400, 'Either topic or flashcardIds is required', {
             requestId,
@@ -827,7 +830,9 @@ export class ExpressServer {
           const questions = await this.studyService.generateQuiz(
             topic || cards[0].topic || 'Quiz',
             desiredCount || Math.min(cards.length, 10),
-            cards
+            cards,
+            'ollama', // Default runtime
+            llmConfig
           );
 
           const quiz = {
@@ -868,7 +873,9 @@ export class ExpressServer {
           const questions = await this.studyService.generateQuiz(
             flashcards[0]?.topic || topic || 'Quiz',
             desiredCount || Math.min(flashcards.length, 10),
-            formattedCards
+            formattedCards,
+            'ollama',
+            llmConfig
           );
 
           const quiz = {
@@ -895,7 +902,10 @@ export class ExpressServer {
 
           const questions = await this.studyService.generateQuiz(
             topic,
-            numQuestions || 5
+            numQuestions || 5,
+            undefined,
+            'ollama',
+            llmConfig
           );
 
           const quiz = {
@@ -964,7 +974,9 @@ export class ExpressServer {
         const questions = await this.studyService.generateQuiz(
           flashcards[0]?.topic || 'Quiz',
           desiredCount || Math.min(flashcards.length, 10),
-          formattedCards
+          formattedCards,
+          'ollama',
+          req.body.llmConfig
         );
 
         // Create quiz object
@@ -1026,7 +1038,10 @@ export class ExpressServer {
         // Generate quiz questions using AI
         const questions = await this.studyService.generateQuiz(
           topic,
-          count || 5
+          count || 5,
+          undefined,
+          'ollama',
+          req.body.llmConfig
         );
 
         // Create quiz object
@@ -1190,7 +1205,7 @@ export class ExpressServer {
 
         // Check if we have a webContextCache on the studyService
         const cacheKey = `recommendations:${topic}`;
-        const cached = (this.studyService as any).webContextCache?.get(cacheKey);
+        const cached = await (this.studyService as any).webContextCache?.get(cacheKey);
 
         if (cached) {
           const recommendations = JSON.parse(cached);
@@ -1267,10 +1282,10 @@ export class ExpressServer {
       logger.info('[Server] Body:', JSON.stringify(req.body, null, 2));
 
       try {
-        const { previousResults, mode } = req.body;
+        const { previousResults, mode, llmConfig } = req.body;
         logger.info(`[Server] Generating advanced quiz - mode: ${mode}, topic: ${previousResults?.topic}`);
 
-        const quiz = await this.studyService.generateAdvancedQuiz(previousResults, mode);
+        const quiz = await this.studyService.generateAdvancedQuiz(previousResults, mode, llmConfig);
         logger.info(`[Server] Advanced quiz generated: ${quiz.length} questions`);
 
         res.json({ success: true, quiz });
@@ -1362,6 +1377,37 @@ export class ExpressServer {
     this.app.get('/api/flashcards', async (_req, res) => {
       // In-memory storage on client side, server returns empty
       res.json({ cards: [] });
+    });
+
+    // LLM Status - Get warmup state (no auth required for initial check)
+    this.app.get('/api/llm/status', async (_req, res) => {
+      try {
+        if (this.ollamaAdapter && typeof this.ollamaAdapter.getStatus === 'function') {
+          const status = this.ollamaAdapter.getStatus();
+          res.json({
+            available: true,
+            ...status
+          });
+        } else {
+          res.json({ available: false, isWarmedUp: false, isWarmingUp: false, model: 'unknown' });
+        }
+      } catch (error: any) {
+        res.status(500).json({ available: false, error: error.message });
+      }
+    });
+
+    // LLM Warmup - Trigger model pre-loading
+    this.app.post('/api/llm/warmup', async (_req, res) => {
+      try {
+        if (this.ollamaAdapter && typeof this.ollamaAdapter.warmup === 'function') {
+          const result = await this.ollamaAdapter.warmup();
+          res.json(result);
+        } else {
+          res.status(400).json({ success: false, error: 'Warmup not supported' });
+        }
+      } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+      }
     });
 
     // Health check
@@ -1478,7 +1524,7 @@ export class ExpressServer {
     const requestId = (req as any).requestId;
 
     try {
-      const { topic, count, mode, knowledgeSource, runtime, parentTopic } = req.body;
+      const { topic, count, mode, knowledgeSource, runtime, parentTopic, llmConfig } = req.body;
       if (!isValidGenerateBody(req.body)) {
         return sendError(res, 400, 'topic is required', {
           requestId,
@@ -1496,7 +1542,8 @@ export class ExpressServer {
           knowledgeSource
         );
 
-        if (cachedResult) {
+        // Only use cache if NO custom LLM config is provided
+        if (cachedResult && !llmConfig) {
           return res.json({
             success: true,
             cached: true,
@@ -1506,7 +1553,7 @@ export class ExpressServer {
       }
 
       // Check Supabase persistent store
-      if (this.supabaseService && this.supabaseService.isAvailable()) {
+      if (this.supabaseService && this.supabaseService.isAvailable() && !llmConfig) {
         try {
           const { data } = await this.supabaseService.getFlashcardsByTopic(topic, desiredCount);
           if (data && Array.isArray(data) && data.length > 0) {
@@ -1532,8 +1579,8 @@ export class ExpressServer {
 
       let jobId: string | null = null;
 
-      // If queue is available, try to offload to background job
-      if (this.queueService && this.queueAvailable) {
+      // If queue is available, try to offload to background job (skip if custom config)
+      if (this.queueService && this.queueAvailable && !llmConfig) {
         try {
           jobId = await this.queueService.addGenerateJob({
             topic,
@@ -1561,7 +1608,8 @@ export class ExpressServer {
         mode,
         knowledgeSource || 'ai-web',
         runtime || 'ollama',
-        parentTopic
+        parentTopic,
+        llmConfig
       );
 
       // Persist to Supabase (best-effort)
