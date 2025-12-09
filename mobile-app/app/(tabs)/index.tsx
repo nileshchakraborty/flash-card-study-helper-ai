@@ -80,6 +80,7 @@ export default function DashboardScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
               <Text className="text-gray-400 text-lg mb-2">No decks found</Text>
+              <Text className="text-gray-500 mt-2 text-center">&quot;Don&apos;t watch the clock; do what it does. Keep going.&quot;</Text>
               <Text className="text-gray-400 text-center px-10">
                 Go to the "Create" tab to generate your first flashcard deck!
               </Text>

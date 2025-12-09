@@ -30,7 +30,7 @@ const logger = new LoggerService();
 
 // 2. Initialize Persistence Layer Variables
 const isVercelDeployment = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
-const useLocalDb = process.env.USE_LOCAL_DB === 'true' || process.env.USE_SQLITE === 'true';
+const useLocalDb = true; // process.env.USE_LOCAL_DB === 'true' || process.env.USE_SQLITE === 'true';
 const useLocalVector = process.env.USE_LOCAL_VECTOR === 'true';
 
 let redisService: RedisService | undefined = undefined; // Changed from null to undefined for optional param compat
