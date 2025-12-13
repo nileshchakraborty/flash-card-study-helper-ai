@@ -7,131 +7,111 @@
 
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web Frontend]
-        MOBILE[Mobile App<br/>React Native]
+    subgraph "Clients"
+        WEB[Web Frontend<br/>Reference SPA]
+        MOBILE[Mobile App<br/>Expo / React Native]
     end
 
     subgraph "API Gateway"
         EXPRESS[Express Server<br/>:3000]
-        GQL[GraphQL<br/>/graphql]
+        GQL[GraphQL API<br/>/graphql]
         REST[REST API<br/>/api/*]
     end
 
-    subgraph "Middleware Layer"
-        AUTH[Auth Middleware<br/>JWE Tokens]
-        RATE[Rate Limiter]
-        CORS[CORS Handler]
+    subgraph "Core Domain"
+        STUDY[Study Service]
+        QUIZ[Quiz Service]
+        AUTH[Auth Service]
     end
 
-    subgraph "Service Layer"
-        STUDY[StudyService]
-        QUIZ[QuizService]
-        AUTH_SVC[AuthService<br/>Singleton]
-        METRICS[MetricsService]
+    subgraph "Infrastructure"
+        QUEUE[BullMQ Queue]
+        CACHE[Flashcard Cache]
+        DB[(Local/Supabase DB)]
+        VECTOR[(Vector Store)]
     end
 
-    subgraph "Queue System"
-        BULL[BullMQ (Redis)<br/>or In-Memory Fallback]
-        WORKER[Queue Worker]
-        CACHE_SVC[FlashcardCache]
+    subgraph "AI & External Adapters"
+        HYBRID[Hybrid AI Adapter]
+        MCP_CLIENT[MCP Client]
+        SERPER[Serper Adapter]
     end
 
-    subgraph "Adapter Layer"
-        HYBRID_OLLAMA[HybridOllamaAdapter]
-        HYBRID_SERPER[HybridSerperAdapter]
-        WEBLLM[WebLLMAdapter]
+    subgraph "External Systems"
+        OLLAMA[Ollama (Local)]
+        WEBLLM[WebLLM (Browser)]
+        SERPER_API[Serper.dev]
+        MCP_SERVER[MCP Server]
     end
 
-    subgraph "MCP Integration"
-        MCP_CLIENT[MCPClientWrapper<br/>Circuit Breaker]
-        MCP_SERVER[MCP Server<br/>stdio]
-    end
-
-    subgraph "MCP Tools"
-        OLLAMA_TOOL[Ollama Tool]
-        STORAGE_TOOL[Storage Tool]
-        DB_TOOL[Database Tool]
-        SEARCH_TOOL[Search Tool]
-    end
-
-    subgraph "External Services"
-        OLLAMA[Ollama<br/>:11434]
-        SERPER[Serper API]
-    end
-
-    subgraph "Storage Layer"
-        FS[File System<br/>.data/]
-        VECTOR[Vector Store<br/>In-Memory]
-    end
-
-    subgraph "Future: LangGraph"
-        GRAPH[FlashcardGenerationGraph<br/>Resilience Layer]
-    end
-
-    %% Client connections
+    %% Wiring
     WEB --> EXPRESS
     MOBILE --> EXPRESS
     
-    %% API Gateway
-    EXPRESS --> GQL
     EXPRESS --> REST
+    EXPRESS --> GQL
     
-    %% Middleware flow
     REST --> AUTH
-    REST --> RATE
-    REST --> CORS
     GQL --> AUTH
-    
-    %% Service connections
     AUTH --> STUDY
     AUTH --> QUIZ
-    STUDY --> BULL
-    QUIZ --- STUDY
-    
-    %% Queue processing
-    BULL --> WORKER
-    WORKER --> GRAPH
-    WORKER --> STUDY
-    STUDY --> CACHE_SVC
-    
-    %% Adapter routing
-    STUDY --> HYBRID_OLLAMA
-    STUDY --> HYBRID_SERPER
-    STUDY --> WEBLLM
-    
-    %% MCP routing
-    HYBRID_OLLAMA --> MCP_CLIENT
-    HYBRID_SERPER --> MCP_CLIENT
-    HYBRID_OLLAMA -.Fallback.-> OLLAMA
-    HYBRID_SERPER -.Fallback.-> SERPER
-    
-    %% MCP tools
-    MCP_CLIENT <--> MCP_SERVER
-    MCP_SERVER --> OLLAMA_TOOL
-    MCP_SERVER --> STORAGE_TOOL
-    MCP_SERVER --> DB_TOOL
-    MCP_SERVER --> SEARCH_TOOL
-    
-    %% External services
-    OLLAMA_TOOL --> OLLAMA
-    SEARCH_TOOL --> SERPER
-    STORAGE_TOOL --> FS
-    DB_TOOL --> FS
-    
-    %% Metrics
-    STUDY --> METRICS
-    HYBRID_OLLAMA --> METRICS
-    
-    %% Storage
-    CACHE_SVC --> VECTOR
-    AUTH_SVC -.Config.-> FS
 
-    style MCP_CLIENT fill:#e1f5ff
-    style MCP_SERVER fill:#e1f5ff
-    style GRAPH fill:#fff3cd
-    style AUTH fill:#d4edda
-    style BULL fill:#f8d7da
+    STUDY --> QUEUE
+    STUDY --> CACHE
+    STUDY --> DB
+    STUDY --> VECTOR
+
+    %% Async Flow
+    QUEUE --> STUDY
+
+    %% AI Integration
+    STUDY --> HYBRID
+    HYBRID -->|Primary| OLLAMA
+    HYBRID -->|Client Edge| WEBLLM
+    HYBRID -->|Tools| MCP_CLIENT
+    
+    MCP_CLIENT --> MCP_SERVER
+    MCP_SERVER --> OLLAMA
+    MCP_SERVER --> SERPER_API
+
+    SERPER --> SERPER_API
+```
+
+## Mobile App Architecture
+
+```mermaid
+graph TD
+    subgraph "Expo / React Native App"
+        APP[App Entry<br/>app/_layout.tsx]
+        
+        subgraph "Routing (Expo Router)"
+            TABS[(tabs)]
+            AUTH[auth/]
+            QUIZ[quiz/]
+            MODAL[modal.tsx]
+        end
+
+        subgraph "State Management"
+            CTX_AUTH[AuthContext]
+            CTX_THEME[ThemeContext]
+            HOOKS[Custom Hooks]
+        end
+
+        subgraph "Services"
+            API[API Client]
+            WEBLLM_BRIDGE[WebLLM Bridge]
+            STORAGE[AsyncStorage]
+        end
+    end
+
+    APP --> TABS
+    APP --> AUTH
+    
+    TABS --> CTX_AUTH
+    QUIZ --> WEBLLM_BRIDGE
+    
+    HOOKS --> API
+    CTX_AUTH --> STORAGE
 ```
 
 ## Request Flow
@@ -294,10 +274,17 @@ graph LR
 - **LangGraph**: Workflow orchestration
 - **Web Search**: Serper API
 
-### Frontend
+### Mobile App (New)
+- **Framework**: React Native with Expo
+- **Routing**: Expo Router (File-based routing like Next.js)
+- **Styling**: NativeWind (Tailwind CSS for Native)
+- **State**: React Hooks + Context
+- **AI**: WebLLM Bridge (runs local LLM in WebView)
+
+### Frontend (Reference SPA)
 - **Build**: esbuild
 - **Framework**: Vanilla JS + TypeScript
-- **Mobile**: React Native (Expo)
+- **State**: Event-driven Controller pattern
 
 ## Deployment Architecture
 

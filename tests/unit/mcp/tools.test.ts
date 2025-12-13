@@ -30,7 +30,7 @@ describe('MCP Tools', () => {
                 ]
             };
 
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as jest.Mock<() => Promise<any>>).mockResolvedValue({
                 ok: true,
                 json: async () => mockResponse
             });
@@ -67,7 +67,7 @@ describe('MCP Tools', () => {
                 ])
             };
 
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as jest.Mock<() => Promise<any>>).mockResolvedValue({
                 ok: true,
                 json: async () => mockOllamaResponse
             });
@@ -92,7 +92,7 @@ describe('MCP Tools', () => {
                 response: "Here is the JSON: ```json\n[{ \"question\": \"Q\", \"answer\": \"A\" }]\n```"
             };
 
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as jest.Mock<() => Promise<any>>).mockResolvedValue({
                 ok: true,
                 json: async () => mockOllamaResponse
             });
@@ -114,7 +114,7 @@ describe('MCP Tools', () => {
                 done: true
             };
 
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as jest.Mock<() => Promise<any>>).mockResolvedValue({
                 ok: true,
                 json: async () => mockOllamaResponse
             });
@@ -144,7 +144,7 @@ describe('MCP Tools', () => {
                 ]
             };
 
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as jest.Mock<() => Promise<any>>).mockResolvedValue({
                 ok: true,
                 json: async () => mockResponse
             });
