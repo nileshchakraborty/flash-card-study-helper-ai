@@ -16,28 +16,28 @@ This project implements a **Clean Architecture** API that leverages LLMs (WebLLM
 ```mermaid
 graph TB
     subgraph "Clients"
-        WEB["Web Frontend<br/>(Reference SPA)"]
-        MOBILE["Mobile App<br/>(Expo/React Native)"]
+        WEB[Web Frontend<br/>(Reference SPA)]
+        MOBILE[Mobile App<br/>(Expo/React Native)]
     end
 
     subgraph "API Gateway"
-        EXPRESS["Express Server<br/>:3000"]
-        GQL["GraphQL API<br/>/graphql"]
-        REST["REST API<br/>/api/*"]
+        EXPRESS[Express Server<br/>:3000]
+        GQL[GraphQL API<br/>/graphql]
+        REST[REST API<br/>/api/*]
     end
 
     subgraph "Core Services"
-        STUDY["Study Service"]
-        QUEUE["BullMQ Queue"]
-        CACHE["Redis Cache"]
+        STUDY[Study Service]
+        QUEUE[BullMQ Queue]
+        CACHE[Redis Cache]
     end
 
     subgraph "AI Layer"
-        HYBRID["Hybrid AI Adapter"]
-        OLLAMA["Ollama (Local)"]
-        WEBLLM["WebLLM (Browser)"]
-        SERPER["Serper (Web Search)"]
-        MCP["MCP Server (Optional)"]
+        HYBRID[Hybrid AI Adapter]
+        OLLAMA[Ollama (Local)]
+        WEBLLM[WebLLM (Browser)]
+        SERPER[Serper (Web Search)]
+        MCP[MCP Server (Optional)]
     end
 
     %% Client Connections
