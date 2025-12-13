@@ -14,24 +14,57 @@ This project implements a **Clean Architecture** API that leverages LLMs (WebLLM
 ### Current Architecture Snapshot
 
 ```mermaid
-flowchart TD
-  UI["SPA"] -->|events| AppController
-  AppController --> QuizHandlers
-  AppController --> GeneratorView
-  AppController --> StudyView
-  AppController --> QuizView
+graph TB
+    subgraph "Clients"
+        WEB[Web Frontend<br/>(Reference SPA)]
+        MOBILE[Mobile App<br/>(Expo/React Native)]
+    end
 
-  AppController -->|REST or GraphQL| API["Express Server"]
-  API --> StudyService
-  StudyService -->|AI adapters quality gate| WebLLM["WebLLM runtime"]
-  StudyService -->|fallback validation| Ollama["Ollama API"]
-  StudyService --> Serper["Serper / Web search"]
-  StudyService --> FlashcardStorage["FlashcardStorageService"]
-  StudyService --> QuizStorage["QuizStorageService"]
-  StudyService --> Queue["BullMQ Queue"]
-  API --> Upload["File Upload -> processFile"]
-  Upload --> FlashcardStorage
-  GeneratorView -->|llmOrchestrator| WebLLM
+    subgraph "API Gateway"
+        EXPRESS[Express Server<br/>:3000]
+        GQL[GraphQL API<br/>/graphql]
+        REST[REST API<br/>/api/*]
+    end
+
+    subgraph "Core Services"
+        STUDY[Study Service]
+        QUEUE[BullMQ Queue]
+        CACHE[Redis Cache]
+    end
+
+    subgraph "AI Layer"
+        HYBRID[Hybrid AI Adapter]
+        OLLAMA[Ollama (Local)]
+        WEBLLM[WebLLM (Browser)]
+        SERPER[Serper (Web Search)]
+        MCP[MCP Server (Optional)]
+    end
+
+    %% Client Connections
+    WEB --> REST
+    WEB --> GQL
+    MOBILE --> REST
+    MOBILE --> GQL
+
+    %% API to Services
+    EXPRESS --> REST
+    EXPRESS --> GQL
+    REST --> STUDY
+    GQL --> STUDY
+
+    %% Service Logic
+    STUDY --> QUEUE
+    STUDY --> CACHE
+    STUDY --> HYBRID
+
+    %% AI Routing
+    HYBRID -->|Preferred| OLLAMA
+    HYBRID -->|Client-side| WEBLLM
+    HYBRID -->|Context| SERPER
+    HYBRID -.->|Tools| MCP
+    
+    %% Queue Processing
+    QUEUE --> STUDY
 ```
 
 ## Type Safety & Code Quality
