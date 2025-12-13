@@ -16,11 +16,19 @@ export class BaseView {
   }
   
   show(element: HTMLElement | null): void {
-    if (element) element.classList.remove('hidden');
+    if (element) {
+      element.classList.remove('hidden');
+      (element as HTMLElement).style.pointerEvents = 'auto';
+      (element as HTMLElement).style.display = '';
+    }
   }
 
   hide(element: HTMLElement | null): void {
-    if (element) element.classList.add('hidden');
+    if (element) {
+      element.classList.add('hidden');
+      (element as HTMLElement).style.pointerEvents = 'none';
+      (element as HTMLElement).style.display = 'none';
+    }
   }
 
   setText(selector: string, text: string): void {

@@ -185,7 +185,50 @@ Poll job status and retrieve results.
 }
 ```
 
+
 ---
+
+#### `POST /api/generate/from-content`
+
+Generate flashcards directly from provided text content or URLs.
+
+**Authentication**: Required  
+**Rate Limit**: 100 requests/15 minutes
+
+**Request Body**:
+```json
+{
+  "type": "text",
+  "content": "Raw text content to generate from...",
+  "topic": "My Topic"
+}
+```
+OR
+```json
+{
+  "type": "url",
+  "content": ["https://example.com/article"],
+  "topic": "Article Topic"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "cards": [
+    {
+      "id": "gen-...",
+      "front": "...",
+      "back": "...",
+      "topic": "..."
+    }
+  ]
+}
+```
+
+---
+
 
 ### Quiz Generation
 

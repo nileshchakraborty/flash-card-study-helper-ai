@@ -3,19 +3,16 @@ import { QueueService } from '../../src/core/services/QueueService.js';
 import type { PubSub } from 'graphql-subscriptions';
 
 // Mock the job.resolvers module to capture pubsub calls
-let mockPubsubPublish: jest.Mock;
-let mockPubsub: PubSub;
+const mockPubsubPublish = jest.fn() as jest.Mock<(...args: any[]) => Promise<void>>;
+const mockPubsub = {
+    publish: mockPubsubPublish,
+    subscribe: jest.fn(),
+    unsubscribe: jest.fn(),
+    asyncIterator: jest.fn(),
+    asyncIterableIterator: jest.fn()
+} as unknown as PubSub;
 
 jest.unstable_mockModule('../../src/graphql/resolvers/job.resolvers.js', () => {
-    mockPubsubPublish = jest.fn();
-    mockPubsub = {
-        publish: mockPubsubPublish,
-        subscribe: jest.fn(),
-        unsubscribe: jest.fn(),
-        asyncIterator: jest.fn(),
-        asyncIterableIterator: jest.fn()
-    } as any;
-
     return {
         pubsub: mockPubsub
     };
@@ -25,16 +22,18 @@ const SKIP_SANDBOX = true;
 
 (SKIP_SANDBOX ? describe.skip : describe)('QueueService PubSub Integration', () => {
     let queueService: QueueService;
-    let mockProcessor: jest.Mock;
+    let mockProcessor: jest.Mock<(...args: any[]) => Promise<any>>;
+    let worker: any;
 
     beforeEach(async () => {
-        mockPubsubPublish.mockClear();
+        mockPubsubPublish.mockReset();
+        mockPubsubPublish.mockResolvedValue(undefined);
 
         // Create queue service instance
         queueService = new QueueService();
 
         // Mock processor function
-        mockProcessor = jest.fn().mockResolvedValue({
+        mockProcessor = jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({
             cards: [{ front: 'Test', back: 'Answer' }],
             recommendedTopics: ['Topic 1']
         });
@@ -42,15 +41,15 @@ const SKIP_SANDBOX = true;
 
     afterEach(async () => {
         // Cleanup: close worker and queue connections
-        await queueService['worker']?.close();
-        await queueService['queue']?.close();
-        await queueService['connection']?.quit();
+        await worker?.close();
+        await (queueService as any)['generateQueue']?.close();
+        await (queueService as any)['connection']?.quit();
     });
 
     describe('Job Completion Events', () => {
         it('should publish JOB_UPDATED event when job completes successfully', async () => {
             // Initialize worker with mock processor
-            queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
             // Add a job
             const jobId = await queueService.addGenerateJob({
@@ -83,7 +82,7 @@ const SKIP_SANDBOX = true;
             };
 
             mockProcessor.mockResolvedValue(expectedResult);
-            queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
             const jobId = await queueService.addGenerateJob({
                 topic: 'Advanced Topic',
@@ -111,6 +110,7 @@ const SKIP_SANDBOX = true;
             mockProcessor.mockRejectedValue(new Error(errorMessage));
 
             queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
             const jobId = await queueService.addGenerateJob({
                 topic: 'Failing Topic',
@@ -135,9 +135,9 @@ const SKIP_SANDBOX = true;
 
         it('should handle pubsub publish errors gracefully', async () => {
             mockPubsubPublish.mockRejectedValue(new Error('Pubsub error'));
-            queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
-            const jobId = await queueService.addGenerateJob({
+            await queueService.addGenerateJob({
                 topic: 'Test',
                 count: 5,
                 mode: 'standard',
@@ -166,7 +166,7 @@ const SKIP_SANDBOX = true;
                 };
             });
 
-            queueService.initWorker(progressProcessor);
+            worker = queueService.initWorker(progressProcessor);
 
             const jobId = await queueService.addGenerateJob({
                 topic: 'Progress Test',
@@ -179,7 +179,7 @@ const SKIP_SANDBOX = true;
 
             // Should have published progress updates
             const progressCalls = mockPubsubPublish.mock.calls.filter(
-                call => call[0] === `JOB_UPDATED_${jobId}` &&
+                (call: any) => call[0] === `JOB_UPDATED_${jobId}` &&
                     call[1].jobUpdated.progress < 100
             );
 
@@ -189,7 +189,7 @@ const SKIP_SANDBOX = true;
 
     describe('Event Channel Naming', () => {
         it('should use correct channel format JOB_UPDATED_{jobId}', async () => {
-            queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
             const jobId = await queueService.addGenerateJob({
                 topic: 'Channel Test',
@@ -205,7 +205,7 @@ const SKIP_SANDBOX = true;
         });
 
         it('should not pollute other job channels', async () => {
-            queueService.initWorker(mockProcessor);
+            worker = queueService.initWorker(mockProcessor);
 
             const jobId1 = await queueService.addGenerateJob({
                 topic: 'Job 1',
@@ -235,10 +235,10 @@ const SKIP_SANDBOX = true;
             expect(job2Calls.length).toBeGreaterThan(0);
 
             // Each call should only reference its own job ID
-            job1Calls.forEach(call => {
+            job1Calls.forEach((call: any) => {
                 expect(call[1].jobUpdated.id).toBe(jobId1);
             });
-            job2Calls.forEach(call => {
+            job2Calls.forEach((call: any) => {
                 expect(call[1].jobUpdated.id).toBe(jobId2);
             });
         });

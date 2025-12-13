@@ -1,7 +1,7 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { GeneratorView } from '../../public/js/views/generator.view.js';
 import { apiService } from '../../public/js/services/api.service.js';
-import { eventBus } from '../../public/js/utils/event-bus.js';
+// import { eventBus } from '../../public/js/utils/event-bus.js';
 
 // Mock dependencies
 // apiService is mocked via jest.config.cjs
@@ -51,9 +51,9 @@ describe('GeneratorView Integration', () => {
         // Mock LLM Orchestrator on window
         mockOrchestrator = {
             isModelLoaded: jest.fn().mockReturnValue(true),
-            generate: jest.fn().mockResolvedValue('[{"question": "Q1", "answer": "A1"}]'),
+            generate: jest.fn<() => Promise<string>>().mockResolvedValue('[{"question": "Q1", "answer": "A1"}]'),
             getRecommendedStrategy: jest.fn().mockReturnValue({ config: {} }),
-            loadModel: jest.fn().mockResolvedValue(undefined)
+            loadModel: jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
         };
         (window as any).llmOrchestrator = mockOrchestrator;
 

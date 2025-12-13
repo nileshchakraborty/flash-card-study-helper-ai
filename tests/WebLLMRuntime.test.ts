@@ -42,7 +42,7 @@ describe('WebLLMRuntime', () => {
         await runtime.initialize(config);
 
         // Get the mock instance to configure return value if needed
-        const mockEngineInstance = (webllm.MLCEngine as unknown as jest.Mock).mock.results[0].value as any;
+        const mockEngineInstance = (webllm.MLCEngine as unknown as jest.Mock).mock.results[0]?.value as any;
         mockEngineInstance.chat.completions.create.mockResolvedValue({
             choices: [{ message: { content: 'Mock response' } }]
         });

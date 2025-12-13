@@ -6,7 +6,7 @@ export class RemoteRuntime implements LLMRuntime {
     isReady = false;
     onProgress?: (progress: number, message: string) => void;
 
-    async initialize(config: ModelConfig): Promise<void> {
+    async initialize(_config: ModelConfig): Promise<void> {
         // Remote runtime is always "ready" instantly, no download needed
         this.isReady = true;
         if (this.onProgress) {
@@ -14,7 +14,7 @@ export class RemoteRuntime implements LLMRuntime {
         }
     }
 
-    async generate(prompt: string, options?: GenerationOptions): Promise<string> {
+    async generate(prompt: string, _options?: GenerationOptions): Promise<string> {
         // In a real app, this would call your backend API which proxies to OpenAI/Anthropic/etc.
         // For this demo, we'll simulate a network call or call a mock endpoint.
 

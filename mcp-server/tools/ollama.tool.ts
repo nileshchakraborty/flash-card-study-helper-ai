@@ -7,7 +7,7 @@ const OllamaInputSchema = z.object({
     max_tokens: z.number().optional().describe('Maximum tokens to generate'),
 });
 
-type OllamaInput = z.infer<typeof OllamaInputSchema>;
+// type OllamaInput = z.infer<typeof OllamaInputSchema>;
 
 export const ollamaTool = {
     name: 'generate_with_ollama',

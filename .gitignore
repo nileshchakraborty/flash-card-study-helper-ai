@@ -6,7 +6,6 @@ cache/
 .env
 dist/
 build/
-.env
 .idea/
 .metrics/
 .vercel
@@ -16,3 +15,8 @@ coverage/*
 coverage/*/*
 test_output.txt
 dump.rdb
+integration_failure.txt
+test_error.out
+playwright-report/
+test-results/
+logs/

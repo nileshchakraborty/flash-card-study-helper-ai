@@ -1,4 +1,4 @@
-import { jest, beforeAll, afterAll, afterEach, describe, it, expect } from '@jest/globals';
+import { jest, beforeAll, afterEach, describe, it, expect } from '@jest/globals';
 import { ExpressServer } from '../../src/adapters/primary/express/server.js';
 import { AuthService } from '../../src/core/services/AuthService.js';
 import { FlashcardCacheService } from '../../src/core/services/FlashcardCacheService.js';

@@ -47,4 +47,14 @@ export class FileSystemAdapter implements StoragePort {
       return []; // Return empty array instead of crashing
     }
   }
+
+  async getDeck(id: string): Promise<Deck | null> {
+    try {
+      const deck = this.deckHistory.find(d => d.id === id);
+      return deck || null;
+    } catch (error) {
+      console.warn('[FileSystemAdapter] Failed to get deck:', error);
+      return null;
+    }
+  }
 }

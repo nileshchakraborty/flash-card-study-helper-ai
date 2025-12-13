@@ -3,12 +3,14 @@ import { BaseView } from './base.view.js';
 import { eventBus } from '../utils/event-bus.js';
 import { quizModel } from '../models/quiz.model.js';
 import { apiService } from '../services/api.service.js';
+import { showLoading, hideLoading, setLoadingText } from '../utils/loading.util.js';
 
 export class QuizView extends BaseView {
   constructor() {
     super();
     this.elements = {
-      setup: document.getElementById('quiz-setup'),
+      // Use the guide container inside the quiz tab as the "setup" element
+      setup: document.getElementById('quiz-setup-guide'),
       questions: document.getElementById('quiz-questions'),
       results: document.getElementById('quiz-results'),
       historySection: document.getElementById('quiz-history-section'),
@@ -66,6 +68,7 @@ export class QuizView extends BaseView {
   init() {
     this.bindEvents();
     this.loadHistory();
+    this.showSetupState();
 
     eventBus.on('quiz:started', (question) => {
       this.showQuestionUI();
@@ -73,10 +76,18 @@ export class QuizView extends BaseView {
     });
 
     eventBus.on('quiz:question-changed', (question) => {
+      // Timer update handled by model tick, but we might want to reset styling
+      const timerDisplay = document.getElementById('quiz-timer-display');
+      if (timerDisplay) {
+        timerDisplay.classList.remove('text-red-600', 'bg-red-50', 'animate-pulse');
+        timerDisplay.classList.add('text-gray-600', 'bg-gray-100');
+      }
       this.renderQuestion(question);
     });
 
     eventBus.on('quiz:completed', (result) => {
+      const timerDisplay = document.getElementById('quiz-timer-display');
+      if (timerDisplay) timerDisplay.classList.add('hidden');
       this.showResultsUI(result);
       this.showPopup(result);
     });
@@ -88,6 +99,80 @@ export class QuizView extends BaseView {
     eventBus.on('quiz:available-updated', (quizzes) => {
       this.renderAvailableQuizzes(quizzes);
     });
+
+    eventBus.on('quiz:timer-tick', (remainingTime) => {
+      this.updateTimerDisplay(remainingTime);
+      const timerDisplay = document.getElementById('quiz-timer-display');
+      if (timerDisplay && quizModel.timeLimit > 0) {
+        timerDisplay.classList.remove('hidden');
+        timerDisplay.classList.add('flex');
+      }
+    });
+
+    // If user lands on Quiz tab with no data, bootstrap sample quiz
+    setTimeout(() => this.maybeAutoStartSample(), 400);
+  }
+
+  showSetupState() {
+    // Default state when no quiz has started yet
+    this.hide(this.elements.questions);
+    this.hide(this.elements.results);
+    this.show(this.elements.setup);
+
+    // Inject a friendly guide card once
+    const guide = document.getElementById('quiz-setup-guide');
+    if (guide) {
+      guide.innerHTML = `
+        <div class="bg-white/80 border border-indigo-100 rounded-2xl p-6 shadow-md">
+          <div class="flex items-start gap-3">
+            <div class="bg-indigo-100 text-indigo-700 w-10 h-10 rounded-xl flex items-center justify-center font-semibold">?</div>
+            <div class="flex-1">
+              <p class="text-sm text-indigo-700 font-semibold mb-1">How to use Create Quiz</p>
+              <ol class="list-decimal list-inside text-gray-700 text-sm space-y-1">
+                <li>Click <strong>Create Quiz</strong> to generate questions from your flashcards or a new topic.</li>
+                <li>Select a topic or pick flashcards, then choose the number of questions and timer.</li>
+                <li>Hit <strong>Start Quiz</strong> — we’ll build the quiz and track your score.</li>
+              </ol>
+              <div class="mt-3 text-sm text-gray-600">
+                Dummy question: <em>“How do I start a quiz?”</em><br/>
+                Dummy answer: <strong>“Open Create Quiz, pick a topic or your flashcards, and press Start Quiz.”</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  updateTimerDisplay(remainingTime: number) {
+    const timerDisplay = document.getElementById('quiz-timer-display');
+    if (!timerDisplay) return;
+
+    if (remainingTime > 0) {
+      timerDisplay.classList.remove('hidden');
+      timerDisplay.classList.add('flex'); // Ensure flex for icon+text
+      (timerDisplay as HTMLElement).style.display = 'flex';
+      const min = Math.floor(remainingTime / 60);
+      const sec = remainingTime % 60;
+      const timeStr = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+
+      const timeSpan = timerDisplay.querySelector('.time-left');
+      if (timeSpan) timeSpan.textContent = timeStr;
+
+      // Color indication
+      if (remainingTime <= 10) {
+        timerDisplay.classList.add('text-red-600', 'bg-red-50');
+        timerDisplay.classList.remove('text-gray-600', 'bg-gray-100');
+        timerDisplay.classList.add('animate-pulse');
+      } else {
+        timerDisplay.classList.remove('text-red-600', 'bg-red-50', 'animate-pulse');
+        timerDisplay.classList.add('text-gray-600', 'bg-gray-100');
+      }
+    } else {
+      timerDisplay.classList.add('hidden');
+      timerDisplay.classList.remove('flex');
+      (timerDisplay as HTMLElement).style.display = 'none';
+    }
   }
 
   // NEW METHODS FOR ENHANCED QUIZ SYSTEM
@@ -162,16 +247,19 @@ export class QuizView extends BaseView {
 
     if (!quizzes || quizzes.length === 0) {
       this.elements.availableQuizzesList.innerHTML = `
-        <div class="text-gray-500 text-sm italic flex items-center justify-between">
-          <span>No quizzes created yet.</span>
-          <button class="text-indigo-600 hover:text-indigo-800 font-semibold" id="available-create-btn">Create Quiz</button>
+        <div class="space-y-4">
+          <div class="text-gray-600 text-sm flex items-center justify-between">
+            <span>Try a sample quiz to learn how it works.</span>
+            <button class="text-indigo-600 hover:text-indigo-800 font-semibold" id="start-sample-quiz">Start Sample Quiz</button>
+          </div>
+          <div class="bg-white/80 border border-indigo-100 rounded-2xl p-4 shadow-sm">
+            <div class="font-semibold text-gray-900 mb-2">Sample: Getting Started</div>
+            <div class="text-sm text-gray-600">3 quick questions about how to use Create Quiz.</div>
+          </div>
         </div>
       `;
-      const btn = document.getElementById('available-create-btn');
-      if (btn) btn.addEventListener('click', () => {
-        const tabBtn = document.querySelector('[data-tab="create-quiz"]') as HTMLElement;
-        tabBtn?.click();
-      });
+      const startSample = document.getElementById('start-sample-quiz');
+      if (startSample) startSample.addEventListener('click', () => this.startSampleQuiz());
       return;
     }
 
@@ -208,6 +296,62 @@ export class QuizView extends BaseView {
       if (!quizId) return;
       eventBus.emit('quiz:start-prefetched', { quizId });
     };
+  }
+
+  startSampleQuiz() {
+    const sampleQuestions = [
+      {
+        id: 'sample-1',
+        question: 'How do you create a quiz from your flashcards?',
+        options: [
+          'Click Create Quiz, choose “From Flashcards”, select cards, then Start Quiz.',
+          'Wait on the Study tab and it will auto-generate.',
+          'Press the Logout button.'
+        ],
+        correctAnswer: 'Click Create Quiz, choose “From Flashcards”, select cards, then Start Quiz.'
+      },
+      {
+        id: 'sample-2',
+        question: 'Where do you set the number of questions and timer?',
+        options: [
+          'In the Create Quiz form before starting.',
+          'On the Settings page only.',
+          'It is fixed and cannot be changed.'
+        ],
+        correctAnswer: 'In the Create Quiz form before starting.'
+      },
+      {
+        id: 'sample-3',
+        question: 'What happens after you finish a quiz?',
+        options: [
+          'Results show your score and are saved for history.',
+          'All flashcards are deleted.',
+          'The app logs you out.'
+        ],
+        correctAnswer: 'Results show your score and are saved for history.'
+      }
+    ];
+
+    quizModel.startQuiz(sampleQuestions, 'standard', 'Sample Quiz');
+    this.showQuestionUI();
+    this.renderQuestion(sampleQuestions[0]);
+
+    // Ensure the Quiz tab is visible when the sample starts
+    const quizTabBtn = document.querySelector<HTMLElement>('.nav-tab[data-tab="quiz"]');
+    quizTabBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+
+  /**
+   * If quiz tab is visible and no quiz/history exists, auto-start sample quiz.
+   */
+  maybeAutoStartSample() {
+    const quizTab = document.getElementById('quiz-tab');
+    const isVisible = quizTab && !quizTab.classList.contains('hidden');
+    const hasQuestions = quizModel.questions && quizModel.questions.length > 0;
+    const hasHistory = quizModel.history && quizModel.history.length > 0;
+    if (isVisible && !hasQuestions && !hasHistory) {
+      this.startSampleQuiz();
+    }
   }
 
   /**
@@ -258,47 +402,121 @@ export class QuizView extends BaseView {
 
   bindEvents() {
     // Quiz form submission
-    const quizForm = this.elements.quizForm; // Changed from this.getElement('#quiz-form')
-    if (quizForm) {
-      this.bind(quizForm, 'submit', async (e) => {
+    if (this.elements.createQuizTopicForm) {
+      this.bind(this.elements.createQuizTopicForm, 'submit', async (e) => {
         e.preventDefault();
-        const countInput = this.getElement('#quiz-size') as HTMLInputElement;
-        const topicInput = this.getElement('#quiz-topic-input') as HTMLInputElement;
-        const timerInput = this.getElement('#quiz-timer') as HTMLSelectElement;
+        const topicInput = this.getElement('#quiz-topic-input-new') as HTMLInputElement;
+        const countInput = this.getElement('#quiz-topic-count') as HTMLInputElement;
+        const timerInput = this.getElement('#quiz-topic-timer') as HTMLSelectElement;
 
         const count = parseInt(countInput?.value || '5');
         const topic = topicInput?.value || 'General';
-        const timer = parseInt(timerInput?.value || '0');
+        const perQuestionSeconds = parseInt(timerInput?.value || '0');
+        const timer = perQuestionSeconds > 0 ? perQuestionSeconds * count : 0; // total quiz time
 
-        // Store timer setting
         (window as any).quizTimer = timer;
-
         eventBus.emit('quiz:request-start', { count, topic, timer });
       });
     }
 
-    // Quiz from cards button
-    const quizFromCardsBtn = this.getElement('#quiz-from-cards');
-    if (quizFromCardsBtn) {
-      this.bind(quizFromCardsBtn, 'click', () => {
-        // Hide web options, show form
-        if (this.elements.webOptions) {
-          this.elements.webOptions.classList.add('hidden');
-        }
-        const topicInput = this.getElement('#quiz-topic-input') as HTMLInputElement;
-        if (topicInput) {
-          topicInput.value = '';
-        }
-        // Import deckModel to get current topic
+    // From Flashcards Button
+    if (this.elements.fromFlashcardsBtn) {
+      this.bind(this.elements.fromFlashcardsBtn, 'click', async () => {
         import('../models/deck.model.js').then(({ deckModel }) => {
-          if (topicInput && deckModel.currentTopic) {
-            topicInput.value = deckModel.currentTopic;
+          this.currentFlashcards = deckModel.cards || [];
+          this.selectedFlashcardIds = new Set(this.currentFlashcards.map(c => c.id));
+          this.renderFlashcardSelectionModal(this.currentFlashcards, this.selectedFlashcardIds);
+        });
+      });
+    }
+
+    // Flashcard Modal Bindings
+    if (this.elements.cancelFlashcardSelection) {
+      this.bind(this.elements.cancelFlashcardSelection, 'click', () => this.hideFlashcardSelectionModal());
+    }
+    if (this.elements.closeFlashcardModal) {
+      this.bind(this.elements.closeFlashcardModal, 'click', () => this.hideFlashcardSelectionModal());
+    }
+
+    // Flashcard Selection Toggle
+    if (this.elements.flashcardList) {
+      this.bind(this.elements.flashcardList, 'click', (e) => {
+        const item = (e.target as HTMLElement).closest('.flashcard-item');
+        if (item) {
+          const id = (item as HTMLElement).dataset.flashcardId;
+          if (id) {
+            if (this.selectedFlashcardIds.has(id)) {
+              this.selectedFlashcardIds.delete(id);
+            } else {
+              this.selectedFlashcardIds.add(id);
+            }
+            this.renderFlashcardSelectionModal(this.currentFlashcards, this.selectedFlashcardIds);
+          }
+        }
+      });
+    }
+
+    // Confirm Selection
+    if (this.elements.confirmFlashcardSelection) {
+      this.bind(this.elements.confirmFlashcardSelection, 'click', () => {
+        const selectedCards = this.currentFlashcards.filter(c => this.selectedFlashcardIds.has(c.id));
+        if (selectedCards.length > 0) {
+          this.hideFlashcardSelectionModal();
+          // Start quiz with selected cards
+          import('../services/settings.service.js').then(async ({ settingsService }) => {
+            // We need to generate quiz from these cards first (or just pass them as raw questions?)
+            // AppController handles quiz:request-start usually.
+            // But here we have specific cards. 
+            // We'll mimic AppController's logic or emit a special event.
+            // For now, let's use quiz:request-start with a special payload or handle it here?
+            // AppController listens to quiz:request-start with count/topic.
+            // It also has logic for "from cards".
+
+            // Alternative: Emit custom event 'quiz:start-from-selection'
+            // But simpler: use AppController's prefetch logic or similar.
+            // Actually, looking at AppController, it handles 'quiz:request-start' and uses deckModel.cards if topic matches.
+
+            // Let's emit a new event 'quiz:start-with-cards' that AppController listens to?
+            // Or just call API here?
+
+            // Let's just do it directly here for now to ensure it works, then refactor.
+            // Actually, AppController logic is complex.
+            eventBus.emit('quiz:start-with-cards', selectedCards);
+          });
+        }
+      });
+    }
+
+    // From Topic Button - Show form
+    if (this.elements.fromTopicBtn) {
+      this.bind(this.elements.fromTopicBtn, 'click', () => {
+        this.showTopicQuizForm();
+      });
+    }
+
+    // Cancel Topic Quiz
+    if (this.elements.cancelTopicQuiz) {
+      this.bind(this.elements.cancelTopicQuiz, 'click', () => {
+        this.hideTopicQuizForm();
+      });
+    }
+
+    // From Deck Button (Direct Start)
+    const fromDeckBtn = this.getElement('#quiz-from-deck-btn');
+    if (fromDeckBtn) {
+      this.bind(fromDeckBtn, 'click', () => {
+        // Import model dynamically or assume global
+        import('../models/deck.model.js').then(({ deckModel }) => {
+          if (deckModel.cards.length > 0) {
+            eventBus.emit('quiz:request-start', { count: deckModel.cards.length, topic: deckModel.currentTopic });
+          } else {
+            alert('No cards in current deck.');
           }
         });
       });
     }
 
-    // Quiz from web button
+    // Legacy support or misc
     if (this.elements.webQuizBtn) {
       this.bind(this.elements.webQuizBtn, 'click', () => {
         if (this.elements.webOptions) {
@@ -307,15 +525,7 @@ export class QuizView extends BaseView {
       });
     }
 
-    // Legacy start button (if exists)
-    if (this.elements.startBtn) {
-      this.bind(this.elements.startBtn, 'click', async () => {
-        const countInput = this.getElement('#quiz-count') as HTMLInputElement;
-        const count = parseInt(countInput?.value || '5');
-        const topic = 'General';
-        eventBus.emit('quiz:request-start', { count, topic });
-      });
-    }
+
 
     if (this.elements.prevBtn) {
       this.bind(this.elements.prevBtn, 'click', () => quizModel.prevQuestion());
@@ -332,6 +542,14 @@ export class QuizView extends BaseView {
     if (this.elements.closePopupBtn) {
       this.bind(this.elements.closePopupBtn, 'click', () => this.hide(this.elements.popup));
     }
+
+    // Try Harder Quiz button
+    if (this.elements.btnTryHarder) {
+      this.bind(this.elements.btnTryHarder, 'click', () => {
+        this.hide(this.elements.popup);
+        eventBus.emit('quiz:requestHarder', {});
+      });
+    }
   }
 
   showQuestionUI() {
@@ -343,6 +561,23 @@ export class QuizView extends BaseView {
     // Tab switching handles visibility.
     this.hide(this.elements.results);
     this.show(this.elements.questions);
+    this.hide(this.elements.setup);
+    const guide = document.getElementById('quiz-setup-guide');
+    if (guide) guide.classList.add('hidden');
+
+    // Ensure timer visibility is synced with current quiz settings
+    const timerDisplay = document.getElementById('quiz-timer-display');
+    if (timerDisplay) {
+      if (quizModel.timeLimit > 0) {
+        timerDisplay.classList.remove('hidden');
+        timerDisplay.classList.add('flex');
+        (timerDisplay as HTMLElement).style.display = 'flex';
+      } else {
+        timerDisplay.classList.add('hidden');
+        timerDisplay.classList.remove('flex');
+        (timerDisplay as HTMLElement).style.display = 'none';
+      }
+    }
 
     console.log('[QuizView] setup classes:', this.elements.setup?.className);
     console.log('[QuizView] questions classes:', this.elements.questions?.className);
@@ -350,8 +585,19 @@ export class QuizView extends BaseView {
 
   showResultsUI(result) {
     this.hide(this.elements.setup);
+    const guide = document.getElementById('quiz-setup-guide');
+    if (guide) guide.classList.add('hidden');
     this.hide(this.elements.questions);
     this.show(this.elements.results);
+
+    // Show stats and history when results are shown
+    if (this.elements.statsSection) this.show(this.elements.statsSection);
+    if (this.elements.historySection) this.show(this.elements.historySection);
+
+    // Refresh the stats content since we just finished a quiz
+    // We can assume the model has reloaded history or we need to trigger it
+    // But renderStats is called by 'quiz:history-updated'. 
+    // Usually model.submitQuiz() triggers history reload/update.
 
     const percentage = Math.round((result.score / result.total) * 100);
     const resultsHTML = `
@@ -410,8 +656,8 @@ export class QuizView extends BaseView {
           const btn = document.createElement('button');
           const isSelected = quizModel.answers[question.id] === option;
           btn.className = `w-full text-left p-4 rounded-lg border-2 transition-all ${isSelected
-            ? 'border-primary bg-primary/10 text-primary'
-            : 'border-gray-200 hover:border-gray-300 bg-white'
+            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md'
+            : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
             }`;
           btn.textContent = option;
           btn.onclick = () => {
@@ -476,6 +722,12 @@ export class QuizView extends BaseView {
           </div>
         </div>
         <div id="history-details-${index}" class="hidden border-t border-gray-100 bg-gray-50 p-4 space-y-3">
+            <div class="flex flex-wrap gap-3 mb-2">
+              <button class="retake-quiz bg-indigo-600 text-white px-3 py-2 rounded-md shadow hover:bg-indigo-700 transition" data-history-index="${index}">
+                Retake quiz
+              </button>
+              <span class="text-xs text-gray-500">Score ${quiz.score}/${quiz.total}${quiz.timeLimit ? ` • Timed ${Math.round(quiz.timeLimit / 60)}m` : ''}</span>
+            </div>
             ${quiz.results.map((r, i) => `
                 <div class="text-sm">
                     <div class="font-medium text-gray-900 mb-1">${i + 1}. ${r.question}</div>
@@ -492,6 +744,26 @@ export class QuizView extends BaseView {
         </div>
       </div>
     `).join('');
+
+    // Wire up retake buttons
+    this.elements.historyList.querySelectorAll('.retake-quiz').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.historyIndex || '-1', 10);
+        const quiz = history[idx];
+        if (!quiz || !quiz.questions || quiz.questions.length === 0) {
+          alert('Unable to retake: questions not available.');
+          return;
+        }
+        // Start quiz with stored questions and timer
+        quizModel.startQuiz(quiz.questions, 'standard', quiz.topic, quiz.timeLimit || 0);
+        // switch to quiz tab
+        const quizTabBtn = document.querySelector('.nav-tab[data-tab="quiz"]') as HTMLElement;
+        if (quizTabBtn) quizTabBtn.click();
+        this.showQuestionUI();
+        this.renderQuestion(quizModel.getCurrentQuestion());
+      });
+    });
   }
 
   renderStats(history) {
@@ -500,7 +772,7 @@ export class QuizView extends BaseView {
       return;
     }
 
-    this.show(this.elements.statsSection);
+    // this.show(this.elements.statsSection); // Do not show automatically on load
 
     const totalQuizzes = history.length;
     const totalScore = history.reduce((acc, curr) => acc + (curr.score / curr.total), 0);
@@ -523,11 +795,15 @@ export class QuizView extends BaseView {
     if (percentage === 100) {
       message = "Perfect score! You're a master of this topic.";
       actionButtons = `
-                <button id="btn-quiz-harder" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all mb-3 flex items-center justify-center gap-2">
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
+                <button id="btn-quiz-harder" class="btn-primary w-full px-6 py-3 rounded-lg hover:shadow-lg transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">psychology</span>
                     Try Harder Questions Quiz
                 </button>
-                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
+                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
                     Retry Quiz
                 </button>
@@ -535,11 +811,15 @@ export class QuizView extends BaseView {
     } else if (percentage < 80) {
       message = "Keep practicing! Review the flashcards to improve.";
       actionButtons = `
-                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all mb-3 flex items-center justify-center gap-2">
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
+                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-indigo-600 hover:text-indigo-600 transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
                     Retry Quiz
                 </button>
-                <button id="btn-quiz-revise" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all flex items-center justify-center gap-2">
+                <button id="btn-quiz-revise" class="btn-primary w-full px-6 py-3 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">school</span>
                     Revise Flashcards
                 </button>
@@ -548,11 +828,15 @@ export class QuizView extends BaseView {
       // 80-99%
       message = "Great job! You're doing well.";
       actionButtons = `
-                <button id="btn-quiz-harder" class="w-full bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all mb-3 flex items-center justify-center gap-2">
+                <button id="btn-quiz-review" class="w-full bg-indigo-600 text-white border-2 border-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-700 hover:border-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow-lg">
+                    <span class="material-icons">visibility</span>
+                    Review Quiz
+                </button>
+                <button id="btn-quiz-harder" class="btn-primary w-full px-6 py-3 rounded-lg hover:shadow-lg transition-all mb-3 flex items-center justify-center gap-2">
                     <span class="material-icons">psychology</span>
                     Try Harder Questions Quiz
                 </button>
-                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
+                <button id="btn-quiz-retry" class="w-full bg-white text-gray-700 border-2 border-gray-200 px-6 py-3 rounded-lg hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2">
                     <span class="material-icons">refresh</span>
                     Retry Quiz
                 </button>
@@ -575,6 +859,14 @@ export class QuizView extends BaseView {
     const retryBtn = actionsContainer.querySelector('#btn-quiz-retry');
     const harderBtn = actionsContainer.querySelector('#btn-quiz-harder');
     const reviseBtn = actionsContainer.querySelector('#btn-quiz-revise');
+    const reviewBtn = actionsContainer.querySelector('#btn-quiz-review');
+
+    if (reviewBtn) {
+      reviewBtn.addEventListener('click', () => {
+        this.hide(this.elements.popup);
+        // Results UI is already shown by showResultsUI
+      });
+    }
 
     if (retryBtn) {
       retryBtn.addEventListener('click', () => {
@@ -586,7 +878,7 @@ export class QuizView extends BaseView {
     if (harderBtn) {
       harderBtn.addEventListener('click', () => {
         this.hide(this.elements.popup);
-        eventBus.emit('quiz:harder', null);
+        eventBus.emit('quiz:requestHarder', {});
       });
     }
 
@@ -605,30 +897,38 @@ export class QuizView extends BaseView {
   }
 
   showLoading() {
-    const loadingOverlay = this.getElement('#loading-overlay');
-    if (loadingOverlay) {
-      loadingOverlay.classList.remove('hidden');
+    showLoading('Preparing your quiz...', 5, {
+      title: 'Generating Quiz',
+      subtitle: 'AI is creating challenging questions based on your content...'
+    });
+    // Start simulated progress for synchronous quiz operation
+    this.startProgressSimulation();
+  }
+
+  private progressInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startProgressSimulation() {
+    let progress = 5;
+    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.progressInterval = setInterval(() => {
+      progress = Math.min(90, progress + Math.random() * 8 + 2);
+      setLoadingText('Generating questions...', progress);
+    }, 800);
+  }
+
+  private stopProgressSimulation() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
     }
-    this.updateLoadingProgress(0, 'Preparing your quiz...');
   }
 
   hideLoading() {
-    const loadingOverlay = this.getElement('#loading-overlay');
-    if (loadingOverlay) {
-      loadingOverlay.classList.add('hidden');
-    }
+    this.stopProgressSimulation();
+    hideLoading();
   }
 
   updateLoadingProgress(progress?: number, message?: string) {
-    const progressEl = document.getElementById('loading-progress');
-    const progressBar = document.getElementById('loading-progress-bar') as HTMLElement | null;
-    const parts = [];
-    if (typeof progress === 'number') {
-      const pct = Math.max(0, Math.min(100, Math.round(progress)));
-      parts.push(`Progress: ${pct}%`);
-      if (progressBar) progressBar.style.width = `${pct}%`;
-    }
-    if (message) parts.push(message);
-    if (progressEl) progressEl.textContent = parts.join(' • ') || 'Working...';
+    setLoadingText(message, progress);
   }
 }

@@ -50,7 +50,7 @@ describe('GraphQL Schema Validation', () => {
             const fields = queryType?.getFields();
 
             expect(fields?.decks).toBeDefined();
-            expect(fields?.decks.type.toString()).toContain('Deck');
+            expect(fields?.decks!.type.toString()).toContain('Deck');
         });
 
         it('should have deck query field', () => {
@@ -65,7 +65,7 @@ describe('GraphQL Schema Validation', () => {
             const fields = queryType?.getFields();
 
             expect(fields?.job).toBeDefined();
-            expect(fields?.job.type.toString()).toContain('Job');
+            expect(fields?.job!.type.toString()).toContain('Job');
         });
 
         it('should have quizHistory query field', () => {
@@ -112,7 +112,7 @@ describe('GraphQL Schema Validation', () => {
             const fields = subscriptionType?.getFields();
 
             expect(fields?.jobUpdated).toBeDefined();
-            expect(fields?.jobUpdated.type.toString()).toContain('Job');
+            expect(fields?.jobUpdated!.type.toString()).toContain('Job');
         });
     });
 
